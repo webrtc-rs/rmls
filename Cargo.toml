@@ -4,7 +4,10 @@ version = "0.0.0"
 edition = "2021"
 authors = ["Rusty Rain <y@liu.mx>"]
 description = "MLS in Rust"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/rmls"
+homepage = "https://rmls.io"
 repository = "https://github.com/ngr-tc/rmls"
 
 [dependencies]
+bytes = "1"

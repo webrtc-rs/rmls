@@ -5,11 +5,11 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::error::{Error, Result};
 
-pub(crate) fn read_varint<B: Buf>(s: &mut B) -> Result<u32> {
-    if !s.has_remaining() {
+pub(crate) fn read_varint<B: Buf>(buf: &mut B) -> Result<u32> {
+    if !buf.has_remaining() {
         return Err(Error::BufferTooSmall);
     }
-    let b = s.get_u8();
+    let b = buf.get_u8();
 
     let prefix = b >> 6;
     if prefix == 3 {
@@ -19,10 +19,10 @@ pub(crate) fn read_varint<B: Buf>(s: &mut B) -> Result<u32> {
     let n = 1 << prefix;
     let mut v = (b & 0x3F) as u32;
     for _ in 0..n - 1 {
-        if !s.has_remaining() {
+        if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        let b = s.get_u8();
+        let b = buf.get_u8();
         v = (v << 8) + b as u32;
     }
 
@@ -33,50 +33,50 @@ pub(crate) fn read_varint<B: Buf>(s: &mut B) -> Result<u32> {
     Ok(v)
 }
 
-pub(crate) fn write_varint<B: BufMut>(n: u32, b: &mut B) -> Result<()> {
+pub(crate) fn write_varint<B: BufMut>(n: u32, buf: &mut B) -> Result<()> {
     if n < (1 << 6) {
-        b.put_u8(n as u8);
+        buf.put_u8(n as u8);
     } else if n < (1 << 14) {
-        b.put_u16(0b01 << 14 | (n as u16));
+        buf.put_u16(0b01 << 14 | (n as u16));
     } else if n < (1 << 30) {
-        b.put_u32(0b10 << 30 | n);
+        buf.put_u32(0b10 << 30 | n);
     } else {
         return Err(Error::VarintExceeds30Bits);
     }
     Ok(())
 }
 
-pub(crate) fn read_opaque_vec<B: Buf>(s: &mut B) -> Result<Bytes> {
-    let n = read_varint(s)? as usize;
-    if s.remaining() < n {
+pub(crate) fn read_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
+    let n = read_varint(buf)? as usize;
+    if buf.remaining() < n {
         return Err(Error::BufferTooSmall);
     }
 
-    Ok(s.copy_to_bytes(n))
+    Ok(buf.copy_to_bytes(n))
 }
 
-pub(crate) fn write_opaque_vec<B: BufMut>(v: &Bytes, b: &mut B) -> Result<()> {
+pub(crate) fn write_opaque_vec<B: BufMut>(v: &Bytes, buf: &mut B) -> Result<()> {
     if v.len() >= 1 << 32 {
         return Err(Error::OpaqueSizeExceedsMaximumValueOfU32);
     }
 
-    write_varint(v.len() as u32, b)?;
+    write_varint(v.len() as u32, buf)?;
 
-    b.put(&v[..]);
+    buf.put(&v[..]);
 
     Ok(())
 }
 
 pub(crate) fn read_vector<B: Buf>(
-    s: &mut B,
+    buf: &mut B,
     mut f: impl FnMut(&mut Bytes) -> Result<()>,
 ) -> Result<()> {
-    let n = read_varint(s)? as usize;
-    if s.remaining() < n {
+    let n = read_varint(buf)? as usize;
+    if buf.remaining() < n {
         return Err(Error::BufferTooSmall);
     }
 
-    let mut v = s.copy_to_bytes(n);
+    let mut v = buf.copy_to_bytes(n);
     let ss = &mut v;
     while !ss.has_remaining() {
         f(ss)?
@@ -86,7 +86,7 @@ pub(crate) fn read_vector<B: Buf>(
 
 pub(crate) fn write_vector<B: BufMut>(
     n: usize,
-    b: &mut B,
+    buf: &mut B,
     mut f: impl FnMut(usize, &mut BytesMut) -> Result<()>,
 ) -> Result<()> {
     // We don't know the total size in advance, and the vector is prefixed with
@@ -98,14 +98,14 @@ pub(crate) fn write_vector<B: BufMut>(
 
     let raw = child.freeze();
 
-    write_opaque_vec(&raw, b)
+    write_opaque_vec(&raw, buf)
 }
 
-pub(crate) fn read_optional<B: Buf>(s: &mut B) -> Result<bool> {
-    if !s.has_remaining() {
+pub(crate) fn read_optional<B: Buf>(buf: &mut B) -> Result<bool> {
+    if !buf.has_remaining() {
         return Err(Error::BufferTooSmall);
     }
-    let b = s.get_u8();
+    let b = buf.get_u8();
 
     match b {
         0 => Ok(false),
@@ -114,9 +114,9 @@ pub(crate) fn read_optional<B: Buf>(s: &mut B) -> Result<bool> {
     }
 }
 
-pub(crate) fn write_optional<B: BufMut>(present: bool, b: &mut B) -> Result<()> {
+pub(crate) fn write_optional<B: BufMut>(present: bool, buf: &mut B) -> Result<()> {
     let n: u8 = if present { 1 } else { 0 };
-    b.put_u8(n);
+    buf.put_u8(n);
     Ok(())
 }
 
@@ -134,10 +134,10 @@ pub(crate) trait Writer {
         B: BufMut;
 }
 
-pub(crate) fn read<B: Buf, V: Reader>(v: &mut V, b: &mut B) -> Result<()> {
-    v.read(b)?;
-    if b.has_remaining() {
-        Err(Error::InputContainsExcessBytes(b.remaining()))
+pub(crate) fn read<B: Buf, V: Reader>(v: &mut V, buf: &mut B) -> Result<()> {
+    v.read(buf)?;
+    if buf.has_remaining() {
+        Err(Error::InputContainsExcessBytes(buf.remaining()))
     } else {
         Ok(())
     }

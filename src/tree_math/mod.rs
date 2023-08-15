@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 // NumLeaves exposes operations on a tree with a given number of leaves.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct NumLeaves(u32);
+pub(crate) struct NumLeaves(pub(crate) u32);
 
 impl NumLeaves {
     pub(crate) fn new(width: u32) -> Self {
@@ -109,7 +109,7 @@ impl NumLeaves {
 
 // NodeIndex is the index of a node in a tree.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct NodeIndex(u32);
+pub(crate) struct NodeIndex(pub(crate) u32);
 
 impl NodeIndex {
     // is_leaf returns true if this is a leaf node, false if this is an intermediate
@@ -172,7 +172,7 @@ impl NodeIndex {
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct LeafIndex(u32);
+pub(crate) struct LeafIndex(pub(crate) u32);
 
 impl LeafIndex {
     // NodeIndex returns the index of the node from a leaf index.

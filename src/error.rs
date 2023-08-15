@@ -26,6 +26,10 @@ pub enum Error {
     InputContainsExcessBytes(usize),
     #[error("invalid sibling")]
     InvalidSibling,
+    #[error("invalid leaf node source {0}")]
+    InvalidLeafNodeSource(u8),
+    #[error("invalid proposal type {0}")]
+    InvalidProposalType(u16),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

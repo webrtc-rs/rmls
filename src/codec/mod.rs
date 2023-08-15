@@ -1,3 +1,6 @@
+#[cfg(test)]
+pub(crate) mod codec_test;
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::error::{Error, Result};
@@ -117,22 +120,22 @@ pub(crate) fn write_optional<B: BufMut>(present: bool, b: &mut B) -> Result<()> 
     Ok(())
 }
 
-pub(crate) trait Unmarshaler {
-    fn unmarshal<B>(&mut self, buf: &mut B) -> Result<()>
+pub(crate) trait Reader {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf;
 }
 
-pub(crate) trait Marshaler {
-    fn marshal<B>(&self, buf: &mut B) -> Result<()>
+pub(crate) trait Writer {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut;
 }
 
-pub(crate) fn unmarshal<B: Buf, V: Unmarshaler>(v: &mut V, b: &mut B) -> Result<()> {
-    v.unmarshal(b)?;
+pub(crate) fn read<B: Buf, V: Reader>(v: &mut V, b: &mut B) -> Result<()> {
+    v.read(b)?;
     if b.has_remaining() {
         Err(Error::InputContainsExcessBytes(b.remaining()))
     } else {
@@ -140,8 +143,8 @@ pub(crate) fn unmarshal<B: Buf, V: Unmarshaler>(v: &mut V, b: &mut B) -> Result<
     }
 }
 
-pub(crate) fn marshal<V: Marshaler>(v: &V) -> Result<Bytes> {
+pub(crate) fn write<V: Writer>(v: &V) -> Result<Bytes> {
     let mut b = BytesMut::new();
-    v.marshal(&mut b)?;
+    v.write(&mut b)?;
     Ok(b.freeze())
 }

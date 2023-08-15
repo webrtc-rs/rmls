@@ -10,6 +10,21 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
+    #[error("buffer too small")]
+    BufferTooSmall,
+    #[error("invalid variable length integer prefix")]
+    InvalidVariableLengthIntegerPrefix,
+    #[error("minimum encoding was not used")]
+    MinimumEncodingWasNotUsed,
+    #[error("varint exceeds 30 bits")]
+    VarintExceeds30Bits,
+    #[error("opaque size exceeds maximum value of uint32")]
+    OpaqueSizeExceedsMaximumValueOfU32,
+    #[error("invalid optional value")]
+    InvalidOptionalValue,
+    #[error("input contains {0} excess bytes")]
+    InputContainsExcessBytes(usize),
+
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),
     #[error("{0}")]

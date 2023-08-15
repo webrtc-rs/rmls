@@ -3,3 +3,5 @@
 
 pub(crate) mod codec;
 pub mod error;
+pub(crate) mod tree;
+pub(crate) mod tree_math;

@@ -24,6 +24,8 @@ pub enum Error {
     InvalidOptionalValue,
     #[error("input contains {0} excess bytes")]
     InputContainsExcessBytes(usize),
+    #[error("invalid sibling")]
+    InvalidSibling,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

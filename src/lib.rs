@@ -1,4 +1,5 @@
 #![warn(rust_2018_idioms)]
 #![allow(dead_code)]
 
-pub(crate) mod util;
+pub mod error;
+pub(crate) mod marshal;

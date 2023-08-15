@@ -10,4 +10,5 @@ homepage = "https://rmls.io"
 repository = "https://github.com/ngr-tc/rmls"
 
 [dependencies]
+thiserror = "1"
 bytes = "1"

@@ -18,10 +18,14 @@
 //
 //    Leaf: 0     1     2     3     4     5     6     7
 
+#[cfg(test)]
+mod tree_math_test;
+
 use crate::error::{Error, Result};
+use serde::{Deserialize, Serialize};
 
 // NumLeaves exposes operations on a tree with a given number of leaves.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct NumLeaves(u32);
 
 impl NumLeaves {
@@ -104,7 +108,7 @@ impl NumLeaves {
 }
 
 // NodeIndex is the index of a node in a tree.
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct NodeIndex(u32);
 
 impl NodeIndex {
@@ -167,6 +171,7 @@ impl NodeIndex {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct LeafIndex(u32);
 
 impl LeafIndex {

@@ -1,8 +1,9 @@
 use crate::crypto::hash::Hash;
+use bytes::Bytes;
 use std::fmt::{Display, Formatter};
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) struct CipherSuite(pub(crate) usize);
+pub(crate) struct CipherSuite(pub(crate) u16);
 
 pub(crate) const CIPHER_SUITE_MLS_128_DHKEMX25519_AES128GCM_SHA256_ED25519: CipherSuite =
     CipherSuite(0x0001);
@@ -56,5 +57,21 @@ impl CipherSuite {
         }
         return desc.hash*/
         Hash(0)
+    }
+
+    pub(crate) fn verify_with_label(
+        &self,
+        _verif_key: &Bytes,
+        _label: &Bytes,
+        _content: &Bytes,
+        _sign_value: &Bytes,
+    ) -> bool {
+        /*TODO: signContent, err := marshalSignContent(label, content)
+        if err != nil {
+            return false
+        }
+
+        return cs.signatureScheme().Verify(verifKey, signContent, signValue)*/
+        true
     }
 }

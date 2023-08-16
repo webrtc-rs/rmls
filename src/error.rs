@@ -30,6 +30,24 @@ pub enum Error {
     InvalidLeafNodeSource(u8),
     #[error("invalid proposal type {0}")]
     InvalidProposalType(u16),
+    #[error("invalid credential type {0}")]
+    InvalidCredentialType(u16),
+    #[error("invalid leaf node source with null lifetime")]
+    InvalidLeafNodeSourceWithNullLifetime,
+    #[error("leaf node signature verification failed")]
+    LeafNodeSignatureVerificationFailed,
+    #[error("credential type {0} used by leaf node not supported by all members")]
+    CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(u16),
+    #[error("lifetime verification failed")]
+    LifetimeVerificationFailed,
+    #[error("extension type {0} used by leaf node not supported by that leaf node")]
+    ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(u16),
+    #[error("duplicate signature key in ratchet tree")]
+    DuplicateSignatureKeyInRatchetTree,
+    #[error("duplicate encryption key in ratchet tree")]
+    DuplicateEncryptionKeyInRatchetTree,
+    #[error("invalid node type {0}")]
+    InvalidNodeType(u8),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

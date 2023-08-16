@@ -7,4 +7,5 @@ pub(crate) mod crypto;
 pub mod error;
 pub(crate) mod framing;
 pub(crate) mod group;
+pub(crate) mod key_schedule;
 pub(crate) mod tree;

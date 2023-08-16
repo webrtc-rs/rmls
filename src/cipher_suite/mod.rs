@@ -51,7 +51,7 @@ impl Display for CipherSuite {
 
 impl CipherSuite {
     pub(crate) fn hash(&self) -> Hash {
-        /*TODO:desc, ok := cipherSuiteDescriptions[cs]
+        /*TODO(yngrtc):desc, ok := cipherSuiteDescriptions[cs]
         if !ok {
             panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
         }
@@ -66,7 +66,7 @@ impl CipherSuite {
         _content: &Bytes,
         _sign_value: &Bytes,
     ) -> bool {
-        /*TODO: signContent, err := marshalSignContent(label, content)
+        /*TODO(yngrtc): signContent, err := marshalSignContent(label, content)
         if err != nil {
             return false
         }

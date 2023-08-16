@@ -171,7 +171,7 @@ impl NodeIndex {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub(crate) struct LeafIndex(pub(crate) u32);
 
 impl LeafIndex {
@@ -179,4 +179,8 @@ impl LeafIndex {
     pub(crate) fn node_index(&self) -> NodeIndex {
         NodeIndex(2 * self.0)
     }
+}
+
+pub(crate) fn is_power_of_two(x: u32) -> bool {
+    x != 0 && (x & (x - 1) == 0)
 }

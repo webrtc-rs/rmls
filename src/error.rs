@@ -48,6 +48,24 @@ pub enum Error {
     DuplicateEncryptionKeyInRatchetTree,
     #[error("invalid node type {0}")]
     InvalidNodeType(u8),
+    #[error("invalid leaf node")]
+    InvalidLeafNode,
+    #[error("invalid parent node")]
+    InvalidParentNode,
+    #[error("invalid children")]
+    InvalidChildren,
+    #[error("tree hash verification failed")]
+    TreeHashVerificationFailed,
+    #[error("parent hashes verification failed")]
+    ParentHashesVerificationFailed,
+    #[error("unmerged leaf is not a descendant of the parent node")]
+    UnmergedLeafIsNotDescendantOfTheParentNode,
+    #[error("non-blank intermediate node is missing unmerged leaf")]
+    NonBlankIntermediateNodeMissingUnmergedLeaf,
+    #[error("updatePath and filtered direct path has different node")]
+    UpdatePathAndFilteredDirectPathHasDifferentNode,
+    #[error("parent hash mismatch for update path's leaf node")]
+    ParentHashMismatchForUpdatePathLeafNode,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

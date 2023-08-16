@@ -65,7 +65,7 @@ impl Writer for ParentNode {
 impl ParentNode {
     pub(crate) fn compute_parent_hash(
         &self,
-        _cs: &CipherSuite,
+        _cs: CipherSuite,
         original_sibling_tree_hash: &Bytes,
     ) -> Result<Bytes> {
         let raw_input = ParentNode::marshal_parent_hash_input(
@@ -73,7 +73,7 @@ impl ParentNode {
             &self.parent_hash,
             original_sibling_tree_hash,
         )?;
-        /*TODO:let h = cs.hash().New()
+        /*TODO(yngrtc):let h = cs.hash().New()
         h.Write(rawInput)
         return h.Sum(nil), nil*/
         Ok(raw_input)
@@ -328,7 +328,7 @@ pub(crate) const EXTENSION_TYPE_EXTERNAL_PUB: ExtensionType = 0x0004;
 pub(crate) const EXTENSION_TYPE_EXTERNAL_SENDERS: ExtensionType = 0x0005;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct Extension {
+pub(crate) struct Extension {
     extension_type: ExtensionType,
     extension_data: Bytes,
 }
@@ -371,7 +371,7 @@ fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct LeafNode {
+pub(crate) struct LeafNode {
     encryption_key: HpkePublicKey,
     signature_key: SignaturePublicKey,
     credential: Credential,
@@ -453,11 +453,11 @@ impl Writer for LeafNode {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct LeafNodeTBS<'a> {
+pub(crate) struct LeafNodeTBS<'a> {
     leaf_node: &'a LeafNode,
 
     // for LEAF_NODE_SOURCE_UPDATE and LEAF_NODE_SOURCE_COMMIT
-    group_id: GroupID,
+    group_id: &'a GroupID,
     leaf_index: LeafIndex,
 }
 
@@ -471,7 +471,7 @@ impl<'a> Writer for LeafNodeTBS<'a> {
 
         match self.leaf_node.leaf_node_source {
             LEAF_NODE_SOURCE_UPDATE | LEAF_NODE_SOURCE_COMMIT => {
-                write_opaque_vec(&self.group_id, buf)?;
+                write_opaque_vec(self.group_id, buf)?;
                 buf.put_u32(self.leaf_index.0);
             }
             _ => {}
@@ -485,7 +485,7 @@ impl LeafNode {
     //
     // group_id and li can be left unspecified if the leaf node source is neither
     // update nor commit.
-    fn verify_signature(&self, cs: CipherSuite, group_id: GroupID, leaf_index: LeafIndex) -> bool {
+    fn verify_signature(&self, cs: CipherSuite, group_id: &GroupID, leaf_index: LeafIndex) -> bool {
         let leaf_node_tbs = if let Ok(leaf_node_tbs) = write(&LeafNodeTBS {
             leaf_node: self,
             group_id,
@@ -507,7 +507,7 @@ impl LeafNode {
     //
     // It does not perform all checks: it does not check that the credential is
     // valid.
-    fn verify(&self, options: LeafNodeVerifyOptions) -> Result<()> {
+    fn verify(&self, options: LeafNodeVerifyOptions<'_>) -> Result<()> {
         let li = options.leaf_index;
 
         if !self.verify_signature(options.cipher_suite, options.group_id, li) {
@@ -557,18 +557,18 @@ impl LeafNode {
     }
 }
 
-struct LeafNodeVerifyOptions {
+pub(crate) struct LeafNodeVerifyOptions<'a> {
     cipher_suite: CipherSuite,
-    group_id: GroupID,
+    group_id: &'a GroupID,
     leaf_index: LeafIndex,
-    supported_creds: HashSet<CredentialType>,
-    signature_keys: HashSet<Bytes>,
-    encryption_keys: HashSet<Bytes>,
-    now: Box<dyn Fn() -> SystemTime>,
+    supported_creds: &'a HashSet<CredentialType>,
+    signature_keys: &'a HashSet<Bytes>,
+    encryption_keys: &'a HashSet<Bytes>,
+    now: &'a dyn Fn() -> SystemTime,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct UpdatePathNode {
+pub(crate) struct UpdatePathNode {
     encryption_key: HpkePublicKey,
     encrypted_path_secret: Vec<HpkeCiphertext>,
 }
@@ -606,7 +606,7 @@ impl Writer for UpdatePathNode {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct UpdatePath {
+pub(crate) struct UpdatePath {
     leaf_node: LeafNode,
     nodes: Vec<UpdatePathNode>,
 }
@@ -644,10 +644,10 @@ impl Writer for UpdatePath {
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-struct NodeType(u8);
+pub(crate) struct NodeType(u8);
 
-const NODE_TYPE_LEAF: NodeType = NodeType(1);
-const NODE_TYPE_PARENT: NodeType = NodeType(2);
+pub(crate) const NODE_TYPE_LEAF: NodeType = NodeType(1);
+pub(crate) const NODE_TYPE_PARENT: NodeType = NodeType(2);
 
 impl Reader for NodeType {
     fn read<B>(&mut self, buf: &mut B) -> Result<()>
@@ -678,7 +678,7 @@ impl Writer for NodeType {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct Node {
+pub(crate) struct Node {
     node_type: NodeType,
     leaf_node: Option<LeafNode>,     // for nodeTypeLeaf
     parent_node: Option<ParentNode>, // for nodeTypeParent

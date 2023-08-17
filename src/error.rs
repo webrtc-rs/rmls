@@ -74,6 +74,8 @@ pub enum Error {
     InvalidEd25519PublicKeySize,
     #[error("invalid Ed25519 signature size")]
     InvalidEd25519SignatureSize,
+    #[error("invalid cipher suite value {0}")]
+    InvalidCipherSuiteValue(u16),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

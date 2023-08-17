@@ -163,7 +163,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let cs: CipherSuite = CipherSuite(b.get_u16());
+            let cs: CipherSuite = b.get_u16().try_into()?;
             self.cipher_suites.push(cs);
             Ok(())
         })?;
@@ -218,7 +218,7 @@ impl Writer for Capabilities {
             self.cipher_suites.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.cipher_suites[i].0);
+                b.put_u16(self.cipher_suites[i] as u16);
                 Ok(())
             },
         )?;

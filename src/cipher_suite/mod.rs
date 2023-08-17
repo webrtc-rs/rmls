@@ -5,9 +5,10 @@ use bytes::Bytes;
 use std::fmt::{Display, Formatter};
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u16)]
 pub enum CipherSuite {
+    #[default]
     MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 = 0x0001,
     MLS_128_DHKEMP256_AES128GCM_SHA256_P256 = 0x0002,
     MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 = 0x0003,
@@ -20,7 +21,7 @@ pub enum CipherSuite {
 impl TryFrom<u16> for CipherSuite {
     type Error = Error;
 
-    fn try_from(v: u16) -> Result<Self, Self::Error> {
+    fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
         match v {
             0x0001 => Ok(CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519),
             0x0002 => Ok(CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256),

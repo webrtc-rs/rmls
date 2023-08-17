@@ -190,7 +190,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let ct: CredentialType = b.get_u16();
+            let ct: CredentialType = b.get_u16().try_into()?;
             self.credentials.push(ct);
             Ok(())
         })?;
@@ -245,7 +245,7 @@ impl Writer for Capabilities {
             self.credentials.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.credentials[i]);
+                b.put_u16(self.credentials[i] as u16);
                 Ok(())
             },
         )?;
@@ -522,7 +522,7 @@ impl LeafNode {
             .contains(&self.credential.credential_type)
         {
             return Err(Error::CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(
-                self.credential.credential_type,
+                self.credential.credential_type as u16,
             ));
         }
 

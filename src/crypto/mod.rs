@@ -11,7 +11,6 @@ pub(crate) type HpkePublicKey = Bytes;
 pub(crate) type SignaturePublicKey = Bytes;
 
 // https://www.iana.org/assignments/mls/mls.xhtml#mls-credential-types
-#[allow(non_camel_case_types)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u16)]
 pub enum CredentialType {
@@ -27,7 +26,7 @@ impl TryFrom<u16> for CredentialType {
         match v {
             0x0001 => Ok(CredentialType::Basic),
             0x0002 => Ok(CredentialType::X509),
-            _ => Err(Error::InvalidCredentialType(v)),
+            _ => Err(Error::InvalidCredentialTypeValue(v)),
         }
     }
 }

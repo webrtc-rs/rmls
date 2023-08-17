@@ -181,7 +181,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let pt: ProposalType = ProposalType(b.get_u16());
+            let pt: ProposalType = b.get_u16().try_into()?;
             self.proposals.push(pt);
             Ok(())
         })?;
@@ -236,7 +236,7 @@ impl Writer for Capabilities {
             self.proposals.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.proposals[i].0);
+                b.put_u16(self.proposals[i] as u16);
                 Ok(())
             },
         )?;

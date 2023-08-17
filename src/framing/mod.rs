@@ -8,7 +8,6 @@ pub(crate) type ProtocolVersion = u16;
 // GroupID is an application-specific group identifier.
 pub(crate) type GroupID = Bytes;
 
-#[allow(non_camel_case_types)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub(crate) enum ContentType {
@@ -26,7 +25,7 @@ impl TryFrom<u8> for ContentType {
             0x01 => Ok(ContentType::Application),
             0x02 => Ok(ContentType::Proposal),
             0x03 => Ok(ContentType::Commit),
-            _ => Err(Error::InvalidContentType(v)),
+            _ => Err(Error::InvalidContentTypeValue(v)),
         }
     }
 }

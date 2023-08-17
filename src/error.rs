@@ -28,12 +28,14 @@ pub enum Error {
     InvalidSibling,
     #[error("invalid leaf node source {0}")]
     InvalidLeafNodeSource(u8),
-    #[error("invalid proposal type {0}")]
-    InvalidProposalType(u16),
-    #[error("invalid credential type {0}")]
-    InvalidCredentialType(u16),
-    #[error("invalid content type {0}")]
-    InvalidContentType(u8),
+    #[error("invalid proposal type value {0}")]
+    InvalidProposalTypeValue(u16),
+    #[error("invalid credential type value {0}")]
+    InvalidCredentialTypeValue(u16),
+    #[error("invalid content type value {0}")]
+    InvalidContentTypeValue(u8),
+    #[error("invalid cipher suite value {0}")]
+    InvalidCipherSuiteValue(u16),
     #[error("invalid leaf node source with null lifetime")]
     InvalidLeafNodeSourceWithNullLifetime,
     #[error("leaf node signature verification failed")]
@@ -74,8 +76,6 @@ pub enum Error {
     InvalidEd25519PublicKeySize,
     #[error("invalid Ed25519 signature size")]
     InvalidEd25519SignatureSize,
-    #[error("invalid cipher suite value {0}")]
-    InvalidCipherSuiteValue(u16),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

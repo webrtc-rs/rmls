@@ -12,9 +12,8 @@ pub(crate) static RATCHET_LABEL_APPLICATION: Bytes = Bytes::from_static(b"applic
 
 fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
     match ct {
-        CONTENT_TYPE_APPLICATION => Ok(RATCHET_LABEL_APPLICATION.clone()),
-        CONTENT_TYPE_PROPOSAL | CONTENT_TYPE_COMMIT => Ok(RATCHET_LABEL_HANDSHAKE.clone()),
-        _ => Err(Error::InvalidContentType(ct.0)),
+        ContentType::Application => Ok(RATCHET_LABEL_APPLICATION.clone()),
+        ContentType::Proposal | ContentType::Commit => Ok(RATCHET_LABEL_HANDSHAKE.clone()),
     }
 }
 

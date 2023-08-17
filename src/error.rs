@@ -32,6 +32,8 @@ pub enum Error {
     InvalidProposalType(u16),
     #[error("invalid credential type {0}")]
     InvalidCredentialType(u16),
+    #[error("invalid content type {0}")]
+    InvalidContentType(u8),
     #[error("invalid leaf node source with null lifetime")]
     InvalidLeafNodeSourceWithNullLifetime,
     #[error("leaf node signature verification failed")]
@@ -66,6 +68,12 @@ pub enum Error {
     UpdatePathAndFilteredDirectPathHasDifferentNode,
     #[error("parent hash mismatch for update path's leaf node")]
     ParentHashMismatchForUpdatePathLeafNode,
+    #[error("invalid Ed25519 private key size")]
+    InvalidEd25519PrivateKeySize,
+    #[error("invalid Ed25519 public key size")]
+    InvalidEd25519PublicKeySize,
+    #[error("invalid Ed25519 signature size")]
+    InvalidEd25519SignatureSize,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

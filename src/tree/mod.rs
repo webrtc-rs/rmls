@@ -1,4 +1,5 @@
 pub(crate) mod ratchet_tree;
+pub(crate) mod secret_tree;
 pub(crate) mod tree_math;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};

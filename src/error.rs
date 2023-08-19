@@ -26,8 +26,10 @@ pub enum Error {
     InputContainsExcessBytes(usize),
     #[error("invalid sibling")]
     InvalidSibling,
-    #[error("invalid leaf node source {0}")]
-    InvalidLeafNodeSource(u8),
+    #[error("invalid leaf node source value {0}")]
+    InvalidLeafNodeSourceValue(u8),
+    #[error("invalid extension type value {0}")]
+    InvalidExtensionTypeValue(u16),
     #[error("invalid proposal type value {0}")]
     InvalidProposalTypeValue(u16),
     #[error("invalid credential type value {0}")]
@@ -50,8 +52,8 @@ pub enum Error {
     DuplicateSignatureKeyInRatchetTree,
     #[error("duplicate encryption key in ratchet tree")]
     DuplicateEncryptionKeyInRatchetTree,
-    #[error("invalid node type {0}")]
-    InvalidNodeType(u8),
+    #[error("invalid node type value {0}")]
+    InvalidNodeTypeValue(u8),
     #[error("invalid leaf node")]
     InvalidLeafNode,
     #[error("invalid parent node")]

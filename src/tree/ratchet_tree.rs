@@ -82,7 +82,7 @@ impl RatchetTree {
 
     fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
         if let Some(node) = self.get(li.node_index()) {
-            if node.node_type != NODE_TYPE_LEAF {
+            if node.node_type != NodeType::Leaf {
                 return None;
             }
             node.leaf_node.as_ref()
@@ -95,7 +95,7 @@ impl RatchetTree {
     fn resolve(&self, x: NodeIndex) -> Vec<NodeIndex> {
         if let Some(n) = self.get(x) {
             let mut res = vec![x];
-            if n.node_type == NODE_TYPE_PARENT {
+            if n.node_type == NodeType::Parent {
                 if let Some(parent_node) = &n.parent_node {
                     for leaf_index in &parent_node.unmerged_leaves {
                         res.push(leaf_index.node_index());
@@ -197,7 +197,7 @@ impl RatchetTree {
 
         for (i, node) in self.0.iter().enumerate() {
             if let Some(node) = node {
-                if node.node_type != NODE_TYPE_PARENT {
+                if node.node_type != NodeType::Parent {
                     continue;
                 }
                 if let Some(parent_node) = &node.parent_node {
@@ -331,7 +331,7 @@ impl RatchetTree {
         i: LeafIndex,
         node: Option<&LeafNode>,
     ) -> Result<()> {
-        buf.put_u8(NODE_TYPE_LEAF.0);
+        buf.put_u8(NodeType::Leaf as u8);
         buf.put_u32(i.0);
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
@@ -346,7 +346,7 @@ impl RatchetTree {
         left_hash: &Bytes,
         right_hash: &Bytes,
     ) -> Result<()> {
-        buf.put_u8(NODE_TYPE_PARENT.0);
+        buf.put_u8(NodeType::Parent as u8);
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
             node.write(buf)?;
@@ -415,21 +415,20 @@ impl RatchetTree {
         for x in node_indices {
             if let Some(node) = self.get(*x) {
                 let h = match node.node_type {
-                    NODE_TYPE_LEAF => {
+                    NodeType::Leaf => {
                         if let Some(leaf_node) = &node.leaf_node {
                             &leaf_node.parent_hash
                         } else {
                             return false;
                         }
                     }
-                    NODE_TYPE_PARENT => {
+                    NodeType::Parent => {
                         if let Some(parent_node) = &node.parent_node {
                             &parent_node.parent_hash
                         } else {
                             return false;
                         }
                     }
-                    _ => return false,
                 };
                 if h == parent_hash {
                     return true;
@@ -505,7 +504,7 @@ impl RatchetTree {
         self.set(
             ni,
             Some(Node {
-                node_type: NODE_TYPE_LEAF,
+                node_type: NodeType::Leaf,
                 leaf_node,
                 parent_node: None,
             }),
@@ -518,7 +517,7 @@ impl RatchetTree {
         self.set(
             ni,
             Some(Node {
-                node_type: NODE_TYPE_LEAF,
+                node_type: NodeType::Leaf,
                 leaf_node,
                 parent_node: None,
             }),
@@ -621,7 +620,7 @@ impl RatchetTree {
             self.set(
                 *ni,
                 Some(Node {
-                    node_type: NODE_TYPE_PARENT,
+                    node_type: NodeType::Parent,
                     leaf_node: None,
                     parent_node: Some(ParentNode {
                         encryption_key: path_node.encryption_key.clone(),
@@ -684,7 +683,7 @@ impl RatchetTree {
         self.set(
             sender_node_index,
             Some(Node {
-                node_type: NODE_TYPE_LEAF,
+                node_type: NodeType::Leaf,
                 leaf_node: Some(path.leaf_node),
                 parent_node: None,
             }),

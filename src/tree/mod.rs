@@ -94,11 +94,26 @@ impl ParentNode {
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) struct LeafNodeSource(pub(crate) u8);
+#[repr(u8)]
+pub(crate) enum LeafNodeSource {
+    #[default]
+    KeyPackage = 1,
+    Update = 2,
+    Commit = 3,
+}
 
-pub(crate) const LEAF_NODE_SOURCE_KEY_PACKAGE: LeafNodeSource = LeafNodeSource(1);
-pub(crate) const LEAF_NODE_SOURCE_UPDATE: LeafNodeSource = LeafNodeSource(2);
-pub(crate) const LEAF_NODE_SOURCE_COMMIT: LeafNodeSource = LeafNodeSource(3);
+impl TryFrom<u8> for LeafNodeSource {
+    type Error = Error;
+
+    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
+        match v {
+            1 => Ok(LeafNodeSource::KeyPackage),
+            2 => Ok(LeafNodeSource::Update),
+            3 => Ok(LeafNodeSource::Commit),
+            _ => Err(Error::InvalidLeafNodeSourceValue(v)),
+        }
+    }
+}
 
 impl Reader for LeafNodeSource {
     fn read<B>(&mut self, buf: &mut B) -> Result<()>
@@ -110,13 +125,9 @@ impl Reader for LeafNodeSource {
             return Err(Error::BufferTooSmall);
         }
 
-        self.0 = buf.get_u8();
-        match *self {
-            LEAF_NODE_SOURCE_KEY_PACKAGE | LEAF_NODE_SOURCE_UPDATE | LEAF_NODE_SOURCE_COMMIT => {
-                Ok(())
-            }
-            _ => Err(Error::InvalidLeafNodeSource(self.0)),
-        }
+        *self = buf.get_u8().try_into()?;
+
+        Ok(())
     }
 }
 
@@ -126,7 +137,7 @@ impl Writer for LeafNodeSource {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u8(self.0);
+        buf.put_u8(*self as u8);
         Ok(())
     }
 }
@@ -172,7 +183,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let et: ExtensionType = b.get_u16();
+            let et: ExtensionType = b.get_u16().try_into()?;
             self.extensions.push(et);
             Ok(())
         })?;
@@ -227,7 +238,7 @@ impl Writer for Capabilities {
             self.extensions.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.extensions[i]);
+                b.put_u16(self.extensions[i] as u16);
                 Ok(())
             },
         )?;
@@ -319,14 +330,32 @@ impl Lifetime {
     }
 }
 
-pub(crate) type ExtensionType = u16;
-
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-extension-types
-pub(crate) const EXTENSION_TYPE_APPLICATION_ID: ExtensionType = 0x0001;
-pub(crate) const EXTENSION_TYPE_RATCHET_TREE: ExtensionType = 0x0002;
-pub(crate) const EXTENSION_TYPE_REQUIRED_CAPABILITIES: ExtensionType = 0x0003;
-pub(crate) const EXTENSION_TYPE_EXTERNAL_PUB: ExtensionType = 0x0004;
-pub(crate) const EXTENSION_TYPE_EXTERNAL_SENDERS: ExtensionType = 0x0005;
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[repr(u16)]
+pub(crate) enum ExtensionType {
+    #[default]
+    ApplicationId = 0x0001,
+    RatchetTree = 0x0002,
+    RequiredCapabilities = 0x0003,
+    ExternalPub = 0x0004,
+    ExternalSenders = 0x0005,
+}
+
+impl TryFrom<u16> for ExtensionType {
+    type Error = Error;
+
+    fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
+        match v {
+            0x0001 => Ok(ExtensionType::ApplicationId),
+            0x0002 => Ok(ExtensionType::RatchetTree),
+            0x0003 => Ok(ExtensionType::RequiredCapabilities),
+            0x0004 => Ok(ExtensionType::ExternalPub),
+            0x0005 => Ok(ExtensionType::ExternalSenders),
+            _ => Err(Error::InvalidExtensionTypeValue(v)),
+        }
+    }
+}
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Extension {
@@ -340,7 +369,7 @@ fn unmarshal_extension_vec<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
         if b.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        let extension_type: ExtensionType = b.get_u16();
+        let extension_type: ExtensionType = b.get_u16().try_into()?;
         let extension_data = read_opaque_vec(b)?;
         exts.push(Extension {
             extension_type,
@@ -356,7 +385,7 @@ fn marshal_extension_vec<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<(
         exts.len(),
         buf,
         |i: usize, b: &mut BytesMut| -> Result<()> {
-            b.put_u16(exts[i].extension_type);
+            b.put_u16(exts[i].extension_type as u16);
             write_opaque_vec(&exts[i].extension_data, b)
         },
     )
@@ -394,14 +423,14 @@ impl LeafNode {
         self.capabilities.write(buf)?;
         self.leaf_node_source.write(buf)?;
         match self.leaf_node_source {
-            LEAF_NODE_SOURCE_KEY_PACKAGE => {
+            LeafNodeSource::KeyPackage => {
                 if let Some(lifetime) = &self.lifetime {
                     lifetime.write(buf)?;
                 } else {
                     return Err(Error::InvalidLeafNodeSourceWithNullLifetime);
                 }
             }
-            LEAF_NODE_SOURCE_COMMIT => write_opaque_vec(&self.parent_hash, buf)?,
+            LeafNodeSource::Commit => write_opaque_vec(&self.parent_hash, buf)?,
             _ => {}
         };
         marshal_extension_vec(&self.extensions, buf)
@@ -424,12 +453,12 @@ impl Reader for LeafNode {
         self.leaf_node_source.read(buf)?;
 
         match self.leaf_node_source {
-            LEAF_NODE_SOURCE_KEY_PACKAGE => {
+            LeafNodeSource::KeyPackage => {
                 let mut lifetime = Lifetime::default();
                 lifetime.read(buf)?;
                 self.lifetime = Some(lifetime);
             }
-            LEAF_NODE_SOURCE_COMMIT => {
+            LeafNodeSource::Commit => {
                 self.parent_hash = read_opaque_vec(buf)?;
             }
             _ => {}
@@ -471,7 +500,7 @@ impl<'a> Writer for LeafNodeTBS<'a> {
         self.leaf_node.write_base(buf)?;
 
         match self.leaf_node.leaf_node_source {
-            LEAF_NODE_SOURCE_UPDATE | LEAF_NODE_SOURCE_COMMIT => {
+            LeafNodeSource::Update | LeafNodeSource::Commit => {
                 write_opaque_vec(self.group_id, buf)?;
                 buf.put_u32(self.leaf_index.0);
             }
@@ -541,7 +570,7 @@ impl LeafNode {
             if !supported_exts.contains(&ext.extension_type) {
                 return Err(
                     Error::ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(
-                        ext.extension_type,
+                        ext.extension_type as u16,
                     ),
                 );
             }
@@ -645,10 +674,24 @@ impl Writer for UpdatePath {
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) struct NodeType(u8);
+#[repr(u8)]
+pub(crate) enum NodeType {
+    #[default]
+    Leaf = 1,
+    Parent = 2,
+}
 
-pub(crate) const NODE_TYPE_LEAF: NodeType = NodeType(1);
-pub(crate) const NODE_TYPE_PARENT: NodeType = NodeType(2);
+impl TryFrom<u8> for NodeType {
+    type Error = Error;
+
+    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
+        match v {
+            1 => Ok(NodeType::Leaf),
+            2 => Ok(NodeType::Parent),
+            _ => Err(Error::InvalidNodeTypeValue(v)),
+        }
+    }
+}
 
 impl Reader for NodeType {
     fn read<B>(&mut self, buf: &mut B) -> Result<()>
@@ -659,12 +702,8 @@ impl Reader for NodeType {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        self.0 = buf.get_u8();
-        match *self {
-            NODE_TYPE_LEAF | NODE_TYPE_PARENT => Ok(()),
-
-            _ => Err(Error::InvalidNodeType(self.0)),
-        }
+        *self = buf.get_u8().try_into()?;
+        Ok(())
     }
 }
 impl Writer for NodeType {
@@ -673,7 +712,7 @@ impl Writer for NodeType {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u8(self.0);
+        buf.put_u8(*self as u8);
         Ok(())
     }
 }
@@ -694,20 +733,18 @@ impl Reader for Node {
         self.node_type.read(buf)?;
 
         match self.node_type {
-            NODE_TYPE_LEAF => {
+            NodeType::Leaf => {
                 let mut leaf_node = LeafNode::default();
                 leaf_node.read(buf)?;
                 self.leaf_node = Some(leaf_node);
                 Ok(())
             }
-            NODE_TYPE_PARENT => {
+            NodeType::Parent => {
                 let mut parent_node = ParentNode::default();
                 parent_node.read(buf)?;
                 self.parent_node = Some(parent_node);
                 Ok(())
             }
-
-            _ => Err(Error::InvalidNodeType(self.node_type.0)),
         }
     }
 }
@@ -720,21 +757,20 @@ impl Writer for Node {
     {
         self.node_type.write(buf)?;
         match self.node_type {
-            NODE_TYPE_LEAF => {
+            NodeType::Leaf => {
                 if let Some(leaf_node) = &self.leaf_node {
                     leaf_node.write(buf)
                 } else {
-                    Err(Error::InvalidNodeType(self.node_type.0))
+                    Err(Error::InvalidNodeTypeValue(self.node_type as u8))
                 }
             }
-            NODE_TYPE_PARENT => {
+            NodeType::Parent => {
                 if let Some(parent_node) = &self.parent_node {
                     parent_node.write(buf)
                 } else {
-                    Err(Error::InvalidNodeType(self.node_type.0))
+                    Err(Error::InvalidNodeTypeValue(self.node_type as u8))
                 }
             }
-            _ => Err(Error::InvalidNodeType(self.node_type.0)),
         }
     }
 }

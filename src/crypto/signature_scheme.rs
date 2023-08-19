@@ -1,43 +1,29 @@
 use bytes::Bytes;
-use ed25519_dalek::{Signer, Verifier};
+use ring::signature::{Ed25519KeyPair, VerificationAlgorithm, ED25519};
 
 use crate::error::*;
 
 pub(crate) trait SignatureScheme {
-    fn sign(&self, secret_key: &Bytes, message: &Bytes) -> Result<Bytes>;
+    fn sign(&self, sign_key: &Bytes, message: &Bytes) -> Result<Bytes>;
     fn verify(&self, public_key: &Bytes, message: &Bytes, sig: &Bytes) -> Result<bool>;
 }
 
 pub(crate) struct Ed25519SignatureScheme;
 
 impl SignatureScheme for Ed25519SignatureScheme {
-    fn sign(&self, secret_key: &Bytes, message: &Bytes) -> Result<Bytes> {
-        let signing_key = ed25519_dalek::SigningKey::from_bytes(
-            secret_key
-                .iter()
-                .as_slice()
-                .try_into()
-                .map_err(|_| Error::InvalidEd25519PrivateKeySize)?,
-        );
+    fn sign(&self, sign_key: &Bytes, message: &Bytes) -> Result<Bytes> {
+        let private_key = Ed25519KeyPair::from_seed_unchecked(sign_key)
+            .map_err(|_| Error::InvalidEd25519PrivateKeySize)?;
 
-        Ok(signing_key.sign(message).to_vec().into())
+        Ok(Bytes::from(private_key.sign(message).as_ref().to_vec()))
     }
 
     fn verify(&self, public_key: &Bytes, message: &Bytes, signature: &Bytes) -> Result<bool> {
-        let verify_key = ed25519_dalek::VerifyingKey::from_bytes(
-            public_key
-                .iter()
-                .as_slice()
-                .try_into()
-                .map_err(|_| Error::InvalidEd25519PublicKeySize)?,
-        )
-        .map_err(|_| Error::InvalidEd25519PublicKeySize)?;
-
-        Ok(verify_key
+        Ok(ED25519
             .verify(
-                message,
-                &ed25519_dalek::Signature::from_slice(signature)
-                    .map_err(|_| Error::InvalidEd25519SignatureSize)?,
+                public_key.as_ref().into(),
+                message.as_ref().into(),
+                signature.as_ref().into(),
             )
             .is_ok())
     }

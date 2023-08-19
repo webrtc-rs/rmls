@@ -74,10 +74,6 @@ pub enum Error {
     ParentHashMismatchForUpdatePathLeafNode,
     #[error("invalid Ed25519 private key size")]
     InvalidEd25519PrivateKeySize,
-    #[error("invalid Ed25519 public key size")]
-    InvalidEd25519PublicKeySize,
-    #[error("invalid Ed25519 signature size")]
-    InvalidEd25519SignatureSize,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

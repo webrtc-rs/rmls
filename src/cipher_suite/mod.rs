@@ -1,3 +1,4 @@
+use crate::crypto::hpke::algs::{Aead, Kdf, Kem};
 use crate::crypto::signature::{
     EcdsaSignatureScheme, Ed25519SignatureScheme, Ed448SignatureScheme, SignatureScheme,
 };
@@ -102,16 +103,43 @@ impl CipherSuite {
     }
 
     pub(crate) fn hpke(&self) -> hpke::Suite {
-        /*match *self {
-            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => Hash::SHA256,
-            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Hash::SHA256,
-            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Hash::SHA256,
-            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => Hash::SHA512,
-            CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => Hash::SHA512,
-            CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => Hash::SHA512,
-            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => Hash::SHA384,
-        }*/
-        hpke::Suite::default()
+        match *self {
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => hpke::Suite::new(
+                Kem::KEM_X25519_HKDF_SHA256,
+                Kdf::KDF_HKDF_SHA256,
+                Aead::AEAD_AES128GCM,
+            ),
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => hpke::Suite::new(
+                Kem::KEM_P256_HKDF_SHA256,
+                Kdf::KDF_HKDF_SHA256,
+                Aead::AEAD_AES128GCM,
+            ),
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => hpke::Suite::new(
+                Kem::KEM_X25519_HKDF_SHA256,
+                Kdf::KDF_HKDF_SHA256,
+                Aead::AEAD_ChaCha20Poly1305,
+            ),
+            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => hpke::Suite::new(
+                Kem::KEM_X448_HKDF_SHA512,
+                Kdf::KDF_HKDF_SHA512,
+                Aead::AEAD_AES256GCM,
+            ),
+            CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => hpke::Suite::new(
+                Kem::KEM_P521_HKDF_SHA512,
+                Kdf::KDF_HKDF_SHA512,
+                Aead::AEAD_AES256GCM,
+            ),
+            CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => hpke::Suite::new(
+                Kem::KEM_X448_HKDF_SHA512,
+                Kdf::KDF_HKDF_SHA512,
+                Aead::AEAD_ChaCha20Poly1305,
+            ),
+            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => hpke::Suite::new(
+                Kem::KEM_P384_HKDF_SHA384,
+                Kdf::KDF_HKDF_SHA384,
+                Aead::AEAD_AES256GCM,
+            ),
+        }
     }
 
     pub(crate) fn signature_scheme(&self) -> Box<dyn SignatureScheme> {

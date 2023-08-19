@@ -313,17 +313,10 @@ impl RatchetTree {
 
             RatchetTree::marshal_parent_node_hash_input(&mut buf, p, &left_hash, &right_hash)?;
         }
-        /*TODO(yngrtc): in, err := b.Bytes()
-        if err != nil {
-            return nil, err
-        }
 
-        h := cs.hash().New()
-        h.Write(in)
-        return h.Sum(nil), nil
-         */
-        let _h = cs.hash();
-        Ok(buf.freeze())
+        let input = buf.freeze();
+        let h = cs.hash();
+        Ok(Bytes::from(h.digest(&input).as_ref().to_vec()))
     }
 
     fn marshal_leaf_node_hash_input<B: BufMut>(
@@ -692,8 +685,7 @@ impl RatchetTree {
         Ok(())
     }
 
-    /*TODO(yngrtc)
-    fn apply(&mut self, proposals []proposal, senders []leaf_index) {
+    /*TODO(yngrtc): fn apply(&mut self, proposals []proposal, senders []leaf_index) {
         // Apply all update proposals
         for i, prop := range proposals {
             if prop.proposalType == PROPOSAL_TYPE_UPDATE {

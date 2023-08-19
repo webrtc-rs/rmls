@@ -9,6 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::cipher_suite::*;
 use crate::codec::*;
+use crate::crypto::hash::Digester;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
@@ -66,7 +67,7 @@ impl Writer for ParentNode {
 impl ParentNode {
     pub(crate) fn compute_parent_hash(
         &self,
-        _cs: CipherSuite,
+        cs: CipherSuite,
         original_sibling_tree_hash: &Bytes,
     ) -> Result<Bytes> {
         let raw_input = ParentNode::marshal_parent_hash_input(
@@ -74,10 +75,8 @@ impl ParentNode {
             &self.parent_hash,
             original_sibling_tree_hash,
         )?;
-        /*TODO(yngrtc):let h = cs.hash().New()
-        h.Write(rawInput)
-        return h.Sum(nil), nil*/
-        Ok(raw_input)
+        let h = cs.hash();
+        Ok(Bytes::from(h.digest(&raw_input).as_ref().to_vec()))
     }
 
     pub(crate) fn marshal_parent_hash_input(

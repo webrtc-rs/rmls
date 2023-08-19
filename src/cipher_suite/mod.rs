@@ -7,7 +7,9 @@ use crate::crypto::{
     signature::SignatureScheme,
 };
 use crate::error::Error;
+
 use bytes::Bytes;
+use ring::hmac;
 use std::fmt::{Display, Formatter};
 
 #[allow(non_camel_case_types)]
@@ -100,7 +102,7 @@ impl CipherSuite {
         }
     }
 
-    pub(crate) fn signature_scheme(&self) -> SignatureScheme {
+    pub(crate) fn signature(&self) -> SignatureScheme {
         match *self {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => SignatureScheme::Ed25519,
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => {
@@ -120,6 +122,60 @@ impl CipherSuite {
         }
     }
 
+    fn sign_mac(&self, key: &[u8], message: &[u8]) -> hmac::Tag {
+        // All cipher suites use HMAC
+        self.hash().sign_mac(key, message)
+    }
+
+    fn verify_mac(&self, key: &[u8], message: &[u8], tag: &[u8]) -> bool {
+        tag == self.sign_mac(key, message).as_ref()
+    }
+    /*
+        func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
+            var b cryptobyte.Builder
+            writeOpaqueVec(&b, label)
+            writeOpaqueVec(&b, value)
+            in, err := b.Bytes()
+            if err != nil {
+                return nil, err
+            }
+
+            h := cs.hash().New()
+            h.Write(in)
+            return h.Sum(nil), nil
+        }
+
+        func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint16) ([]byte, error) {
+            label = append([]byte("MLS 1.0 "), label...)
+
+            var b cryptobyte.Builder
+            b.AddUint16(length)
+            writeOpaqueVec(&b, label)
+            writeOpaqueVec(&b, context)
+            kdfLabel, err := b.Bytes()
+            if err != nil {
+                return nil, err
+            }
+
+            _, kdf, _ := cs.hpke().Params()
+            return kdf.Expand(secret, kdfLabel, uint(length)), nil
+        }
+
+        func (cs cipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
+            _, kdf, _ := cs.hpke().Params()
+            return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
+        }
+
+        func (cs cipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
+            signContent, err := marshalSignContent(label, content)
+            if err != nil {
+                return nil, err
+            }
+
+            return cs.signatureScheme().Sign(signKey, signContent)
+        }
+    */
+
     pub(crate) fn verify_with_label(
         &self,
         _verif_key: &Bytes,
@@ -135,4 +191,78 @@ impl CipherSuite {
         return cs.signatureScheme().Verify(verifKey, signContent, signValue)*/
         true
     }
+
+    /*
+    func (cs cipherSuite) encryptWithLabel(publicKey, label, context, plaintext []byte) (kemOutput, ciphertext []byte, err error) {
+        encryptContext, err := marshalEncryptContext(label, context)
+        if err != nil {
+            return nil, nil, err
+        }
+
+        hpke := cs.hpke()
+        kem, _, _ := hpke.Params()
+        pub, err := kem.Scheme().UnmarshalBinaryPublicKey(publicKey)
+        if err != nil {
+            return nil, nil, err
+        }
+
+        sender, err := hpke.NewSender(pub, encryptContext)
+        if err != nil {
+            return nil, nil, err
+        }
+
+        kemOutput, sealer, err := sender.Setup(rand.Reader)
+        if err != nil {
+            return nil, nil, err
+        }
+
+        ciphertext, err = sealer.Seal(plaintext, nil)
+        return kemOutput, ciphertext, err
+    }
+
+    func (cs cipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
+        encryptContext, err := marshalEncryptContext(label, context)
+        if err != nil {
+            return nil, err
+        }
+
+        hpke := cs.hpke()
+        kem, _, _ := hpke.Params()
+        priv, err := kem.Scheme().UnmarshalBinaryPrivateKey(privateKey)
+        if err != nil {
+            return nil, err
+        }
+
+        receiver, err := hpke.NewReceiver(priv, encryptContext)
+        if err != nil {
+            return nil, err
+        }
+
+        opener, err := receiver.Setup(kemOutput)
+        if err != nil {
+            return nil, err
+        }
+
+        return opener.Open(ciphertext, nil)
+    }
+    */
 }
+
+/*
+func marshalSignContent(label, content []byte) ([]byte, error) {
+    label = append([]byte("MLS 1.0 "), label...)
+
+    var b cryptobyte.Builder
+    writeOpaqueVec(&b, label)
+    writeOpaqueVec(&b, content)
+    return b.Bytes()
+}
+
+func marshalEncryptContext(label, context []byte) ([]byte, error) {
+    label = append([]byte("MLS 1.0 "), label...)
+
+    var b cryptobyte.Builder
+    writeOpaqueVec(&b, label)
+    writeOpaqueVec(&b, context)
+    return b.Bytes()
+}*/

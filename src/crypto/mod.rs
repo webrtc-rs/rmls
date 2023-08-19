@@ -5,7 +5,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 pub(crate) mod hash;
 pub(crate) mod hpke;
-pub(crate) mod signature_scheme;
+pub(crate) mod signature;
 
 pub(crate) type HpkePublicKey = Bytes;
 pub(crate) type SignaturePublicKey = Bytes;

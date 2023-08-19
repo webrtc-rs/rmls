@@ -1,4 +1,6 @@
-use crate::crypto::signature_scheme::SignatureScheme;
+use crate::crypto::signature::{
+    EcdsaSignatureScheme, Ed25519SignatureScheme, Ed448SignatureScheme, SignatureScheme,
+};
 use crate::crypto::{hash::Hash, hpke};
 use crate::error::Error;
 use bytes::Bytes;
@@ -88,30 +90,53 @@ var cipherSuiteDescriptions = map[cipherSuite]cipherSuiteDescription{
 
 impl CipherSuite {
     pub(crate) fn hash(&self) -> Hash {
-        /*TODO(yngrtc):desc, ok := cipherSuiteDescriptions[cs]
-        if !ok {
-            panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
+        match *self {
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => Hash::SHA256,
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Hash::SHA256,
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Hash::SHA256,
+            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => Hash::SHA384,
         }
-        return desc.hash*/
-        Hash(0)
-    }
-    /*
-    pub(crate) fn hpke(&self) -> hpke::Suite {
-        desc, ok := cipherSuiteDescriptions[cs]
-        if !ok {
-            panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
-        }
-        return desc.hpke
     }
 
-    pub(crate) fn signature_scheme(&self) ->impl SignatureScheme {
-        desc, ok := cipherSuiteDescriptions[cs]
-        if !ok {
-            panic(fmt.Errorf("mls: invalid cipher suite %d", cs))
-        }
-        return desc.sig
+    pub(crate) fn hpke(&self) -> hpke::Suite {
+        /*match *self {
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => Hash::SHA256,
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Hash::SHA256,
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Hash::SHA256,
+            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => Hash::SHA512,
+            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => Hash::SHA384,
+        }*/
+        hpke::Suite::default()
     }
-    */
+
+    pub(crate) fn signature_scheme(&self) -> Box<dyn SignatureScheme> {
+        match *self {
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => {
+                Box::new(Ed25519SignatureScheme)
+            }
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => {
+                Box::new(EcdsaSignatureScheme::ECDSA_P256_SHA256_ASN1)
+            }
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
+                Box::new(Ed25519SignatureScheme)
+            }
+            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => Box::new(Ed448SignatureScheme),
+            CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => {
+                Box::new(EcdsaSignatureScheme::ECDSA_P521_SHA512_ASN1)
+            }
+            CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => {
+                Box::new(Ed448SignatureScheme)
+            }
+            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => {
+                Box::new(EcdsaSignatureScheme::ECDSA_P384_SHA384_ASN1)
+            }
+        }
+    }
 
     pub(crate) fn verify_with_label(
         &self,

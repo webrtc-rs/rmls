@@ -74,6 +74,10 @@ pub enum Error {
     ParentHashMismatchForUpdatePathLeafNode,
     #[error("invalid Ed25519 private key size")]
     InvalidEd25519PrivateKeySize,
+    #[error("unsupported Ecdsa P521 SHA512")]
+    UnsupportedEcdsaP521Sha512,
+    #[error("unsupported Ed448")]
+    UnsupportedEd448SignatureScheme,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

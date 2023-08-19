@@ -9,7 +9,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::cipher_suite::*;
 use crate::codec::*;
-use crate::crypto::hash::Digester;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;

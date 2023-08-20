@@ -2,7 +2,7 @@ pub mod algs;
 
 use algs::*;
 
-pub trait Hpke {}
+pub trait Hpke: Send + Sync {}
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

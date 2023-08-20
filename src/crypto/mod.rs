@@ -1,11 +1,12 @@
-use crate::codec::{read_opaque_vec, read_vector, write_opaque_vec, write_vector, Reader, Writer};
+use crate::codec::*;
 use crate::error::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-pub(crate) mod hash;
-pub(crate) mod hpke;
-pub(crate) mod signature;
+pub mod crypto_provider;
+pub mod hash;
+pub mod hpke;
+pub mod signature;
 
 pub(crate) type HpkePublicKey = Bytes;
 pub(crate) type SignaturePublicKey = Bytes;

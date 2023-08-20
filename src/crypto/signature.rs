@@ -4,7 +4,7 @@ use signature::{Signer, Verifier};
 
 use crate::error::*;
 
-pub trait Signature {
+pub trait Signature: Send + Sync {
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
 
     fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<()>;

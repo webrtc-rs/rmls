@@ -4,7 +4,7 @@ use ring::{
     hmac,
 };
 
-pub trait Hash {
+pub trait Hash: Send + Sync {
     fn digest(&self, data: &[u8]) -> Bytes;
 
     fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;

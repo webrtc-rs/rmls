@@ -38,34 +38,24 @@ impl SignatureScheme {
         }
     }
 
-    pub(crate) fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> bool {
+    pub(crate) fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<()> {
         match *self {
-            SignatureScheme::Ed25519 => ED25519
-                .verify(public_key.into(), message.into(), signature.into())
-                .is_ok(),
-            SignatureScheme::ECDSA_P256_SHA256 => {
-                let encoded_point = if let Ok(encoded_point) = EncodedPoint::from_bytes(public_key)
-                {
-                    encoded_point
-                } else {
-                    return false;
-                };
-                let verifying_key =
-                    if let Ok(verifying_key) = VerifyingKey::from_encoded_point(&encoded_point) {
-                        verifying_key
-                    } else {
-                        return false;
-                    };
-                let signature = if let Ok(signature) = Signature::from_der(signature) {
-                    signature
-                } else {
-                    return false;
-                };
-                verifying_key.verify(message, &signature).is_ok()
+            SignatureScheme::Ed25519 => {
+                ED25519
+                    .verify(public_key.into(), message.into(), signature.into())
+                    .map_err(|err| Error::RingError(err.to_string()))?;
+                Ok(())
             }
-            SignatureScheme::ECDSA_P384_SHA384 => false,
-            SignatureScheme::ECDSA_P521_SHA512 => false,
-            SignatureScheme::Ed448 => false,
+            SignatureScheme::ECDSA_P256_SHA256 => {
+                let encoded_point = EncodedPoint::from_bytes(public_key)?;
+                let verifying_key = VerifyingKey::from_encoded_point(&encoded_point)?;
+                let signature = Signature::from_der(signature)?;
+                verifying_key.verify(message, &signature)?;
+                Ok(())
+            }
+            SignatureScheme::ECDSA_P384_SHA384 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::ECDSA_P521_SHA512 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::Ed448 => Err(Error::UnsupportedEd448),
         }
     }
 }

@@ -106,7 +106,7 @@ struct SignWithLabelTest {
 fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
     if cs.signature() != SignatureScheme::Ed25519
         && cs.signature() != SignatureScheme::ECDSA_P256_SHA256
-    //&& cs.signature() != SignatureScheme::ECDSA_P384_SHA384_ASN1
+    //&& cs.signature() != SignatureScheme::ECDSA_P384_SHA384
     {
         //TODO(yngrtc): implement other signature scheme
         println!("\t test_sign_with_label {} skipped", cs);
@@ -119,14 +119,16 @@ fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
     let signature = hex_to_bytes(&tc.signature);
 
     assert!(
-        cs.verify_with_label(&public, label, &content, &signature),
+        cs.verify_with_label(&public, label, &content, &signature)
+            .is_ok(),
         "reference signature did not verify"
     );
 
     let sign_value = cs.sign_with_label(&private, label, &content)?;
 
     assert!(
-        cs.verify_with_label(&public, label, &content, &sign_value),
+        cs.verify_with_label(&public, label, &content, &sign_value)
+            .is_ok(),
         "generated signature did not verify"
     );
 

@@ -78,6 +78,8 @@ pub enum Error {
     UnsupportedEcdsa,
     #[error("unsupported Ed448")]
     UnsupportedEd448,
+    #[error("ring error {0}")]
+    RingError(String),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),
@@ -89,6 +91,10 @@ pub enum Error {
     Std(#[source] StdError),
     #[error("serde_json error: {0}")]
     SerdeJson(#[from] serde_json::Error),
+    #[error("{0}")]
+    Sec1(#[source] sec1::Error),
+    #[error("{0}")]
+    Ecdsa(#[source] ecdsa::Error),
 
     #[error("{0}")]
     Other(String),
@@ -115,3 +121,15 @@ impl From<io::Error> for Error {
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct StdError(pub Box<dyn std::error::Error + Send + Sync>);
+
+impl From<sec1::Error> for Error {
+    fn from(e: sec1::Error) -> Self {
+        Error::Sec1(e)
+    }
+}
+
+impl From<ecdsa::Error> for Error {
+    fn from(e: ecdsa::Error) -> Self {
+        Error::Ecdsa(e)
+    }
+}

@@ -183,12 +183,8 @@ impl CipherSuite {
         label: &[u8],
         content: &[u8],
         sign_value: &[u8],
-    ) -> bool {
-        let sign_content = if let Ok(sign_content) = marshal_sign_content(label, content) {
-            sign_content
-        } else {
-            return false;
-        };
+    ) -> Result<()> {
+        let sign_content = marshal_sign_content(label, content)?;
         self.signature()
             .verify(verify_key, &sign_content, sign_value)
     }

@@ -512,6 +512,7 @@ impl LeafNode {
             &leaf_node_tbs,
             &self.signature,
         )
+        .is_ok()
     }
 
     // verify performs leaf node validation described in section 7.3.

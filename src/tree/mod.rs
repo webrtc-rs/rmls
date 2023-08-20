@@ -3,6 +3,7 @@ pub(crate) mod secret_tree;
 pub(crate) mod tree_math;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use ring::digest;
 use std::collections::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -67,21 +68,21 @@ impl ParentNode {
     pub(crate) fn compute_parent_hash(
         &self,
         cs: CipherSuite,
-        original_sibling_tree_hash: &Bytes,
-    ) -> Result<Bytes> {
-        let raw_input = ParentNode::marshal_parent_hash_input(
+        original_sibling_tree_hash: &[u8],
+    ) -> Result<digest::Digest> {
+        let input = ParentNode::marshal_parent_hash_input(
             &self.encryption_key,
             &self.parent_hash,
             original_sibling_tree_hash,
         )?;
         let h = cs.hash();
-        Ok(Bytes::from(h.digest(&raw_input).as_ref().to_vec()))
+        Ok(h.digest(&input))
     }
 
     pub(crate) fn marshal_parent_hash_input(
         encryption_key: &HpkePublicKey,
-        parent_hash: &Bytes,
-        original_sibling_tree_hash: &Bytes,
+        parent_hash: &[u8],
+        original_sibling_tree_hash: &[u8],
     ) -> Result<Bytes> {
         let mut buf = BytesMut::new();
         write_opaque_vec(encryption_key, &mut buf)?;
@@ -91,26 +92,12 @@ impl ParentNode {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) enum LeafNodeSource {
+    KeyPackage(Lifetime), // = 1,
     #[default]
-    KeyPackage = 1,
-    Update = 2,
-    Commit = 3,
-}
-
-impl TryFrom<u8> for LeafNodeSource {
-    type Error = Error;
-
-    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
-        match v {
-            1 => Ok(LeafNodeSource::KeyPackage),
-            2 => Ok(LeafNodeSource::Update),
-            3 => Ok(LeafNodeSource::Commit),
-            _ => Err(Error::InvalidLeafNodeSourceValue(v)),
-        }
-    }
+    Update, // = 2,
+    Commit(Bytes),        // = 3,
 }
 
 impl Reader for LeafNodeSource {
@@ -122,8 +109,17 @@ impl Reader for LeafNodeSource {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-
-        *self = buf.get_u8().try_into()?;
+        let v = buf.get_u8();
+        match v {
+            1 => {
+                let mut lifetime = Lifetime::default();
+                lifetime.read(buf)?;
+                *self = LeafNodeSource::KeyPackage(lifetime);
+            }
+            2 => *self = LeafNodeSource::Update,
+            3 => *self = LeafNodeSource::Commit(read_opaque_vec(buf)?),
+            _ => return Err(Error::InvalidLeafNodeSourceValue(v)),
+        };
 
         Ok(())
     }
@@ -135,7 +131,18 @@ impl Writer for LeafNodeSource {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u8(*self as u8);
+        match self {
+            LeafNodeSource::KeyPackage(lifetime) => {
+                buf.put_u8(1);
+                lifetime.write(buf)?;
+            }
+            LeafNodeSource::Update => buf.put_u8(2),
+            LeafNodeSource::Commit(parent_hash) => {
+                buf.put_u8(3);
+                write_opaque_vec(parent_hash, buf)?
+            }
+        };
+
         Ok(())
     }
 }
@@ -406,8 +413,6 @@ pub(crate) struct LeafNode {
     capabilities: Capabilities,
 
     leaf_node_source: LeafNodeSource,
-    lifetime: Option<Lifetime>, // for LEAF_NODE_SOURCE_KEY_PACKAGE
-    parent_hash: Bytes,         // for LEAF_NODE_SOURCE_COMMIT
 
     extensions: Vec<Extension>,
     signature: Bytes,
@@ -420,17 +425,7 @@ impl LeafNode {
         self.credential.write(buf)?;
         self.capabilities.write(buf)?;
         self.leaf_node_source.write(buf)?;
-        match self.leaf_node_source {
-            LeafNodeSource::KeyPackage => {
-                if let Some(lifetime) = &self.lifetime {
-                    lifetime.write(buf)?;
-                } else {
-                    return Err(Error::InvalidLeafNodeSourceWithNullLifetime);
-                }
-            }
-            LeafNodeSource::Commit => write_opaque_vec(&self.parent_hash, buf)?,
-            _ => {}
-        };
+
         marshal_extension_vec(&self.extensions, buf)
     }
 }
@@ -449,18 +444,6 @@ impl Reader for LeafNode {
         self.credential.read(buf)?;
         self.capabilities.read(buf)?;
         self.leaf_node_source.read(buf)?;
-
-        match self.leaf_node_source {
-            LeafNodeSource::KeyPackage => {
-                let mut lifetime = Lifetime::default();
-                lifetime.read(buf)?;
-                self.lifetime = Some(lifetime);
-            }
-            LeafNodeSource::Commit => {
-                self.parent_hash = read_opaque_vec(buf)?;
-            }
-            _ => {}
-        };
 
         self.extensions = unmarshal_extension_vec(buf)?;
         self.signature = read_opaque_vec(buf)?;
@@ -497,8 +480,8 @@ impl<'a> Writer for LeafNodeTBS<'a> {
     {
         self.leaf_node.write_base(buf)?;
 
-        match self.leaf_node.leaf_node_source {
-            LeafNodeSource::Update | LeafNodeSource::Commit => {
+        match &self.leaf_node.leaf_node_source {
+            LeafNodeSource::Update | LeafNodeSource::Commit(_) => {
                 write_opaque_vec(self.group_id, buf)?;
                 buf.put_u32(self.leaf_index.0);
             }
@@ -525,7 +508,7 @@ impl LeafNode {
         };
         cs.verify_with_label(
             &self.signature_key,
-            &Bytes::from("LeafNodeTBS".as_bytes()),
+            "LeafNodeTBS".as_bytes(),
             &leaf_node_tbs,
             &self.signature,
         )
@@ -553,7 +536,7 @@ impl LeafNode {
             ));
         }
 
-        if let Some(lifetime) = &self.lifetime {
+        if let LeafNodeSource::KeyPackage(lifetime) = &self.leaf_node_source {
             let t = (options.now)();
             if !lifetime.verify(t) {
                 return Err(Error::LifetimeVerificationFailed);

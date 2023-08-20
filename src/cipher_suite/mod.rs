@@ -1,3 +1,4 @@
+use crate::codec::*;
 use crate::crypto::{
     hash::Hash,
     hpke::{
@@ -6,10 +7,11 @@ use crate::crypto::{
     },
     signature::SignatureScheme,
 };
-use crate::error::Error;
+use crate::error::*;
 
-use bytes::Bytes;
-use ring::hmac;
+use bytes::{BufMut, Bytes, BytesMut};
+use ring::signature::Signature;
+use ring::{digest, hmac};
 use std::fmt::{Display, Formatter};
 
 #[allow(non_camel_case_types)]
@@ -130,83 +132,81 @@ impl CipherSuite {
     fn verify_mac(&self, key: &[u8], message: &[u8], tag: &[u8]) -> bool {
         tag == self.sign_mac(key, message).as_ref()
     }
-    /*
-        func (cs cipherSuite) refHash(label, value []byte) ([]byte, error) {
-            var b cryptobyte.Builder
-            writeOpaqueVec(&b, label)
-            writeOpaqueVec(&b, value)
-            in, err := b.Bytes()
-            if err != nil {
-                return nil, err
-            }
 
-            h := cs.hash().New()
-            h.Write(in)
-            return h.Sum(nil), nil
-        }
+    fn ref_hash(&self, label: &[u8], value: &[u8]) -> Result<digest::Digest> {
+        let mut buf = BytesMut::new();
+        write_opaque_vec(label, &mut buf)?;
+        write_opaque_vec(value, &mut buf)?;
+        let input = buf.freeze();
+        let h = self.hash();
+        Ok(h.digest(&input))
+    }
 
-        func (cs cipherSuite) expandWithLabel(secret, label, context []byte, length uint16) ([]byte, error) {
-            label = append([]byte("MLS 1.0 "), label...)
+    fn expand_with_label(
+        &self,
+        _secret: &[u8],
+        label: &[u8],
+        context: &[u8],
+        length: u16,
+    ) -> Result<Bytes> {
+        let mut mls_label = "MLS 1.0 ".as_bytes().to_vec();
+        mls_label.extend_from_slice(label);
 
-            var b cryptobyte.Builder
-            b.AddUint16(length)
-            writeOpaqueVec(&b, label)
-            writeOpaqueVec(&b, context)
-            kdfLabel, err := b.Bytes()
-            if err != nil {
-                return nil, err
-            }
+        let mut buf = BytesMut::new();
+        buf.put_u16(length);
+        write_opaque_vec(&mls_label, &mut buf)?;
+        write_opaque_vec(context, &mut buf)?;
+        let kdf_label = buf.freeze();
+        //TODO(yngrtc):_, kdf, _ := cs.hpke().Params()
+        //TODO(yngrtc):return kdf.Expand(secret, kdfLabel, uint(length)), nil
+        Ok(kdf_label)
+    }
 
-            _, kdf, _ := cs.hpke().Params()
-            return kdf.Expand(secret, kdfLabel, uint(length)), nil
-        }
+    fn derive_secret(&self, _secret: &[u8], _label: &[u8]) -> Result<Bytes> {
+        //TODO(yngrtc):_, kdf, _ := cs.hpke().Params()
+        //TODO(yngrtc):return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
+        Ok(Bytes::new())
+    }
 
-        func (cs cipherSuite) deriveSecret(secret, label []byte) ([]byte, error) {
-            _, kdf, _ := cs.hpke().Params()
-            return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
-        }
-
-        func (cs cipherSuite) signWithLabel(signKey, label, content []byte) ([]byte, error) {
-            signContent, err := marshalSignContent(label, content)
-            if err != nil {
-                return nil, err
-            }
-
-            return cs.signatureScheme().Sign(signKey, signContent)
-        }
-    */
+    fn sign_with_label(&self, sign_key: &[u8], label: &[u8], content: &[u8]) -> Result<Signature> {
+        let sign_content = marshal_sign_content(label, content)?;
+        self.signature().sign(sign_key, &sign_content)
+    }
 
     pub(crate) fn verify_with_label(
         &self,
-        _verif_key: &Bytes,
-        _label: &Bytes,
-        _content: &Bytes,
-        _sign_value: &Bytes,
+        verify_key: &[u8],
+        label: &[u8],
+        content: &[u8],
+        sign_value: &[u8],
     ) -> bool {
-        /*TODO(yngrtc): signContent, err := marshalSignContent(label, content)
-        if err != nil {
-            return false
-        }
-
-        return cs.signatureScheme().Verify(verifKey, signContent, signValue)*/
-        true
+        let sign_content = if let Ok(sign_content) = marshal_sign_content(label, content) {
+            sign_content
+        } else {
+            return false;
+        };
+        self.signature()
+            .verify(verify_key, &sign_content, sign_value)
     }
 
-    /*
-    func (cs cipherSuite) encryptWithLabel(publicKey, label, context, plaintext []byte) (kemOutput, ciphertext []byte, err error) {
-        encryptContext, err := marshalEncryptContext(label, context)
-        if err != nil {
-            return nil, nil, err
-        }
+    fn encrypt_with_label(
+        &self,
+        _public_key: &[u8],
+        label: &[u8],
+        context: &[u8],
+        _plaintext: &[u8],
+    ) -> Result<(Bytes, Bytes)> {
+        let encrypt_context = marshal_encrypt_context(label, context)?;
 
+        /*TODO(yngrtc):
         hpke := cs.hpke()
         kem, _, _ := hpke.Params()
-        pub, err := kem.Scheme().UnmarshalBinaryPublicKey(publicKey)
+        pub, err := kem.Scheme().UnmarshalBinaryPublicKey(public_key)
         if err != nil {
             return nil, nil, err
         }
 
-        sender, err := hpke.NewSender(pub, encryptContext)
+        sender, err := hpke.NewSender(pub , encrypt_context)
         if err != nil {
             return nil, nil, err
         }
@@ -217,52 +217,59 @@ impl CipherSuite {
         }
 
         ciphertext, err = sealer.Seal(plaintext, nil)
-        return kemOutput, ciphertext, err
+        return kemOutput, ciphertext, err*/
+        Ok((encrypt_context.clone(), encrypt_context))
     }
 
-    func (cs cipherSuite) decryptWithLabel(privateKey, label, context, kemOutput, ciphertext []byte) ([]byte, error) {
-        encryptContext, err := marshalEncryptContext(label, context)
-        if err != nil {
-            return nil, err
-        }
+    fn decrypt_with_label(
+        &self,
+        _private_key: &[u8],
+        label: &[u8],
+        context: &[u8],
+        _kem_output: &[u8],
+        _ciphertext: &[u8],
+    ) -> Result<Bytes> {
+        let encrypt_context = marshal_encrypt_context(label, context)?;
 
+        /*TODO(yngrtc):
         hpke := cs.hpke()
         kem, _, _ := hpke.Params()
-        priv, err := kem.Scheme().UnmarshalBinaryPrivateKey(privateKey)
+        priv, err := kem.Scheme().UnmarshalBinaryPrivateKey(private_key)
         if err != nil {
             return nil, err
         }
 
-        receiver, err := hpke.NewReceiver(priv, encryptContext)
+        receiver, err := hpke.NewReceiver(priv, encrypt_context)
         if err != nil {
             return nil, err
         }
 
-        opener, err := receiver.Setup(kemOutput)
+        opener, err := receiver.Setup(kem_output)
         if err != nil {
             return nil, err
         }
 
-        return opener.Open(ciphertext, nil)
+        return opener.Open(ciphertext, nil)*/
+        Ok(encrypt_context)
     }
-    */
 }
 
-/*
-func marshalSignContent(label, content []byte) ([]byte, error) {
-    label = append([]byte("MLS 1.0 "), label...)
+fn marshal_sign_content(label: &[u8], content: &[u8]) -> Result<Bytes> {
+    let mut mls_label = "MLS 1.0 ".as_bytes().to_vec();
+    mls_label.extend_from_slice(label);
 
-    var b cryptobyte.Builder
-    writeOpaqueVec(&b, label)
-    writeOpaqueVec(&b, content)
-    return b.Bytes()
+    let mut buf = BytesMut::new();
+    write_opaque_vec(&mls_label, &mut buf)?;
+    write_opaque_vec(content, &mut buf)?;
+    Ok(buf.freeze())
 }
 
-func marshalEncryptContext(label, context []byte) ([]byte, error) {
-    label = append([]byte("MLS 1.0 "), label...)
+fn marshal_encrypt_context(label: &[u8], context: &[u8]) -> Result<Bytes> {
+    let mut mls_label = "MLS 1.0 ".as_bytes().to_vec();
+    mls_label.extend_from_slice(label);
 
-    var b cryptobyte.Builder
-    writeOpaqueVec(&b, label)
-    writeOpaqueVec(&b, context)
-    return b.Bytes()
-}*/
+    let mut buf = BytesMut::new();
+    write_opaque_vec(&mls_label, &mut buf)?;
+    write_opaque_vec(context, &mut buf)?;
+    Ok(buf.freeze())
+}

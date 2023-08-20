@@ -167,7 +167,7 @@ impl RatchetTree {
 
         let h = self.compute_root_tree_hash(cs)?;
 
-        if h != ctx.tree_hash {
+        if h.as_ref() != ctx.tree_hash.as_ref() {
             return Err(Error::TreeHashVerificationFailed);
         }
 
@@ -250,7 +250,7 @@ impl RatchetTree {
         false
     }
 
-    fn compute_root_tree_hash(&self, cs: CipherSuite) -> Result<Bytes> {
+    fn compute_root_tree_hash(&self, cs: CipherSuite) -> Result<digest::Digest> {
         self.compute_tree_hash(cs, self.num_leaves().root(), &HashSet::new())
     }
 
@@ -259,7 +259,7 @@ impl RatchetTree {
         cs: CipherSuite,
         x: NodeIndex,
         exclude: &HashSet<LeafIndex>,
-    ) -> Result<Bytes> {
+    ) -> Result<digest::Digest> {
         let n = self.get(x);
 
         let mut buf = BytesMut::new();
@@ -311,12 +311,17 @@ impl RatchetTree {
                 None
             };
 
-            RatchetTree::marshal_parent_node_hash_input(&mut buf, p, &left_hash, &right_hash)?;
+            RatchetTree::marshal_parent_node_hash_input(
+                &mut buf,
+                p,
+                left_hash.as_ref(),
+                right_hash.as_ref(),
+            )?;
         }
 
         let input = buf.freeze();
         let h = cs.hash();
-        Ok(Bytes::from(h.digest(&input).as_ref().to_vec()))
+        Ok(h.digest(&input))
     }
 
     fn marshal_leaf_node_hash_input<B: BufMut>(
@@ -336,8 +341,8 @@ impl RatchetTree {
     fn marshal_parent_node_hash_input<B: BufMut>(
         buf: &mut B,
         node: Option<&ParentNode>,
-        left_hash: &Bytes,
-        right_hash: &Bytes,
+        left_hash: &[u8],
+        right_hash: &[u8],
     ) -> Result<()> {
         buf.put_u8(NodeType::Parent as u8);
         write_optional(node.is_some(), buf)?;
@@ -377,14 +382,14 @@ impl RatchetTree {
                         };
 
                     let left_parent_hash = if let Ok(left_parent_hash) =
-                        parent_node.compute_parent_hash(cs, &right_tree_hash)
+                        parent_node.compute_parent_hash(cs, right_tree_hash.as_ref())
                     {
                         left_parent_hash
                     } else {
                         return false;
                     };
                     let right_parent_hash = if let Ok(right_parent_hash) =
-                        parent_node.compute_parent_hash(cs, &left_tree_hash)
+                        parent_node.compute_parent_hash(cs, left_tree_hash.as_ref())
                     {
                         right_parent_hash
                     } else {
@@ -392,9 +397,9 @@ impl RatchetTree {
                     };
 
                     let is_left_descendant =
-                        self.find_parent_hash(&self.resolve(l), &left_parent_hash);
+                        self.find_parent_hash(&self.resolve(l), left_parent_hash.as_ref());
                     let is_right_descendant =
-                        self.find_parent_hash(&self.resolve(r), &right_parent_hash);
+                        self.find_parent_hash(&self.resolve(r), right_parent_hash.as_ref());
                     if is_left_descendant == is_right_descendant {
                         return false;
                     }
@@ -404,22 +409,25 @@ impl RatchetTree {
         true
     }
 
-    fn find_parent_hash(&self, node_indices: &[NodeIndex], parent_hash: &Bytes) -> bool {
+    fn find_parent_hash(&self, node_indices: &[NodeIndex], parent_hash: &[u8]) -> bool {
         for x in node_indices {
             if let Some(node) = self.get(*x) {
                 let h = match node.node_type {
                     NodeType::Leaf => {
                         if let Some(leaf_node) = &node.leaf_node {
-                            &leaf_node.parent_hash
+                            match &leaf_node.leaf_node_source {
+                                LeafNodeSource::Commit(parent_hash) => parent_hash,
+                                _ => continue,
+                            }
                         } else {
-                            return false;
+                            continue;
                         }
                     }
                     NodeType::Parent => {
                         if let Some(parent_node) = &node.parent_node {
                             &parent_node.parent_hash
                         } else {
-                            return false;
+                            continue;
                         }
                     }
                 };
@@ -625,7 +633,7 @@ impl RatchetTree {
 
         let exclude = HashSet::new();
         // Compute parent hashes, from root to leaf
-        let mut prev_parent_hash = Bytes::new();
+        let mut prev_parent_hash = None;
         for i in (0..filtered_direct_path.len()).rev() {
             let ni = filtered_direct_path[i];
             let node_parent_hash = if let Some(node) = self.get(ni) {
@@ -649,9 +657,9 @@ impl RatchetTree {
 
                     let tree_hash = self.compute_tree_hash(cs, s, &exclude)?;
 
-                    let node_parent_hash = prev_parent_hash;
-                    prev_parent_hash = node.compute_parent_hash(cs, &tree_hash)?;
-                    Some(node_parent_hash)
+                    let node_parent_hash = prev_parent_hash.take();
+                    prev_parent_hash = Some(node.compute_parent_hash(cs, tree_hash.as_ref())?);
+                    node_parent_hash
                 } else {
                     None
                 }
@@ -663,13 +671,19 @@ impl RatchetTree {
             if let Some(node_parent_hash) = node_parent_hash {
                 if let Some(node) = self.get_mut(ni) {
                     if let Some(node) = &mut node.parent_node {
-                        node.parent_hash = node_parent_hash;
+                        node.parent_hash = Bytes::from(node_parent_hash.as_ref().to_vec());
                     }
                 }
             }
         }
 
-        if path.leaf_node.parent_hash != prev_parent_hash {
+        if let (LeafNodeSource::Commit(parent_hash), Some(prev_parent_hash)) =
+            (&path.leaf_node.leaf_node_source, prev_parent_hash)
+        {
+            if parent_hash != prev_parent_hash.as_ref() {
+                return Err(Error::ParentHashMismatchForUpdatePathLeafNode);
+            }
+        } else {
             return Err(Error::ParentHashMismatchForUpdatePathLeafNode);
         }
 

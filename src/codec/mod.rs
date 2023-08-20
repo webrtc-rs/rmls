@@ -55,14 +55,14 @@ pub(crate) fn read_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
     Ok(buf.copy_to_bytes(n))
 }
 
-pub(crate) fn write_opaque_vec<B: BufMut>(v: &Bytes, buf: &mut B) -> Result<()> {
+pub(crate) fn write_opaque_vec<B: BufMut>(v: &[u8], buf: &mut B) -> Result<()> {
     if v.len() >= 1 << 32 {
         return Err(Error::OpaqueSizeExceedsMaximumValueOfU32);
     }
 
     write_varint(v.len() as u32, buf)?;
 
-    buf.put(&v[..]);
+    buf.put(v);
 
     Ok(())
 }

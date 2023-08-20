@@ -38,8 +38,6 @@ pub enum Error {
     InvalidContentTypeValue(u8),
     #[error("invalid cipher suite value {0}")]
     InvalidCipherSuiteValue(u16),
-    #[error("invalid leaf node source with null lifetime")]
-    InvalidLeafNodeSourceWithNullLifetime,
     #[error("leaf node signature verification failed")]
     LeafNodeSignatureVerificationFailed,
     #[error("credential type {0} used by leaf node not supported by all members")]

@@ -1,9 +1,6 @@
 use bytes::Bytes;
-use p256::{
-    ecdsa::{signature::Signer, signature::Verifier, Signature, SigningKey, VerifyingKey},
-    EncodedPoint,
-};
 use ring::signature::{Ed25519KeyPair, VerificationAlgorithm, ED25519};
+use signature::{Signer, Verifier};
 
 use crate::error::*;
 
@@ -27,12 +24,17 @@ impl SignatureScheme {
                 Ok(Bytes::from(private_key.sign(message).as_ref().to_vec()))
             }
             SignatureScheme::ECDSA_P256_SHA256 => {
-                let private_key = SigningKey::from_bytes(sign_key.into())
+                let private_key = ecdsa::SigningKey::from_bytes(sign_key.into())
                     .map_err(|_| Error::InvalidECDSAPrivateKey)?;
-                let signature: Signature = private_key.sign(message);
+                let signature: p256::ecdsa::Signature = private_key.sign(message);
                 Ok(Bytes::from(signature.to_der().to_bytes().to_vec()))
             }
-            SignatureScheme::ECDSA_P384_SHA384 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::ECDSA_P384_SHA384 => {
+                let private_key = ecdsa::SigningKey::from_bytes(sign_key.into())
+                    .map_err(|_| Error::InvalidECDSAPrivateKey)?;
+                let signature: p384::ecdsa::Signature = private_key.sign(message);
+                Ok(Bytes::from(signature.to_der().to_bytes().to_vec()))
+            }
             SignatureScheme::ECDSA_P521_SHA512 => Err(Error::UnsupportedEcdsa),
             SignatureScheme::Ed448 => Err(Error::UnsupportedEd448),
         }
@@ -47,13 +49,21 @@ impl SignatureScheme {
                 Ok(())
             }
             SignatureScheme::ECDSA_P256_SHA256 => {
-                let encoded_point = EncodedPoint::from_bytes(public_key)?;
-                let verifying_key = VerifyingKey::from_encoded_point(&encoded_point)?;
-                let signature = Signature::from_der(signature)?;
+                let encoded_point = p256::EncodedPoint::from_bytes(public_key)?;
+                let verifying_key: ecdsa::VerifyingKey<p256::NistP256> =
+                    ecdsa::VerifyingKey::from_encoded_point(&encoded_point)?;
+                let signature = ecdsa::Signature::from_der(signature)?;
                 verifying_key.verify(message, &signature)?;
                 Ok(())
             }
-            SignatureScheme::ECDSA_P384_SHA384 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::ECDSA_P384_SHA384 => {
+                let encoded_point = p384::EncodedPoint::from_bytes(public_key)?;
+                let verifying_key: ecdsa::VerifyingKey<p384::NistP384> =
+                    ecdsa::VerifyingKey::from_encoded_point(&encoded_point)?;
+                let signature = ecdsa::Signature::from_der(signature)?;
+                verifying_key.verify(message, &signature)?;
+                Ok(())
+            }
             SignatureScheme::ECDSA_P521_SHA512 => Err(Error::UnsupportedEcdsa),
             SignatureScheme::Ed448 => Err(Error::UnsupportedEd448),
         }

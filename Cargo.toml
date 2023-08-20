@@ -15,6 +15,7 @@ bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ring = "0.16.20"
+ecdsa = "0.16.8"
 p256 = "0.13.2"
 p384 = "0.13.0"
-ecdsa = "0.16.8"
+p521 = "0.13.0"

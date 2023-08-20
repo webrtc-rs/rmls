@@ -1,5 +1,4 @@
 use crate::codec::*;
-use crate::crypto::hash::Hash;
 use crate::key_schedule::GroupContext;
 use crate::tree::*;
 
@@ -163,17 +162,22 @@ impl RatchetTree {
     //
     //   - It doesn't check that credentials are valid.
     //   - It doesn't check the lifetime field.
-    fn verify_integrity(&self, ctx: &GroupContext, now: impl Fn() -> SystemTime) -> Result<()> {
-        let cs = ctx.cipher_suite;
+    fn verify_integrity(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        ctx: &GroupContext,
+        now: impl Fn() -> SystemTime,
+    ) -> Result<()> {
+        let cipher_suite = ctx.cipher_suite;
         let num_leaves = self.num_leaves();
 
-        let h = self.compute_root_tree_hash(cs)?;
+        let h = self.compute_root_tree_hash(crypto_provider, cipher_suite)?;
 
         if h.as_ref() != ctx.tree_hash.as_ref() {
             return Err(Error::TreeHashVerificationFailed);
         }
 
-        if !self.verify_parent_hashes(cs) {
+        if !self.verify_parent_hashes(crypto_provider, cipher_suite) {
             return Err(Error::ParentHashesVerificationFailed);
         }
 
@@ -182,15 +186,18 @@ impl RatchetTree {
         let mut encryption_keys = HashSet::new();
         for li in 0..num_leaves.0 {
             if let Some(node) = self.get_leaf(LeafIndex(li)) {
-                node.verify(LeafNodeVerifyOptions {
-                    cipher_suite: cs,
-                    group_id: &ctx.group_id,
-                    leaf_index: LeafIndex(li),
-                    supported_creds: &supported_creds,
-                    signature_keys: &signature_keys,
-                    encryption_keys: &encryption_keys,
-                    now: &now,
-                })?;
+                node.verify(
+                    crypto_provider,
+                    LeafNodeVerifyOptions {
+                        cipher_suite,
+                        group_id: &ctx.group_id,
+                        leaf_index: LeafIndex(li),
+                        supported_creds: &supported_creds,
+                        signature_keys: &signature_keys,
+                        encryption_keys: &encryption_keys,
+                        now: &now,
+                    },
+                )?;
 
                 signature_keys.insert(node.signature_key.clone());
                 encryption_keys.insert(node.encryption_key.clone());
@@ -252,13 +259,23 @@ impl RatchetTree {
         false
     }
 
-    fn compute_root_tree_hash(&self, cs: CipherSuite) -> Result<Bytes> {
-        self.compute_tree_hash(cs, self.num_leaves().root(), &HashSet::new())
+    fn compute_root_tree_hash(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+    ) -> Result<Bytes> {
+        self.compute_tree_hash(
+            crypto_provider,
+            cipher_suite,
+            self.num_leaves().root(),
+            &HashSet::new(),
+        )
     }
 
     fn compute_tree_hash(
         &self,
-        cs: CipherSuite,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
         x: NodeIndex,
         exclude: &HashSet<LeafIndex>,
     ) -> Result<Bytes> {
@@ -285,8 +302,9 @@ impl RatchetTree {
                 return Err(Error::InvalidChildren);
             }
 
-            let left_hash = self.compute_tree_hash(cs, left, exclude)?;
-            let right_hash = self.compute_tree_hash(cs, right, exclude)?;
+            let left_hash = self.compute_tree_hash(crypto_provider, cipher_suite, left, exclude)?;
+            let right_hash =
+                self.compute_tree_hash(crypto_provider, cipher_suite, right, exclude)?;
 
             let mut filtered_parent;
 
@@ -322,7 +340,7 @@ impl RatchetTree {
         }
 
         let input = buf.freeze();
-        let h = cs.hash();
+        let h = crypto_provider.hash(cipher_suite);
         Ok(h.digest(&input))
     }
 
@@ -355,7 +373,11 @@ impl RatchetTree {
         write_opaque_vec(right_hash, buf)
     }
 
-    fn verify_parent_hashes(&self, cs: CipherSuite) -> bool {
+    fn verify_parent_hashes(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+    ) -> bool {
         for (i, node) in self.0.iter().enumerate() {
             if let Some(node) = node {
                 let x = NodeIndex(i as u32);
@@ -370,28 +392,33 @@ impl RatchetTree {
                         exclude.insert(*li);
                     }
 
-                    let left_tree_hash =
-                        if let Ok(left_tree_hash) = self.compute_tree_hash(cs, l, &exclude) {
-                            left_tree_hash
-                        } else {
-                            return false;
-                        };
-                    let right_tree_hash =
-                        if let Ok(right_tree_hash) = self.compute_tree_hash(cs, r, &exclude) {
-                            right_tree_hash
-                        } else {
-                            return false;
-                        };
-
-                    let left_parent_hash = if let Ok(left_parent_hash) =
-                        parent_node.compute_parent_hash(cs, right_tree_hash.as_ref())
+                    let left_tree_hash = if let Ok(left_tree_hash) =
+                        self.compute_tree_hash(crypto_provider, cipher_suite, l, &exclude)
                     {
+                        left_tree_hash
+                    } else {
+                        return false;
+                    };
+                    let right_tree_hash = if let Ok(right_tree_hash) =
+                        self.compute_tree_hash(crypto_provider, cipher_suite, r, &exclude)
+                    {
+                        right_tree_hash
+                    } else {
+                        return false;
+                    };
+
+                    let left_parent_hash = if let Ok(left_parent_hash) = parent_node
+                        .compute_parent_hash(
+                            crypto_provider,
+                            cipher_suite,
+                            right_tree_hash.as_ref(),
+                        ) {
                         left_parent_hash
                     } else {
                         return false;
                     };
-                    let right_parent_hash = if let Ok(right_parent_hash) =
-                        parent_node.compute_parent_hash(cs, left_tree_hash.as_ref())
+                    let right_parent_hash = if let Ok(right_parent_hash) = parent_node
+                        .compute_parent_hash(crypto_provider, cipher_suite, left_tree_hash.as_ref())
                     {
                         right_parent_hash
                     } else {
@@ -602,7 +629,8 @@ impl RatchetTree {
 
     fn merge_update_path(
         &mut self,
-        cs: CipherSuite,
+        crypto_provide: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
         sender_leaf_index: LeafIndex,
         path: UpdatePath,
     ) -> Result<()> {
@@ -657,10 +685,15 @@ impl RatchetTree {
                         s = r;
                     }
 
-                    let tree_hash = self.compute_tree_hash(cs, s, &exclude)?;
+                    let tree_hash =
+                        self.compute_tree_hash(crypto_provide, cipher_suite, s, &exclude)?;
 
                     let node_parent_hash = prev_parent_hash.take();
-                    prev_parent_hash = Some(node.compute_parent_hash(cs, tree_hash.as_ref())?);
+                    prev_parent_hash = Some(node.compute_parent_hash(
+                        crypto_provide,
+                        cipher_suite,
+                        tree_hash.as_ref(),
+                    )?);
                     node_parent_hash
                 } else {
                     None

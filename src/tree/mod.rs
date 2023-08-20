@@ -9,7 +9,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::cipher_suite::*;
 use crate::codec::*;
-use crate::crypto::hash::Hash;
+use crate::crypto::crypto_provider::CryptoProvider;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
@@ -67,7 +67,8 @@ impl Writer for ParentNode {
 impl ParentNode {
     pub(crate) fn compute_parent_hash(
         &self,
-        cs: CipherSuite,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
         original_sibling_tree_hash: &[u8],
     ) -> Result<Bytes> {
         let input = ParentNode::marshal_parent_hash_input(
@@ -75,7 +76,7 @@ impl ParentNode {
             &self.parent_hash,
             original_sibling_tree_hash,
         )?;
-        let h = cs.hash();
+        let h = crypto_provider.hash(cipher_suite);
         Ok(h.digest(&input))
     }
 
@@ -496,7 +497,13 @@ impl LeafNode {
     //
     // group_id and li can be left unspecified if the leaf node source is neither
     // update nor commit.
-    fn verify_signature(&self, cs: CipherSuite, group_id: &GroupID, leaf_index: LeafIndex) -> bool {
+    fn verify_signature(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        group_id: &GroupID,
+        leaf_index: LeafIndex,
+    ) -> bool {
         let leaf_node_tbs = if let Ok(leaf_node_tbs) = write(&LeafNodeTBS {
             leaf_node: self,
             group_id,
@@ -506,23 +513,29 @@ impl LeafNode {
         } else {
             return false;
         };
-        cs.verify_with_label(
-            &self.signature_key,
-            "LeafNodeTBS".as_bytes(),
-            &leaf_node_tbs,
-            &self.signature,
-        )
-        .is_ok()
+        crypto_provider
+            .verify_with_label(
+                cipher_suite,
+                &self.signature_key,
+                "LeafNodeTBS".as_bytes(),
+                &leaf_node_tbs,
+                &self.signature,
+            )
+            .is_ok()
     }
 
     // verify performs leaf node validation described in section 7.3.
     //
     // It does not perform all checks: it does not check that the credential is
     // valid.
-    fn verify(&self, options: LeafNodeVerifyOptions<'_>) -> Result<()> {
+    fn verify(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        options: LeafNodeVerifyOptions<'_>,
+    ) -> Result<()> {
         let li = options.leaf_index;
 
-        if !self.verify_signature(options.cipher_suite, options.group_id, li) {
+        if !self.verify_signature(crypto_provider, options.cipher_suite, options.group_id, li) {
             return Err(Error::LeafNodeSignatureVerificationFailed);
         }
 

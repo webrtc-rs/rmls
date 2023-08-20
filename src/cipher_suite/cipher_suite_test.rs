@@ -1,5 +1,6 @@
 use super::*;
 use crate::codec::codec_test::*;
+use crate::crypto::crypto_provider::{ring::RingCryptoProvider, CryptoProvider};
 use crate::error::*;
 
 use serde::{Deserialize, Serialize};
@@ -22,11 +23,15 @@ struct RefHashTest {
     value: String,
 }
 
-fn test_ref_hash(cs: CipherSuite, tc: &RefHashTest) -> Result<()> {
+fn test_ref_hash(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &RefHashTest,
+) -> Result<()> {
     let label = tc.label.as_bytes();
     let value = hex_to_bytes(&tc.value);
     let expect_out = hex_to_bytes(&tc.out);
-    let actual_out = cs.ref_hash(label, &value)?;
+    let actual_out = crypto_provider.ref_hash(cipher_suite, label, &value)?;
 
     assert_eq!(
         actual_out.as_ref(),
@@ -103,13 +108,17 @@ struct SignWithLabelTest {
     signature: String,
 }
 
-fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
-    if cs == CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
-        || cs == CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
-        || cs == CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
+fn test_sign_with_label(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &SignWithLabelTest,
+) -> Result<()> {
+    if cipher_suite == CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
+        || cipher_suite == CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
+        || cipher_suite == CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
     {
         //TODO(yngrtc): implement ECDSA_P521_SHA512 and Ed448
-        println!("\t test_sign_with_label {:?} skipped", cs);
+        println!("\t test_sign_with_label {:?} skipped", cipher_suite);
         return Ok(());
     }
     let private = hex_to_bytes(&tc.r#priv);
@@ -119,15 +128,17 @@ fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
     let signature = hex_to_bytes(&tc.signature);
 
     assert!(
-        cs.verify_with_label(&public, label, &content, &signature)
+        crypto_provider
+            .verify_with_label(cipher_suite, &public, label, &content, &signature)
             .is_ok(),
         "reference signature did not verify"
     );
 
-    let sign_value = cs.sign_with_label(&private, label, &content)?;
+    let sign_value = crypto_provider.sign_with_label(cipher_suite, &private, label, &content)?;
 
     assert!(
-        cs.verify_with_label(&public, label, &content, &sign_value)
+        crypto_provider
+            .verify_with_label(cipher_suite, &public, label, &content, &sign_value)
             .is_ok(),
         "generated signature did not verify"
     );
@@ -173,11 +184,13 @@ func testEncryptWithLabel(t *testing.T, cs cipherSuite, tc *encryptWithLabelTest
 fn test_crypto_basics() -> Result<()> {
     let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
 
+    let crypto_provider = RingCryptoProvider {};
+
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("testing {}:\n\t {:?}", cipher_suite, tc);
 
-        test_ref_hash(cipher_suite, &tc.ref_hash)?;
+        test_ref_hash(&crypto_provider, cipher_suite, &tc.ref_hash)?;
         /*
         t.Run("expand_with_label", func(t *testing.T) {
             testExpandWithLabel(t, tc.CipherSuite, &tc.ExpandWithLabel)
@@ -188,7 +201,7 @@ fn test_crypto_basics() -> Result<()> {
         t.Run("derive_tree_secret", func(t *testing.T) {
             testDeriveTreeSecret(t, tc.CipherSuite, &tc.DeriveTreeSecret)
         })*/
-        test_sign_with_label(cipher_suite, &tc.sign_with_label)?;
+        test_sign_with_label(&crypto_provider, cipher_suite, &tc.sign_with_label)?;
         /*
         t.Run("encrypt_with_label", func(t *testing.T) {
             testEncryptWithLabel(t, tc.CipherSuite, &tc.EncryptWithLabel)

@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod cipher_suite_test;
+
 use crate::codec::*;
 use crate::crypto::{
     hash::Hash,

@@ -22,8 +22,7 @@ struct RefHashTest {
     value: String,
 }
 
-fn test_ref_hash(cs: u16, tc: &RefHashTest) -> Result<()> {
-    let cs: CipherSuite = cs.try_into()?;
+fn test_ref_hash(cs: CipherSuite, tc: &RefHashTest) -> Result<()> {
     let label = tc.label.as_bytes();
     let value = hex_to_bytes(&tc.value);
     let expect_out = hex_to_bytes(&tc.out);
@@ -103,21 +102,34 @@ struct SignWithLabelTest {
     label: String,
     signature: String,
 }
-/*
-func testSignWithLabel(t *testing.T, cs cipherSuite, tc *signWithLabelTest) {
-    if !cs.verifyWithLabel([]byte(tc.Pub), []byte(tc.label), []byte(tc.Content), []byte(tc.Signature)) {
-        t.Error("reference signature did not verify")
-    }
 
-    signValue, err := cs.signWithLabel([]byte(tc.Priv), []byte(tc.label), []byte(tc.Content))
-    if err != nil {
-        t.Fatalf("signWithLabel() = %v", err)
+fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
+    if cs.signature() != SignatureScheme::Ed25519 {
+        //TODO(yngrtc): implement other signature scheme
+        println!("\t test_sign_with_label {} skipped", cs);
+        return Ok(());
     }
-    if !cs.verifyWithLabel([]byte(tc.Pub), []byte(tc.label), []byte(tc.Content), signValue) {
-        t.Error("generated signature did not verify")
-    }
+    let private = hex_to_bytes(&tc.r#priv);
+    let public = hex_to_bytes(&tc.r#pub);
+    let content = hex_to_bytes(&tc.content);
+    let label = tc.label.as_bytes();
+    let signature = hex_to_bytes(&tc.signature);
+
+    assert!(
+        cs.verify_with_label(&public, label, &content, &signature),
+        "reference signature did not verify"
+    );
+
+    let sign_value = cs.sign_with_label(&private, label, &content)?;
+
+    assert!(
+        cs.verify_with_label(&public, label, &content, sign_value.as_ref()),
+        "generated signature did not verify"
+    );
+
+    Ok(())
 }
-*/
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct EncryptWithLabelTest {
     r#priv: String,
@@ -157,7 +169,10 @@ fn test_crypto_basics() -> Result<()> {
     let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
 
     for tc in tests {
-        test_ref_hash(tc.cipher_suite, &tc.ref_hash)?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        println!("testing {}:\n\t {:?}", cipher_suite, tc);
+
+        test_ref_hash(cipher_suite, &tc.ref_hash)?;
         /*
         t.Run("expand_with_label", func(t *testing.T) {
             testExpandWithLabel(t, tc.CipherSuite, &tc.ExpandWithLabel)
@@ -167,10 +182,9 @@ fn test_crypto_basics() -> Result<()> {
         })
         t.Run("derive_tree_secret", func(t *testing.T) {
             testDeriveTreeSecret(t, tc.CipherSuite, &tc.DeriveTreeSecret)
-        })
-        t.Run("sign_with_label", func(t *testing.T) {
-            testSignWithLabel(t, tc.CipherSuite, &tc.SignWithLabel)
-        })
+        })*/
+        test_sign_with_label(cipher_suite, &tc.sign_with_label)?;
+        /*
         t.Run("encrypt_with_label", func(t *testing.T) {
             testEncryptWithLabel(t, tc.CipherSuite, &tc.EncryptWithLabel)
         })*/

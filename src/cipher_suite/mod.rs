@@ -3,17 +3,16 @@ mod cipher_suite_test;
 
 use crate::codec::*;
 use crate::crypto::{
-    hash::Hash,
+    hash::{Hash, HashScheme},
     hpke::{
         algs::{Aead, Kdf, Kem},
-        HpkeSuite,
+        Hpke, HpkeSuite,
     },
-    signature::SignatureScheme,
+    signature::{Signature, SignatureScheme},
 };
 use crate::error::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use ring::{digest, hmac};
 use std::fmt::{Display, Formatter};
 
 #[allow(non_camel_case_types)]
@@ -54,19 +53,38 @@ impl Display for CipherSuite {
 }
 
 impl CipherSuite {
-    pub(crate) fn hash(&self) -> Hash {
-        match *self {
+    pub fn supports(&self, cipher_suite: CipherSuite) -> Result<()> {
+        match cipher_suite {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
-            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256
-            | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Hash::SHA256,
-            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => Hash::SHA384,
-            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
-            | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
-            | CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => Hash::SHA512,
+            | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
+            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Ok(()),
+            _ => Err(Error::UnsupportedCipherSuite),
         }
     }
 
-    pub(crate) fn hpke(&self) -> HpkeSuite {
+    pub fn supported(&self) -> Vec<CipherSuite> {
+        vec![
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519,
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
+        ]
+    }
+
+    pub fn hash(&self) -> impl Hash {
+        match *self {
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256
+            | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
+                HashScheme::SHA256
+            }
+            CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => HashScheme::SHA384,
+            CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
+            | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
+            | CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => HashScheme::SHA512,
+        }
+    }
+
+    pub fn hpke(&self) -> impl Hpke {
         match *self {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => HpkeSuite::new(
                 Kem::KEM_X25519_HKDF_SHA256,
@@ -106,7 +124,7 @@ impl CipherSuite {
         }
     }
 
-    pub(crate) fn signature(&self) -> SignatureScheme {
+    pub fn signature(&self) -> impl Signature {
         match *self {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
             | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
@@ -128,16 +146,16 @@ impl CipherSuite {
         }
     }
 
-    fn sign_mac(&self, key: &[u8], message: &[u8]) -> hmac::Tag {
+    fn sign_mac(&self, key: &[u8], message: &[u8]) -> Bytes {
         // All cipher suites use HMAC
-        self.hash().sign_mac(key, message)
+        self.hash().sign(key, message)
     }
 
     fn verify_mac(&self, key: &[u8], message: &[u8], tag: &[u8]) -> bool {
         tag == self.sign_mac(key, message).as_ref()
     }
 
-    fn ref_hash(&self, label: &[u8], value: &[u8]) -> Result<digest::Digest> {
+    fn ref_hash(&self, label: &[u8], value: &[u8]) -> Result<Bytes> {
         let mut buf = BytesMut::new();
         write_opaque_vec(label, &mut buf)?;
         write_opaque_vec(value, &mut buf)?;

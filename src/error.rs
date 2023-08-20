@@ -80,6 +80,8 @@ pub enum Error {
     UnsupportedEd448,
     #[error("ring error {0}")]
     RingError(String),
+    #[error("unsupported CipherSuite")]
+    UnsupportedCipherSuite,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

@@ -104,11 +104,12 @@ struct SignWithLabelTest {
 }
 
 fn test_sign_with_label(cs: CipherSuite, tc: &SignWithLabelTest) -> Result<()> {
-    if cs.signature() == SignatureScheme::ECDSA_P521_SHA512
-        || cs.signature() == SignatureScheme::Ed448
+    if cs == CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
+        || cs == CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
+        || cs == CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
     {
         //TODO(yngrtc): implement ECDSA_P521_SHA512 and Ed448
-        println!("\t test_sign_with_label {:?} skipped", cs.signature());
+        println!("\t test_sign_with_label {:?} skipped", cs);
         return Ok(());
     }
     let private = hex_to_bytes(&tc.r#priv);

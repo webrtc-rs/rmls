@@ -1,29 +1,39 @@
-use ring::digest::{self, digest, SHA256, SHA384, SHA512};
-use ring::hmac;
+use bytes::Bytes;
+use ring::{
+    digest::{digest, SHA256, SHA384, SHA512},
+    hmac,
+};
+
+pub trait Hash {
+    fn digest(&self, data: &[u8]) -> Bytes;
+
+    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;
+}
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum Hash {
+pub(crate) enum HashScheme {
     #[default]
     SHA256,
     SHA384,
     SHA512,
 }
 
-impl Hash {
-    pub(crate) fn digest(&self, data: &[u8]) -> digest::Digest {
-        match *self {
-            Hash::SHA256 => digest(&SHA256, data),
-            Hash::SHA384 => digest(&SHA384, data),
-            Hash::SHA512 => digest(&SHA512, data),
-        }
+impl Hash for HashScheme {
+    fn digest(&self, data: &[u8]) -> Bytes {
+        let d = match *self {
+            HashScheme::SHA256 => digest(&SHA256, data),
+            HashScheme::SHA384 => digest(&SHA384, data),
+            HashScheme::SHA512 => digest(&SHA512, data),
+        };
+        Bytes::from(d.as_ref().to_vec())
     }
 
-    pub(crate) fn sign_mac(&self, key: &[u8], message: &[u8]) -> hmac::Tag {
+    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes {
         let hmac_key = match *self {
-            Hash::SHA256 => hmac::Key::new(hmac::HMAC_SHA256, key),
-            Hash::SHA384 => hmac::Key::new(hmac::HMAC_SHA384, key),
-            Hash::SHA512 => hmac::Key::new(hmac::HMAC_SHA512, key),
+            HashScheme::SHA256 => hmac::Key::new(hmac::HMAC_SHA256, key),
+            HashScheme::SHA384 => hmac::Key::new(hmac::HMAC_SHA384, key),
+            HashScheme::SHA512 => hmac::Key::new(hmac::HMAC_SHA512, key),
         };
-        hmac::sign(&hmac_key, message)
+        Bytes::from(hmac::sign(&hmac_key, message).as_ref().to_vec())
     }
 }

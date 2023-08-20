@@ -2,6 +2,8 @@ pub mod algs;
 
 use algs::*;
 
+pub trait Hpke {}
+
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct HpkeSuite {
@@ -15,3 +17,5 @@ impl HpkeSuite {
         HpkeSuite { kem, kdf, aead }
     }
 }
+
+impl Hpke for HpkeSuite {}

@@ -3,13 +3,13 @@ pub(crate) mod secret_tree;
 pub(crate) mod tree_math;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use ring::digest;
 use std::collections::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::cipher_suite::*;
 use crate::codec::*;
+use crate::crypto::hash::Hash;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
@@ -69,7 +69,7 @@ impl ParentNode {
         &self,
         cs: CipherSuite,
         original_sibling_tree_hash: &[u8],
-    ) -> Result<digest::Digest> {
+    ) -> Result<Bytes> {
         let input = ParentNode::marshal_parent_hash_input(
             &self.encryption_key,
             &self.parent_hash,

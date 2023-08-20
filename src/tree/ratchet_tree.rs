@@ -1,6 +1,8 @@
 use crate::codec::*;
+use crate::crypto::hash::Hash;
 use crate::key_schedule::GroupContext;
 use crate::tree::*;
+
 use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -250,7 +252,7 @@ impl RatchetTree {
         false
     }
 
-    fn compute_root_tree_hash(&self, cs: CipherSuite) -> Result<digest::Digest> {
+    fn compute_root_tree_hash(&self, cs: CipherSuite) -> Result<Bytes> {
         self.compute_tree_hash(cs, self.num_leaves().root(), &HashSet::new())
     }
 
@@ -259,7 +261,7 @@ impl RatchetTree {
         cs: CipherSuite,
         x: NodeIndex,
         exclude: &HashSet<LeafIndex>,
-    ) -> Result<digest::Digest> {
+    ) -> Result<Bytes> {
         let n = self.get(x);
 
         let mut buf = BytesMut::new();

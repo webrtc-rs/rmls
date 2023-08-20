@@ -13,7 +13,6 @@ use crate::crypto::{
 use crate::error::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use ring::signature::Signature;
 use ring::{digest, hmac};
 use std::fmt::{Display, Formatter};
 
@@ -111,18 +110,18 @@ impl CipherSuite {
         match *self {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => SignatureScheme::Ed25519,
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => {
-                SignatureScheme::ECDSA_P256_SHA256_ASN1
+                SignatureScheme::ECDSA_P256_SHA256
             }
             CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
                 SignatureScheme::Ed25519
             }
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448 => SignatureScheme::Ed448,
             CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521 => {
-                SignatureScheme::ECDSA_P521_SHA512_ASN1
+                SignatureScheme::ECDSA_P521_SHA512
             }
             CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448 => SignatureScheme::Ed448,
             CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => {
-                SignatureScheme::ECDSA_P384_SHA384_ASN1
+                SignatureScheme::ECDSA_P384_SHA384
             }
         }
     }
@@ -171,7 +170,7 @@ impl CipherSuite {
         Ok(Bytes::new())
     }
 
-    fn sign_with_label(&self, sign_key: &[u8], label: &[u8], content: &[u8]) -> Result<Signature> {
+    fn sign_with_label(&self, sign_key: &[u8], label: &[u8], content: &[u8]) -> Result<Bytes> {
         let sign_content = marshal_sign_content(label, content)?;
         self.signature().sign(sign_key, &sign_content)
     }

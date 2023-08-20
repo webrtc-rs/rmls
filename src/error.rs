@@ -70,8 +70,10 @@ pub enum Error {
     UpdatePathAndFilteredDirectPathHasDifferentNode,
     #[error("parent hash mismatch for update path's leaf node")]
     ParentHashMismatchForUpdatePathLeafNode,
-    #[error("invalid Ed25519 private key size")]
-    InvalidEd25519PrivateKeySize,
+    #[error("invalid Ed25519 private key")]
+    InvalidEd25519PrivateKey,
+    #[error("invalid ECDSA private key")]
+    InvalidECDSAPrivateKey,
     #[error("unsupported Ecdsa")]
     UnsupportedEcdsa,
     #[error("unsupported Ed448")]

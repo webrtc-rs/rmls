@@ -84,6 +84,8 @@ pub enum Error {
     RustCryptoError(String),
     #[error("unsupported CipherSuite")]
     UnsupportedCipherSuite,
+    #[error("unsupported HKPE KEM")]
+    UnsupportedHkpeKem,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

@@ -6,7 +6,7 @@ use crate::crypto::hpke_algs::*;
 use crate::error::*;
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub(super) struct HpkeSuite {
     kem: Kem,
     kdf: Kdf,

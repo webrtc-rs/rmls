@@ -46,6 +46,7 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
 
         Ok(Bytes::from(out))
     }
+
     fn kdf_extract_size(&self) -> usize {
         match self.kdf {
             Kdf::KDF_HKDF_SHA256 => 32,

@@ -123,8 +123,7 @@ pub trait CryptoProvider {
         context: &[u8],
         _plaintext: &[u8],
     ) -> Result<(Bytes, Bytes)> {
-        let encrypt_context = mls_prefix_label_data(label, context)?;
-
+        let _encrypt_context = mls_prefix_label_data(label, context)?;
         /*TODO(yngrtc):
         hpke := cs.hpke()
         kem, _, _ := hpke.Params()
@@ -145,7 +144,7 @@ pub trait CryptoProvider {
 
         ciphertext, err = sealer.Seal(plaintext, nil)
         return kemOutput, ciphertext, err*/
-        Ok((encrypt_context.clone(), encrypt_context))
+        Ok((Bytes::new(), Bytes::new()))
     }
 
     fn decrypt_with_label(
@@ -157,8 +156,7 @@ pub trait CryptoProvider {
         _kem_output: &[u8],
         _ciphertext: &[u8],
     ) -> Result<Bytes> {
-        let encrypt_context = mls_prefix_label_data(label, context)?;
-
+        let _encrypt_context = mls_prefix_label_data(label, context)?;
         /*TODO(yngrtc):
         hpke := cs.hpke()
         kem, _, _ := hpke.Params()
@@ -178,7 +176,7 @@ pub trait CryptoProvider {
         }
 
         return opener.Open(ciphertext, nil)*/
-        Ok(encrypt_context)
+        Ok(Bytes::new())
     }
 }
 

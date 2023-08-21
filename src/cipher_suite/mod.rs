@@ -6,7 +6,7 @@ use crate::error::*;
 use std::fmt::{Display, Formatter};
 
 #[allow(non_camel_case_types)]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u16)]
 pub enum CipherSuite {
     #[default]

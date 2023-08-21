@@ -191,3 +191,9 @@ fn mls_prefix_label_data(label: &[u8], data: &[u8]) -> Result<Bytes> {
     write_opaque_vec(data, &mut buf)?;
     Ok(buf.freeze())
 }
+
+struct CipherSuiteDescription {
+    hash: Arc<dyn Hash>,
+    hpke: Arc<dyn Hpke>,
+    signature: Arc<dyn Signature>,
+}

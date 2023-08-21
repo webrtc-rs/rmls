@@ -51,11 +51,11 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
         let infos = [info];
         let okm = prk
             .expand(&infos, MyKeyType(length))
-            .map_err(|err| Error::RingError(err.to_string()))?;
+            .map_err(|err| Error::RingCryptoError(err.to_string()))?;
 
         let mut out = vec![0u8; length as usize];
         okm.fill(&mut out)
-            .map_err(|err| Error::RingError(err.to_string()))?;
+            .map_err(|err| Error::RingCryptoError(err.to_string()))?;
 
         Ok(Bytes::from(out))
     }

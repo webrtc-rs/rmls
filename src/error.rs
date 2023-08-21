@@ -78,8 +78,10 @@ pub enum Error {
     UnsupportedEcdsa,
     #[error("unsupported Ed448")]
     UnsupportedEd448,
-    #[error("ring error {0}")]
-    RingError(String),
+    #[error("RingCrypto error {0}")]
+    RingCryptoError(String),
+    #[error("RustCrypto error {0}")]
+    RustCryptoError(String),
     #[error("unsupported CipherSuite")]
     UnsupportedCipherSuite,
 

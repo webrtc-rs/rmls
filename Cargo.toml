@@ -14,12 +14,15 @@ thiserror = "1"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-hpke = "0.10.0"
+#hpke = "0.10.0"
+
 # RingCryptoProvider
 ring = "0.16.20"
+
 # RustCryptoProvider
 sha2 = "0.10.7"
 hmac = "0.12.1"
+hkdf = "0.12.3"
 ed25519-dalek = "2.0.0"
 ecdsa = "0.16.8"
 sec1 = "0.7.3"

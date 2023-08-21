@@ -1,6 +1,8 @@
 pub mod algs;
 
 use bytes::Bytes;
+use hkdf::Hkdf;
+use sha2::{Sha256, Sha384, Sha512};
 
 use crate::error::*;
 use algs::*;
@@ -20,8 +22,31 @@ impl HpkeSuite {
 }
 
 impl crate::crypto::provider::Hpke for HpkeSuite {
-    fn kdf_expand(&self, _secret: &[u8], _info: &[u8], _length: u16) -> Result<Bytes> {
-        Ok(Bytes::new())
+    fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
+        let mut out = vec![0u8; length as usize];
+
+        match self.kdf {
+            Kdf::KDF_HKDF_SHA256 => {
+                let hkdf = Hkdf::<Sha256>::from_prk(secret)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+                hkdf.expand(info, &mut out)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+            }
+            Kdf::KDF_HKDF_SHA384 => {
+                let hkdf = Hkdf::<Sha384>::from_prk(secret)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+                hkdf.expand(info, &mut out)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+            }
+            Kdf::KDF_HKDF_SHA512 => {
+                let hkdf = Hkdf::<Sha512>::from_prk(secret)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+                hkdf.expand(info, &mut out)
+                    .map_err(|err| Error::RustCryptoError(err.to_string()))?;
+            }
+        };
+
+        Ok(Bytes::from(out))
     }
     fn kdf_extract_size(&self) -> usize {
         match self.kdf {

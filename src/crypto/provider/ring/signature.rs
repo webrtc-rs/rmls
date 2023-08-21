@@ -45,7 +45,7 @@ impl crate::crypto::provider::Signature for SignatureScheme {
             SignatureScheme::Ed25519 => {
                 ED25519
                     .verify(public_key.into(), message.into(), signature.into())
-                    .map_err(|err| Error::RingError(err.to_string()))?;
+                    .map_err(|err| Error::RingCryptoError(err.to_string()))?;
                 Ok(())
             }
             SignatureScheme::ECDSA_P256_SHA256 => {

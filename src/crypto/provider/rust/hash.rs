@@ -10,7 +10,7 @@ pub(super) enum HashScheme {
     SHA512,
 }
 
-impl crate::crypto::crypto_provider::Hash for HashScheme {
+impl crate::crypto::provider::Hash for HashScheme {
     fn digest(&self, data: &[u8]) -> Bytes {
         match *self {
             HashScheme::SHA256 => {

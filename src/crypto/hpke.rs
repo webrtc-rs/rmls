@@ -16,4 +16,4 @@ impl HpkeSuite {
     }
 }
 
-impl crate::crypto::crypto_provider::Hpke for HpkeSuite {}
+impl crate::crypto::provider::Hpke for HpkeSuite {}

@@ -15,7 +15,7 @@ pub(super) enum SignatureScheme {
     Ed448,
 }
 
-impl crate::crypto::crypto_provider::Signature for SignatureScheme {
+impl crate::crypto::provider::Signature for SignatureScheme {
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes> {
         match *self {
             SignatureScheme::Ed25519 => {

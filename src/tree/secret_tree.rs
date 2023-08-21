@@ -1,6 +1,7 @@
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::cipher_suite::*;
+use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 use crate::framing::*;
 use crate::tree::tree_math::*;
@@ -95,29 +96,36 @@ impl RatchetSecret  {
     fn deriveNonce(&self, cs: CipherSuite) ->Result<Bytes> {
         _, _, aead := cs.hpke().Params()
         nn := uint16(aead.NonceSize())
-        return deriveTreeSecret(cs, secret.secret, []byte("nonce"), secret.generation, nn)
+        return derive_tree_secret(cs, secret.secret, []byte("nonce"), secret.generation, nn)
     }
 
     fn deriveKey(cs cipherSuite) ([]byte, error) {
         _, _, aead := cs.hpke().Params()
         nk := uint16(aead.KeySize())
-        return deriveTreeSecret(cs, secret.secret, []byte("key"), secret.generation, nk)
+        return derive_tree_secret(cs, secret.secret, []byte("key"), secret.generation, nk)
     }
 
     fn deriveNext(cs cipherSuite) (ratchetSecret, error) {
         _, kdf, _ := cs.hpke().Params()
         nh := uint16(kdf.ExtractSize())
-        next, err := deriveTreeSecret(cs, secret.secret, []byte("secret"), secret.generation, nh)
+        next, err := derive_tree_secret(cs, secret.secret, []byte("secret"), secret.generation, nh)
         return ratchetSecret{next, secret.generation + 1}, err
     }
 
 }
-
-fn deriveTreeSecret(cs cipherSuite, secret, label []byte, generation uint32, length uint16) ([]byte, error) {
-    var b cryptobyte.Builder
-    b.AddUint32(generation)
-    context := b.BytesOrPanic()
-
-    return cs.expandWithLabel(secret, label, context, length)
-}
 */
+
+pub fn derive_tree_secret(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    secret: &[u8],
+    label: &[u8],
+    generation: u32,
+    length: u16,
+) -> Result<Bytes> {
+    let mut buf = BytesMut::new();
+    buf.put_u32(generation);
+    let context = buf.freeze();
+
+    crypto_provider.expand_with_label(cipher_suite, secret, label, &context, length)
+}

@@ -3,6 +3,7 @@ use crate::codec::codec_test::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
 
+use crate::tree::secret_tree::derive_tree_secret;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -111,17 +112,35 @@ struct DeriveTreeSecretTest {
     length: u16,
     out: String,
 }
-/*
-func testDeriveTreeSecret(t *testing.T, cs cipherSuite, tc *deriveTreeSecretTest) {
-    out, err := deriveTreeSecret(cs, []byte(tc.secret), []byte(tc.label), tc.generation, tc.length)
-    if err != nil {
-        t.Fatal(err)
-    }
-    if !bytes.Equal([]byte(tc.out), out) {
-        t.Errorf("got %v, want %v", out, tc.out)
-    }
+
+fn test_derive_tree_secret(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &DeriveTreeSecretTest,
+) -> Result<()> {
+    let secret = hex_to_bytes(&tc.secret);
+    let label = tc.label.as_bytes();
+    let expect_out = hex_to_bytes(&tc.out);
+    let actual_out = derive_tree_secret(
+        crypto_provider,
+        cipher_suite,
+        &secret,
+        label,
+        tc.generation,
+        tc.length,
+    )?;
+
+    assert_eq!(
+        actual_out.as_ref(),
+        &expect_out,
+        "got {:?}, want {:?}",
+        actual_out.as_ref(),
+        &expect_out,
+    );
+
+    Ok(())
 }
-*/
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct SignWithLabelTest {
     r#priv: String,
@@ -217,10 +236,8 @@ fn test_crypto_basics_with_crypto_provider(
 
         test_derive_secret(crypto_provider, cipher_suite, &tc.derive_secret)?;
 
-        /*
-        t.Run("derive_tree_secret", func(t *testing.T) {
-            testDeriveTreeSecret(t, tc.CipherSuite, &tc.DeriveTreeSecret)
-        })*/
+        test_derive_tree_secret(crypto_provider, cipher_suite, &tc.derive_tree_secret)?;
+
         test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
         /*
         t.Run("encrypt_with_label", func(t *testing.T) {

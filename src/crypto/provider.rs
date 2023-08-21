@@ -16,7 +16,10 @@ pub trait Hash: Send + Sync {
     fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;
 }
 
-pub trait Hpke: Send + Sync {}
+pub trait Hpke: Send + Sync {
+    fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes>;
+    fn kdf_extract_size(&self) -> usize;
+}
 
 pub trait Signature: Send + Sync {
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
@@ -61,8 +64,8 @@ pub trait CryptoProvider {
 
     fn expand_with_label(
         &self,
-        _cipher_suite: CipherSuite,
-        _secret: &[u8],
+        cipher_suite: CipherSuite,
+        secret: &[u8],
         label: &[u8],
         context: &[u8],
         length: u16,
@@ -74,21 +77,18 @@ pub trait CryptoProvider {
         buf.put_u16(length);
         write_opaque_vec(&mls_label, &mut buf)?;
         write_opaque_vec(context, &mut buf)?;
-        let kdf_label = buf.freeze();
-        //TODO(yngrtc):_, kdf, _ := cs.hpke().Params()
-        //TODO(yngrtc):return kdf.Expand(secret, kdfLabel, uint(length)), nil
-        Ok(kdf_label)
+        let info = buf.freeze();
+        self.hpke(cipher_suite).kdf_expand(secret, &info, length)
     }
 
     fn derive_secret(
         &self,
-        _cipher_suite: CipherSuite,
-        _secret: &[u8],
-        _label: &[u8],
+        cipher_suite: CipherSuite,
+        secret: &[u8],
+        label: &[u8],
     ) -> Result<Bytes> {
-        //TODO(yngrtc):_, kdf, _ := cs.hpke().Params()
-        //TODO(yngrtc):return cs.expandWithLabel(secret, label, nil, uint16(kdf.ExtractSize()))
-        Ok(Bytes::new())
+        let length = self.hpke(cipher_suite).kdf_extract_size();
+        self.expand_with_label(cipher_suite, secret, label, &[], length as u16)
     }
 
     fn sign_with_label(

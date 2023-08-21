@@ -52,34 +52,57 @@ struct ExpandWithLabelTest {
     length: u16,
     out: String,
 }
-/*
-func testExpandWithLabel(t *testing.T, cs cipherSuite, tc *expandWithLabelTest) {
-    out, err := cs.expandWithLabel([]byte(tc.secret), []byte(tc.label), []byte(tc.context), tc.length)
-    if err != nil {
-        t.Fatal(err)
-    }
-    if !bytes.Equal([]byte(tc.out), out) {
-        t.Errorf("got %v, want %v", out, tc.out)
-    }
+
+fn test_expand_with_label(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &ExpandWithLabelTest,
+) -> Result<()> {
+    let secret = hex_to_bytes(&tc.secret);
+    let label = tc.label.as_bytes();
+    let context = hex_to_bytes(&tc.context);
+    let expect_out = hex_to_bytes(&tc.out);
+    let actual_out =
+        crypto_provider.expand_with_label(cipher_suite, &secret, &label, &context, tc.length)?;
+
+    assert_eq!(
+        actual_out.as_ref(),
+        &expect_out,
+        "got {:?}, want {:?}",
+        actual_out.as_ref(),
+        &expect_out,
+    );
+
+    Ok(())
 }
-*/
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct DeriveSecretTest {
     label: String,
     out: String,
     secret: String,
 }
-/*
-func testDeriveSecret(t *testing.T, cs cipherSuite, tc *deriveSecretTest) {
-    out, err := cs.deriveSecret([]byte(tc.secret), []byte(tc.label))
-    if err != nil {
-        t.Fatal(err)
-    }
-    if !bytes.Equal([]byte(tc.out), out) {
-        t.Errorf("got %v, want %v", out, tc.out)
-    }
+
+fn test_derive_secret(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &DeriveSecretTest,
+) -> Result<()> {
+    let label = tc.label.as_bytes();
+    let secret = hex_to_bytes(&tc.secret);
+    let expect_out = hex_to_bytes(&tc.out);
+    let actual_out = crypto_provider.derive_secret(cipher_suite, &secret, label)?;
+    assert_eq!(
+        actual_out.as_ref(),
+        &expect_out,
+        "got {:?}, want {:?}",
+        actual_out.as_ref(),
+        &expect_out,
+    );
+
+    Ok(())
 }
-*/
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct DeriveTreeSecretTest {
     secret: String,
@@ -189,13 +212,12 @@ fn test_crypto_basics_with_crypto_provider(
         println!("testing {}:\n\t {:?}", cipher_suite, tc);
 
         test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
+
+        test_expand_with_label(crypto_provider, cipher_suite, &tc.expand_with_label)?;
+
+        test_derive_secret(crypto_provider, cipher_suite, &tc.derive_secret)?;
+
         /*
-        t.Run("expand_with_label", func(t *testing.T) {
-            testExpandWithLabel(t, tc.CipherSuite, &tc.ExpandWithLabel)
-        })
-        t.Run("derive_secret", func(t *testing.T) {
-            testDeriveSecret(t, tc.CipherSuite, &tc.DeriveSecret)
-        })
         t.Run("derive_tree_secret", func(t *testing.T) {
             testDeriveTreeSecret(t, tc.CipherSuite, &tc.DeriveTreeSecret)
         })*/

@@ -1,8 +1,14 @@
+mod hash;
+
+mod signature;
+
+use self::hash::HashScheme;
+use self::signature::SignatureScheme;
 use super::*;
-use crate::crypto::hash::HashScheme;
-use crate::crypto::hpke::algs::{Aead, Kdf, Kem};
-use crate::crypto::hpke::HpkeSuite;
-use crate::crypto::signature::SignatureScheme;
+use crate::crypto::hpke::{
+    algs::{Aead, Kdf, Kem},
+    HpkeSuite,
+};
 
 pub struct RingCryptoProvider;
 

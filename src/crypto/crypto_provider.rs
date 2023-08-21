@@ -2,7 +2,6 @@ pub mod ring;
 pub mod rust;
 
 use crate::cipher_suite::CipherSuite;
-use crate::crypto::{hash::Hash, hpke::Hpke, signature::Signature};
 use crate::error::*;
 
 use crate::codec::write_opaque_vec;
@@ -10,6 +9,20 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::sync::Arc;
 
 pub const MLS_PREFIX: &str = "MLS 1.0 ";
+
+pub trait Hash: Send + Sync {
+    fn digest(&self, data: &[u8]) -> Bytes;
+
+    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;
+}
+
+pub trait Hpke: Send + Sync {}
+
+pub trait Signature: Send + Sync {
+    fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
+
+    fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<()>;
+}
 
 pub trait CryptoProvider {
     fn supports(&self, cipher_suite: CipherSuite) -> Result<()>;

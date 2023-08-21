@@ -4,9 +4,7 @@ use crate::error::*;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 pub mod crypto_provider;
-pub mod hash;
 pub mod hpke;
-pub mod signature;
 
 pub(crate) type HpkePublicKey = Bytes;
 pub(crate) type SignaturePublicKey = Bytes;

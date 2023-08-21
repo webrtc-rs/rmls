@@ -4,21 +4,15 @@ use ring::{
     hmac,
 };
 
-pub trait Hash: Send + Sync {
-    fn digest(&self, data: &[u8]) -> Bytes;
-
-    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;
-}
-
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum HashScheme {
+pub(super) enum HashScheme {
     #[default]
     SHA256,
     SHA384,
     SHA512,
 }
 
-impl Hash for HashScheme {
+impl crate::crypto::crypto_provider::Hash for HashScheme {
     fn digest(&self, data: &[u8]) -> Bytes {
         let d = match *self {
             HashScheme::SHA256 => digest(&SHA256, data),

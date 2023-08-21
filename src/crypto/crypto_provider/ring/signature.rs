@@ -4,15 +4,9 @@ use signature::{Signer, Verifier};
 
 use crate::error::*;
 
-pub trait Signature: Send + Sync {
-    fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
-
-    fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<()>;
-}
-
 #[allow(non_camel_case_types)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum SignatureScheme {
+pub(super) enum SignatureScheme {
     #[default]
     Ed25519,
     ECDSA_P256_SHA256,
@@ -21,7 +15,7 @@ pub(crate) enum SignatureScheme {
     Ed448,
 }
 
-impl Signature for SignatureScheme {
+impl crate::crypto::crypto_provider::Signature for SignatureScheme {
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes> {
         match *self {
             SignatureScheme::Ed25519 => {

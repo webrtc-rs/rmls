@@ -1,6 +1,8 @@
 use super::*;
 use crate::codec::codec_test::*;
-use crate::crypto::crypto_provider::{ring::RingCryptoProvider, CryptoProvider};
+use crate::crypto::crypto_provider::{
+    ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider,
+};
 use crate::error::*;
 
 use serde::{Deserialize, Serialize};
@@ -180,17 +182,15 @@ func testEncryptWithLabel(t *testing.T, cs cipherSuite, tc *encryptWithLabelTest
 }
 */
 
-#[test]
-fn test_crypto_basics() -> Result<()> {
-    let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
-
-    let crypto_provider = RingCryptoProvider {};
-
+fn test_crypto_basics_with_crypto_provider(
+    tests: &[CryptoBasicsTest],
+    crypto_provider: &impl CryptoProvider,
+) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("testing {}:\n\t {:?}", cipher_suite, tc);
 
-        test_ref_hash(&crypto_provider, cipher_suite, &tc.ref_hash)?;
+        test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
         /*
         t.Run("expand_with_label", func(t *testing.T) {
             testExpandWithLabel(t, tc.CipherSuite, &tc.ExpandWithLabel)
@@ -201,12 +201,23 @@ fn test_crypto_basics() -> Result<()> {
         t.Run("derive_tree_secret", func(t *testing.T) {
             testDeriveTreeSecret(t, tc.CipherSuite, &tc.DeriveTreeSecret)
         })*/
-        test_sign_with_label(&crypto_provider, cipher_suite, &tc.sign_with_label)?;
+        test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
         /*
         t.Run("encrypt_with_label", func(t *testing.T) {
             testEncryptWithLabel(t, tc.CipherSuite, &tc.EncryptWithLabel)
         })*/
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_crypto_basics() -> Result<()> {
+    let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
+
+    test_crypto_basics_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+
+    test_crypto_basics_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
 }

@@ -1,22 +1,20 @@
-pub mod algs;
-
 use bytes::Bytes;
 use hkdf::Hkdf;
 use sha2::{Sha256, Sha384, Sha512};
 
+use crate::crypto::hpke_algs::*;
 use crate::error::*;
-use algs::*;
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct HpkeSuite {
+pub(super) struct HpkeSuite {
     kem: Kem,
     kdf: Kdf,
     aead: Aead,
 }
 
 impl HpkeSuite {
-    pub fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
+    pub(super) fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
         HpkeSuite { kem, kdf, aead }
     }
 }

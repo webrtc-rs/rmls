@@ -1,22 +1,20 @@
-pub mod algs;
-
 use bytes::Bytes;
 use ring::digest::{SHA256_OUTPUT_LEN, SHA384_OUTPUT_LEN, SHA512_OUTPUT_LEN};
-use ring::hkdf::{KeyType, Okm, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
+use ring::hkdf::{KeyType, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
 
+use crate::crypto::hpke_algs::*;
 use crate::error::*;
-use algs::*;
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct HpkeSuite {
+pub(super) struct HpkeSuite {
     kem: Kem,
     kdf: Kdf,
     aead: Aead,
 }
 
 impl HpkeSuite {
-    pub fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
+    pub(super) fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
         HpkeSuite { kem, kdf, aead }
     }
 }
@@ -29,14 +27,6 @@ struct MyKeyType<T: core::fmt::Debug + PartialEq>(T);
 impl KeyType for MyKeyType<u16> {
     fn len(&self) -> usize {
         self.0 as usize
-    }
-}
-
-impl From<Okm<'_, MyKeyType<u16>>> for MyKeyType<Vec<u8>> {
-    fn from(okm: Okm<'_, MyKeyType<u16>>) -> Self {
-        let mut r = vec![0u8; okm.len().0 as usize];
-        okm.fill(&mut r).unwrap();
-        Self(r)
     }
 }
 

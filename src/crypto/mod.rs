@@ -3,6 +3,7 @@ use crate::error::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+pub mod hpke_algs;
 pub mod provider;
 
 pub(crate) type HpkePublicKey = Bytes;

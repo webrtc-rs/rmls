@@ -1,13 +1,14 @@
 mod hash;
+mod hpke;
 mod signature;
 
 use self::hash::HashScheme;
-use self::signature::SignatureScheme;
-use super::*;
-use crate::crypto::hpke::{
+use self::hpke::{
     algs::{Aead, Kdf, Kem},
     HpkeSuite,
 };
+use self::signature::SignatureScheme;
+use super::*;
 
 pub struct RustCryptoProvider;
 

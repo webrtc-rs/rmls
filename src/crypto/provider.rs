@@ -7,7 +7,8 @@ use crate::error::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{
-    aead::AesGcm128, kdf::HkdfSha256, kem::X25519HkdfSha256, Deserializable, OpModeS, Serializable,
+    aead::AesGcm128, kdf::HkdfSha256, kem::X25519HkdfSha256, Deserializable, OpModeR, OpModeS,
+    Serializable,
 };
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -174,9 +175,31 @@ pub trait CryptoProvider {
         kem_output: &[u8],
         ciphertext: &[u8],
     ) -> Result<Bytes> {
-        let _encrypt_context = mls_prefix_label_data(label, context)?;
+        let info = mls_prefix_label_data(label, context)?;
         match cipher_suite {
-            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => Ok(Bytes::new()),
+            CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => {
+                let x25519_private_key =
+                    <hpke::kem::X25519HkdfSha256 as hpke::Kem>::PrivateKey::from_bytes(private_key)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+                let encapped_key =
+                    <hpke::kem::X25519HkdfSha256 as hpke::Kem>::EncappedKey::from_bytes(kem_output)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let mut decryption_context =
+                    hpke::setup_receiver::<AesGcm128, HkdfSha256, X25519HkdfSha256>(
+                        &OpModeR::Base,
+                        &x25519_private_key,
+                        &encapped_key,
+                        &info,
+                    )
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let plaintext = decryption_context
+                    .open(ciphertext, &[])
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                Ok(Bytes::from(plaintext))
+            }
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Ok(Bytes::new()),
             CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Ok(Bytes::new()),
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
@@ -186,25 +209,6 @@ pub trait CryptoProvider {
                 Err(Error::UnsupportedCipherSuite)
             }
         }
-        /*TODO(yngrtc):
-        hpke := cs.hpke()
-        kem, _, _ := hpke.Params()
-        priv, err := kem.Scheme().UnmarshalBinaryPrivateKey(private_key)
-        if err != nil {
-            return nil, err
-        }
-
-        receiver, err := hpke.NewReceiver(priv, encrypt_context)
-        if err != nil {
-            return nil, err
-        }
-
-        opener, err := receiver.Setup(kem_output)
-        if err != nil {
-            return nil, err
-        }
-
-        return opener.Open(ciphertext, nil)*/
     }
 }
 

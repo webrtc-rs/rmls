@@ -1,6 +1,8 @@
+use crate::cipher_suite::CipherSuite;
 use bytes::{Buf, BufMut, Bytes};
 
 use crate::codec::*;
+use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 
 pub(crate) type ProtocolVersion = u16;
@@ -51,5 +53,52 @@ impl Writer for ContentType {
     {
         buf.put_u8(*self as u8);
         Ok(())
+    }
+}
+
+pub(crate) fn expand_sender_data_key(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sender_data_secret: &[u8],
+    ciphertext: &[u8],
+) -> Result<Bytes> {
+    let nk = crypto_provider.hpke(cipher_suite).aead_key_size() as u16;
+    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext);
+    crypto_provider.expand_with_label(
+        cipher_suite,
+        sender_data_secret,
+        b"key",
+        ciphertext_sample,
+        nk,
+    )
+}
+
+pub(crate) fn expand_sender_data_nonce(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sender_data_secret: &[u8],
+    ciphertext: &[u8],
+) -> Result<Bytes> {
+    let nn = crypto_provider.hpke(cipher_suite).aead_nonce_size() as u16;
+    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext);
+    crypto_provider.expand_with_label(
+        cipher_suite,
+        sender_data_secret,
+        b"nonce",
+        ciphertext_sample,
+        nn,
+    )
+}
+
+pub(crate) fn sample_ciphertext<'a>(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    ciphertext: &'a [u8],
+) -> &'a [u8] {
+    let n = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+    if ciphertext.len() < n {
+        ciphertext
+    } else {
+        &ciphertext[..n]
     }
 }

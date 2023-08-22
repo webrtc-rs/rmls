@@ -2,8 +2,8 @@ use super::*;
 use crate::codec::codec_test::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
-
 use crate::tree::secret_tree::derive_tree_secret;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -267,7 +267,7 @@ fn test_crypto_basics_with_crypto_provider(
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("testing {}:\n\t {:?}", cipher_suite, tc);
+        println!("test_crypto_basics {}:\n\t {:?}", cipher_suite, tc);
 
         test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
 

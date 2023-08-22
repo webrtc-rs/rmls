@@ -1,4 +1,8 @@
+#[cfg(test)]
+mod secret_tree_test;
+
 use bytes::{BufMut, Bytes, BytesMut};
+use std::fmt::{Display, Formatter};
 
 use crate::cipher_suite::*;
 use crate::crypto::provider::CryptoProvider;
@@ -6,15 +10,29 @@ use crate::error::*;
 use crate::framing::*;
 use crate::tree::tree_math::*;
 
-pub(crate) type RatchetLabel = Bytes;
+const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";
+const RATCHET_LABEL_APPLICATION_STR: &str = "application";
 
-pub(crate) static RATCHET_LABEL_HANDSHAKE: Bytes = Bytes::from_static(b"handshake");
-pub(crate) static RATCHET_LABEL_APPLICATION: Bytes = Bytes::from_static(b"application");
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) enum RatchetLabel {
+    #[default]
+    Handshake,
+    Application,
+}
+
+impl Display for RatchetLabel {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RatchetLabel::Handshake => write!(f, "{}", RATCHET_LABEL_HANDSHAKE_STR),
+            RatchetLabel::Application => write!(f, "{}", RATCHET_LABEL_APPLICATION_STR),
+        }
+    }
+}
 
 fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
     match ct {
-        ContentType::Application => Ok(RATCHET_LABEL_APPLICATION.clone()),
-        ContentType::Proposal | ContentType::Commit => Ok(RATCHET_LABEL_HANDSHAKE.clone()),
+        ContentType::Application => Ok(RatchetLabel::Handshake),
+        ContentType::Proposal | ContentType::Commit => Ok(RatchetLabel::Application),
     }
 }
 
@@ -27,10 +45,10 @@ fn derive_secret_tree(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     n: NumLeaves,
-    encryption_secret: Bytes,
+    encryption_secret: &[u8],
 ) -> Result<SecretTree> {
     let mut tree = SecretTree(vec![None; n.width() as usize]);
-    tree.set(n.root(), encryption_secret);
+    tree.set(n.root(), encryption_secret.to_vec().into());
     tree.derive_children(crypto_provider, cipher_suite, n.root())?;
     Ok(tree)
 }
@@ -89,7 +107,7 @@ impl SecretTree {
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
         ni: NodeIndex,
-        label: &RatchetLabel,
+        label: RatchetLabel,
     ) -> Result<RatchetSecret> {
         let parent_secret = self
             .get(ni)
@@ -97,8 +115,13 @@ impl SecretTree {
             .as_ref()
             .ok_or(Error::InvalidParentNode)?;
         let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
-        let secret =
-            crypto_provider.expand_with_label(cipher_suite, parent_secret, label, &[], nh)?;
+        let secret = crypto_provider.expand_with_label(
+            cipher_suite,
+            parent_secret,
+            label.to_string().as_bytes(),
+            &[],
+            nh,
+        )?;
         Ok(RatchetSecret {
             secret,
             generation: 0,
@@ -107,8 +130,8 @@ impl SecretTree {
 }
 
 pub(crate) struct RatchetSecret {
-    secret: Bytes,
-    generation: u32,
+    pub(crate) secret: Bytes,
+    pub(crate) generation: u32,
 }
 
 impl RatchetSecret {

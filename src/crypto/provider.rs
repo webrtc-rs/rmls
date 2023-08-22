@@ -6,7 +6,6 @@ use crate::error::*;
 
 use crate::codec::write_opaque_vec;
 use bytes::{BufMut, Bytes, BytesMut};
-use std::sync::Arc;
 
 pub const MLS_PREFIX: &str = "MLS 1.0 ";
 
@@ -32,11 +31,11 @@ pub trait CryptoProvider {
 
     fn supported(&self) -> Vec<CipherSuite>;
 
-    fn hash(&self, cipher_suite: CipherSuite) -> Arc<dyn Hash>;
+    fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash;
 
-    fn hpke(&self, cipher_suite: CipherSuite) -> Arc<dyn Hpke>;
+    fn hpke(&self, cipher_suite: CipherSuite) -> &dyn Hpke;
 
-    fn signature(&self, cipher_suite: CipherSuite) -> Arc<dyn Signature>;
+    fn signature(&self, cipher_suite: CipherSuite) -> &dyn Signature;
 
     fn sign_mac(&self, cipher_suite: CipherSuite, key: &[u8], message: &[u8]) -> Bytes {
         // All cipher suites use HMAC
@@ -188,10 +187,4 @@ fn mls_prefix_label_data(label: &[u8], data: &[u8]) -> Result<Bytes> {
     write_opaque_vec(&mls_label, &mut buf)?;
     write_opaque_vec(data, &mut buf)?;
     Ok(buf.freeze())
-}
-
-struct CipherSuiteDescription {
-    hash: Arc<dyn Hash>,
-    hpke: Arc<dyn Hpke>,
-    signature: Arc<dyn Signature>,
 }

@@ -8,97 +8,84 @@ use self::signature::SignatureScheme;
 use super::*;
 use crate::crypto::hpke_algs::{Aead, Kdf, Kem};
 
-use std::collections::HashMap;
-
-lazy_static! {
-    static ref CIPHER_SUITE_DESCRIPTIONS: HashMap<CipherSuite, CipherSuiteDescription> =
-        HashMap::from_iter([
-            (
-                CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA256),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_X25519_HKDF_SHA256,
-                        Kdf::KDF_HKDF_SHA256,
-                        Aead::AEAD_AES128GCM,
-                    )),
-                    signature: Arc::new(SignatureScheme::Ed25519),
-                },
-            ),
-            (
-                CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA256),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_P256_HKDF_SHA256,
-                        Kdf::KDF_HKDF_SHA256,
-                        Aead::AEAD_AES128GCM,
-                    )),
-                    signature: Arc::new(SignatureScheme::ECDSA_P256_SHA256),
-                },
-            ),
-            (
-                CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA256),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_X25519_HKDF_SHA256,
-                        Kdf::KDF_HKDF_SHA256,
-                        Aead::AEAD_ChaCha20Poly1305,
-                    )),
-                    signature: Arc::new(SignatureScheme::Ed25519),
-                },
-            ),
-            (
-                CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA512),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_X448_HKDF_SHA512,
-                        Kdf::KDF_HKDF_SHA512,
-                        Aead::AEAD_AES256GCM,
-                    )),
-                    signature: Arc::new(SignatureScheme::Ed448),
-                },
-            ),
-            (
-                CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA512),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_P521_HKDF_SHA512,
-                        Kdf::KDF_HKDF_SHA512,
-                        Aead::AEAD_AES256GCM,
-                    )),
-                    signature: Arc::new(SignatureScheme::ECDSA_P521_SHA512),
-                },
-            ),
-            (
-                CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA512),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_X448_HKDF_SHA512,
-                        Kdf::KDF_HKDF_SHA512,
-                        Aead::AEAD_ChaCha20Poly1305,
-                    )),
-                    signature: Arc::new(SignatureScheme::Ed448),
-                },
-            ),
-            (
-                CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384,
-                CipherSuiteDescription {
-                    hash: Arc::new(HashScheme::SHA384),
-                    hpke: Arc::new(HpkeSuite::new(
-                        Kem::KEM_P384_HKDF_SHA384,
-                        Kdf::KDF_HKDF_SHA384,
-                        Aead::AEAD_AES256GCM,
-                    )),
-                    signature: Arc::new(SignatureScheme::ECDSA_P384_SHA384),
-                },
-            ),
-        ]);
+struct CipherSuiteDescription {
+    hash: HashScheme,
+    hpke: HpkeSuite,
+    signature: SignatureScheme,
 }
+
+static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384*/] = [
+    //1: CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA256,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_X25519_HKDF_SHA256,
+            kdf: Kdf::KDF_HKDF_SHA256,
+            aead: Aead::AEAD_AES128GCM,
+        },
+        signature: SignatureScheme::Ed25519,
+    },
+    //2: CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA256,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_P256_HKDF_SHA256,
+            kdf: Kdf::KDF_HKDF_SHA256,
+            aead: Aead::AEAD_AES128GCM,
+        },
+        signature: SignatureScheme::ECDSA_P256_SHA256,
+    },
+    //3: CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA256,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_X25519_HKDF_SHA256,
+            kdf: Kdf::KDF_HKDF_SHA256,
+            aead: Aead::AEAD_ChaCha20Poly1305,
+        },
+        signature: SignatureScheme::Ed25519,
+    },
+    //4: CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA512,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_X448_HKDF_SHA512,
+            kdf: Kdf::KDF_HKDF_SHA512,
+            aead: Aead::AEAD_AES256GCM,
+        },
+        signature: SignatureScheme::Ed448,
+    },
+    //5: CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA512,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_P521_HKDF_SHA512,
+            kdf: Kdf::KDF_HKDF_SHA512,
+            aead: Aead::AEAD_AES256GCM,
+        },
+        signature: SignatureScheme::ECDSA_P521_SHA512,
+    },
+    //6:C ipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA512,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_X448_HKDF_SHA512,
+            kdf: Kdf::KDF_HKDF_SHA512,
+            aead: Aead::AEAD_ChaCha20Poly1305,
+        },
+        signature: SignatureScheme::Ed448,
+    },
+    //7: CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384,
+    CipherSuiteDescription {
+        hash: HashScheme::SHA384,
+        hpke: HpkeSuite {
+            kem: Kem::KEM_P384_HKDF_SHA384,
+            kdf: Kdf::KDF_HKDF_SHA384,
+            aead: Aead::AEAD_AES256GCM,
+        },
+        signature: SignatureScheme::ECDSA_P384_SHA384,
+    },
+];
 
 pub struct RingCryptoProvider;
 
@@ -120,27 +107,15 @@ impl CryptoProvider for RingCryptoProvider {
         ]
     }
 
-    fn hash(&self, cipher_suite: CipherSuite) -> Arc<dyn Hash> {
-        CIPHER_SUITE_DESCRIPTIONS
-            .get(&cipher_suite)
-            .unwrap()
-            .hash
-            .clone()
+    fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash {
+        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].hash
     }
 
-    fn hpke(&self, cipher_suite: CipherSuite) -> Arc<dyn Hpke> {
-        CIPHER_SUITE_DESCRIPTIONS
-            .get(&cipher_suite)
-            .unwrap()
-            .hpke
-            .clone()
+    fn hpke(&self, cipher_suite: CipherSuite) -> &dyn Hpke {
+        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].hpke
     }
 
-    fn signature(&self, cipher_suite: CipherSuite) -> Arc<dyn Signature> {
-        CIPHER_SUITE_DESCRIPTIONS
-            .get(&cipher_suite)
-            .unwrap()
-            .signature
-            .clone()
+    fn signature(&self, cipher_suite: CipherSuite) -> &dyn Signature {
+        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].signature
     }
 }

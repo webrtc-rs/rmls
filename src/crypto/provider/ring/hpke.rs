@@ -8,9 +8,9 @@ use crate::error::*;
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub(super) struct HpkeSuite {
-    kem: Kem,
-    kdf: Kdf,
-    aead: Aead,
+    pub(super) kem: Kem,
+    pub(super) kdf: Kdf,
+    pub(super) aead: Aead,
 }
 
 impl HpkeSuite {

@@ -1,8 +1,8 @@
 use super::*;
+use crate::codec::codec_test::{hex_to_bytes, load_test_vector};
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
 
-use crate::codec::codec_test::{hex_to_bytes, load_test_vector};
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -149,7 +149,7 @@ fn test_secret_tree_with_crypto_provider(
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_secret_tree {}:\n\t {:?}", cipher_suite, tc);
+        println!("test_secret_tree {}", cipher_suite);
 
         secret_tree_test(crypto_provider, cipher_suite, tc)?;
     }

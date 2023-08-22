@@ -1,6 +1,8 @@
 pub(crate) mod ratchet_tree;
 pub(crate) mod secret_tree;
 pub(crate) mod tree_math;
+#[cfg(test)]
+mod tree_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
@@ -412,10 +414,9 @@ pub(crate) struct LeafNode {
     signature_key: SignaturePublicKey,
     credential: Credential,
     capabilities: Capabilities,
-
     leaf_node_source: LeafNodeSource,
-
     extensions: Vec<Extension>,
+
     signature: Bytes,
 }
 
@@ -538,8 +539,6 @@ impl LeafNode {
         if !self.verify_signature(crypto_provider, options.cipher_suite, options.group_id, li) {
             return Err(Error::LeafNodeSignatureVerificationFailed);
         }
-
-        // TODO: check required_capabilities group extension
 
         if !options
             .supported_creds
@@ -668,55 +667,16 @@ impl Writer for UpdatePath {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
-pub(crate) enum NodeType {
-    #[default]
-    Leaf = 1,
-    Parent = 2,
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum Node {
+    Leaf(LeafNode),
+    Parent(ParentNode),
 }
 
-impl TryFrom<u8> for NodeType {
-    type Error = Error;
-
-    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
-        match v {
-            1 => Ok(NodeType::Leaf),
-            2 => Ok(NodeType::Parent),
-            _ => Err(Error::InvalidNodeTypeValue(v)),
-        }
+impl Default for Node {
+    fn default() -> Self {
+        Node::Leaf(LeafNode::default())
     }
-}
-
-impl Reader for NodeType {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        if !buf.has_remaining() {
-            return Err(Error::BufferTooSmall);
-        }
-        *self = buf.get_u8().try_into()?;
-        Ok(())
-    }
-}
-impl Writer for NodeType {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        buf.put_u8(*self as u8);
-        Ok(())
-    }
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Node {
-    node_type: NodeType,
-    leaf_node: Option<LeafNode>,     // for nodeTypeLeaf
-    parent_node: Option<ParentNode>, // for nodeTypeParent
 }
 
 impl Reader for Node {
@@ -725,21 +685,25 @@ impl Reader for Node {
         Self: Sized,
         B: Buf,
     {
-        self.node_type.read(buf)?;
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
 
-        match self.node_type {
-            NodeType::Leaf => {
+        let v = buf.get_u8();
+        match v {
+            1 => {
                 let mut leaf_node = LeafNode::default();
                 leaf_node.read(buf)?;
-                self.leaf_node = Some(leaf_node);
+                *self = Node::Leaf(leaf_node);
                 Ok(())
             }
-            NodeType::Parent => {
+            2 => {
                 let mut parent_node = ParentNode::default();
                 parent_node.read(buf)?;
-                self.parent_node = Some(parent_node);
+                *self = Node::Parent(parent_node);
                 Ok(())
             }
+            _ => Err(Error::InvalidNodeTypeValue(v)),
         }
     }
 }
@@ -750,21 +714,14 @@ impl Writer for Node {
         Self: Sized,
         B: BufMut,
     {
-        self.node_type.write(buf)?;
-        match self.node_type {
-            NodeType::Leaf => {
-                if let Some(leaf_node) = &self.leaf_node {
-                    leaf_node.write(buf)
-                } else {
-                    Err(Error::InvalidNodeTypeValue(self.node_type as u8))
-                }
+        match self {
+            Node::Leaf(leaf_node) => {
+                buf.put_u8(1);
+                leaf_node.write(buf)
             }
-            NodeType::Parent => {
-                if let Some(parent_node) = &self.parent_node {
-                    parent_node.write(buf)
-                } else {
-                    Err(Error::InvalidNodeTypeValue(self.node_type as u8))
-                }
+            Node::Parent(parent_node) => {
+                buf.put_u8(2);
+                parent_node.write(buf)
             }
         }
     }

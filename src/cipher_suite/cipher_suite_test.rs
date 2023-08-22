@@ -267,7 +267,7 @@ fn test_crypto_basics_with_crypto_provider(
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_crypto_basics {}:\n\t {:?}", cipher_suite, tc);
+        println!("test_crypto_basics {}", cipher_suite);
 
         test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
 

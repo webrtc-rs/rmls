@@ -82,25 +82,20 @@ impl RatchetTree {
     }
 
     fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
-        if let Some(node) = self.get(li.node_index()) {
-            if node.node_type != NodeType::Leaf {
-                return None;
-            }
-            node.leaf_node.as_ref()
+        if let Some(Node::Leaf(leaf_node)) = self.get(li.node_index()) {
+            Some(leaf_node)
         } else {
             None
         }
     }
 
     // resolve computes the resolution of a node.
-    fn resolve(&self, x: NodeIndex) -> Vec<NodeIndex> {
+    pub(crate) fn resolve(&self, x: NodeIndex) -> Vec<NodeIndex> {
         if let Some(n) = self.get(x) {
             let mut res = vec![x];
-            if n.node_type == NodeType::Parent {
-                if let Some(parent_node) = &n.parent_node {
-                    for leaf_index in &parent_node.unmerged_leaves {
-                        res.push(leaf_index.node_index());
-                    }
+            if let Node::Parent(parent_node) = n {
+                for leaf_index in &parent_node.unmerged_leaves {
+                    res.push(leaf_index.node_index());
                 }
             }
             res
@@ -205,45 +200,34 @@ impl RatchetTree {
         }
 
         for (i, node) in self.0.iter().enumerate() {
-            if let Some(node) = node {
-                if node.node_type != NodeType::Parent {
-                    continue;
-                }
-                if let Some(parent_node) = &node.parent_node {
-                    let p = NodeIndex(i as u32);
-                    for unmerged_leaf in &parent_node.unmerged_leaves {
-                        let mut x = unmerged_leaf.node_index();
-                        loop {
-                            let (y, ok) = num_leaves.parent(x);
-                            if !ok {
-                                return Err(Error::UnmergedLeafIsNotDescendantOfTheParentNode);
-                            } else if y == p {
-                                break;
-                            }
-                            x = y;
+            if let Some(Node::Parent(parent_node)) = node {
+                let p = NodeIndex(i as u32);
+                for unmerged_leaf in &parent_node.unmerged_leaves {
+                    let mut x = unmerged_leaf.node_index();
+                    loop {
+                        let (y, ok) = num_leaves.parent(x);
+                        if !ok {
+                            return Err(Error::UnmergedLeafIsNotDescendantOfTheParentNode);
+                        } else if y == p {
+                            break;
+                        }
+                        x = y;
 
-                            if let Some(intermediate_node) = self.get(x) {
-                                if let Some(intermediate_node_parent_node) =
-                                    &intermediate_node.parent_node
-                                {
-                                    if !RatchetTree::has_unmerged_leaf(
-                                        intermediate_node_parent_node,
-                                        unmerged_leaf,
-                                    ) {
-                                        return Err(
-                                            Error::NonBlankIntermediateNodeMissingUnmergedLeaf,
-                                        );
-                                    }
-                                }
+                        if let Some(Node::Parent(intermediate_node_parent_node)) = self.get(x) {
+                            if !RatchetTree::has_unmerged_leaf(
+                                intermediate_node_parent_node,
+                                unmerged_leaf,
+                            ) {
+                                return Err(Error::NonBlankIntermediateNodeMissingUnmergedLeaf);
                             }
                         }
                     }
-
-                    if encryption_keys.contains(&parent_node.encryption_key) {
-                        return Err(Error::DuplicateEncryptionKeyInRatchetTree);
-                    }
-                    encryption_keys.insert(parent_node.encryption_key.clone());
                 }
+
+                if encryption_keys.contains(&parent_node.encryption_key) {
+                    return Err(Error::DuplicateEncryptionKeyInRatchetTree);
+                }
+                encryption_keys.insert(parent_node.encryption_key.clone());
             }
         }
 
@@ -272,7 +256,7 @@ impl RatchetTree {
         )
     }
 
-    fn compute_tree_hash(
+    pub(crate) fn compute_tree_hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -289,9 +273,11 @@ impl RatchetTree {
             let mut l = None;
             if let Some(n) = n {
                 if !excluded {
-                    l = n.leaf_node.as_ref();
-                    if l.is_none() {
-                        return Err(Error::InvalidLeafNode);
+                    match n {
+                        Node::Leaf(leaf_node) => {
+                            l = Some(leaf_node);
+                        }
+                        Node::Parent(_) => return Err(Error::InvalidLeafNode),
                     }
                 }
             }
@@ -309,7 +295,7 @@ impl RatchetTree {
             let mut filtered_parent;
 
             let p = if let Some(n) = n {
-                if let Some(p) = n.parent_node.as_ref() {
+                if let Node::Parent(p) = n {
                     if !p.unmerged_leaves.is_empty() && !exclude.is_empty() {
                         let mut unmerged_leaves = vec![]; // make([]leaf_index, 0, len(p.unmerged_leaves))
                         for li in &p.unmerged_leaves {
@@ -349,7 +335,7 @@ impl RatchetTree {
         i: LeafIndex,
         node: Option<&LeafNode>,
     ) -> Result<()> {
-        buf.put_u8(NodeType::Leaf as u8);
+        buf.put_u8(1 /*NodeType::Leaf*/);
         buf.put_u32(i.0);
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
@@ -364,7 +350,7 @@ impl RatchetTree {
         left_hash: &[u8],
         right_hash: &[u8],
     ) -> Result<()> {
-        buf.put_u8(NodeType::Parent as u8);
+        buf.put_u8(2 /*NodeType::Parent*/);
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
             node.write(buf)?;
@@ -373,7 +359,7 @@ impl RatchetTree {
         write_opaque_vec(right_hash, buf)
     }
 
-    fn verify_parent_hashes(
+    pub(crate) fn verify_parent_hashes(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -386,7 +372,7 @@ impl RatchetTree {
                     continue;
                 }
 
-                if let Some(parent_node) = node.parent_node.as_ref() {
+                if let Node::Parent(parent_node) = node {
                     let mut exclude = HashSet::new();
                     for li in &parent_node.unmerged_leaves {
                         exclude.insert(*li);
@@ -441,24 +427,12 @@ impl RatchetTree {
     fn find_parent_hash(&self, node_indices: &[NodeIndex], parent_hash: &[u8]) -> bool {
         for x in node_indices {
             if let Some(node) = self.get(*x) {
-                let h = match node.node_type {
-                    NodeType::Leaf => {
-                        if let Some(leaf_node) = &node.leaf_node {
-                            match &leaf_node.leaf_node_source {
-                                LeafNodeSource::Commit(parent_hash) => parent_hash,
-                                _ => continue,
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    NodeType::Parent => {
-                        if let Some(parent_node) = &node.parent_node {
-                            &parent_node.parent_hash
-                        } else {
-                            continue;
-                        }
-                    }
+                let h = match node {
+                    Node::Leaf(leaf_node) => match &leaf_node.leaf_node_source {
+                        LeafNodeSource::Commit(parent_hash) => parent_hash,
+                        _ => continue,
+                    },
+                    Node::Parent(parent_node) => &parent_node.parent_hash,
                 };
                 if h == parent_hash {
                     return true;
@@ -491,7 +465,7 @@ impl RatchetTree {
         (LeafIndex(0), false)
     }
 
-    fn add(&mut self, leaf_node: Option<LeafNode>) {
+    fn add(&mut self, leaf_node: LeafNode) {
         let mut li = LeafIndex(0);
         let mut ni: NodeIndex;
         let mut found = false;
@@ -522,36 +496,18 @@ impl RatchetTree {
                 break;
             }
             p = q;
-            if let Some(node) = self.get_mut(p) {
-                if let Some(parent_node) = &mut node.parent_node {
-                    parent_node.unmerged_leaves.push(li);
-                } else {
-                    //TODO(yngrtc): what if none?
-                }
+            if let Some(Node::Parent(parent_node)) = self.get_mut(p) {
+                parent_node.unmerged_leaves.push(li);
             }
         }
 
-        self.set(
-            ni,
-            Some(Node {
-                node_type: NodeType::Leaf,
-                leaf_node,
-                parent_node: None,
-            }),
-        );
+        self.set(ni, Some(Node::Leaf(leaf_node)));
     }
 
-    fn update(&mut self, li: LeafIndex, leaf_node: Option<LeafNode>) {
+    fn update(&mut self, li: LeafIndex, leaf_node: LeafNode) {
         let mut ni = li.node_index();
 
-        self.set(
-            ni,
-            Some(Node {
-                node_type: NodeType::Leaf,
-                leaf_node,
-                parent_node: None,
-            }),
-        );
+        self.set(ni, Some(Node::Leaf(leaf_node)));
 
         let num_leaves = self.num_leaves();
         loop {
@@ -650,14 +606,10 @@ impl RatchetTree {
             let path_node = &path.nodes[i];
             self.set(
                 *ni,
-                Some(Node {
-                    node_type: NodeType::Parent,
-                    leaf_node: None,
-                    parent_node: Some(ParentNode {
-                        encryption_key: path_node.encryption_key.clone(),
-                        ..Default::default()
-                    }),
-                }),
+                Some(Node::Parent(ParentNode {
+                    encryption_key: path_node.encryption_key.clone(),
+                    ..Default::default()
+                })),
             );
         }
 
@@ -666,48 +618,42 @@ impl RatchetTree {
         let mut prev_parent_hash = None;
         for i in (0..filtered_direct_path.len()).rev() {
             let ni = filtered_direct_path[i];
-            let node_parent_hash = if let Some(node) = self.get(ni) {
-                if let Some(node) = &node.parent_node {
-                    let (l, r, ok) = ni.children();
-                    if !ok {
-                        return Err(Error::InvalidChildren);
-                    }
-
-                    let mut s = l;
-                    let mut found = false;
-                    for ni in &direct_path {
-                        if *ni == s {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if s == sender_node_index || found {
-                        s = r;
-                    }
-
-                    let tree_hash =
-                        self.compute_tree_hash(crypto_provide, cipher_suite, s, &exclude)?;
-
-                    let node_parent_hash = prev_parent_hash.take();
-                    prev_parent_hash = Some(node.compute_parent_hash(
-                        crypto_provide,
-                        cipher_suite,
-                        tree_hash.as_ref(),
-                    )?);
-                    node_parent_hash
-                } else {
-                    None
+            let node_parent_hash = if let Some(Node::Parent(parent_node)) = self.get(ni) {
+                let (l, r, ok) = ni.children();
+                if !ok {
+                    return Err(Error::InvalidChildren);
                 }
+
+                let mut s = l;
+                let mut found = false;
+                for ni in &direct_path {
+                    if *ni == s {
+                        found = true;
+                        break;
+                    }
+                }
+                if s == sender_node_index || found {
+                    s = r;
+                }
+
+                let tree_hash =
+                    self.compute_tree_hash(crypto_provide, cipher_suite, s, &exclude)?;
+
+                let node_parent_hash = prev_parent_hash.take();
+                prev_parent_hash = Some(parent_node.compute_parent_hash(
+                    crypto_provide,
+                    cipher_suite,
+                    tree_hash.as_ref(),
+                )?);
+                node_parent_hash
             } else {
                 None
             };
 
             //workaround to assign node.parent_hash
             if let Some(node_parent_hash) = node_parent_hash {
-                if let Some(node) = self.get_mut(ni) {
-                    if let Some(node) = &mut node.parent_node {
-                        node.parent_hash = Bytes::from(node_parent_hash.as_ref().to_vec());
-                    }
+                if let Some(Node::Parent(parent_node)) = self.get_mut(ni) {
+                    parent_node.parent_hash = Bytes::from(node_parent_hash.as_ref().to_vec());
                 }
             }
         }
@@ -722,14 +668,7 @@ impl RatchetTree {
             return Err(Error::ParentHashMismatchForUpdatePathLeafNode);
         }
 
-        self.set(
-            sender_node_index,
-            Some(Node {
-                node_type: NodeType::Leaf,
-                leaf_node: Some(path.leaf_node),
-                parent_node: None,
-            }),
-        );
+        self.set(sender_node_index, Some(Node::Leaf(path.leaf_node)));
 
         Ok(())
     }

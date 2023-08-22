@@ -6,7 +6,7 @@ use self::hash::HashScheme;
 use self::hpke::HpkeSuite;
 use self::signature::SignatureScheme;
 use super::*;
-use crate::crypto::hpke_algs::{Aead, Kdf, Kem};
+use crate::crypto::*;
 
 struct CipherSuiteDescription {
     hash: HashScheme,

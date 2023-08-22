@@ -2,8 +2,7 @@ use bytes::Bytes;
 use ring::digest::{SHA256_OUTPUT_LEN, SHA384_OUTPUT_LEN, SHA512_OUTPUT_LEN};
 use ring::hkdf::{KeyType, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
 
-use crate::crypto::hpke_algs::*;
-use crate::error::*;
+use crate::crypto::*;
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]

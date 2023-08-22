@@ -2,8 +2,7 @@ use bytes::Bytes;
 use hkdf::Hkdf;
 use sha2::{Sha256, Sha384, Sha512};
 
-use crate::crypto::hpke_algs::*;
-use crate::error::*;
+use crate::crypto::*;
 
 // Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

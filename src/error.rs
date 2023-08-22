@@ -82,6 +82,8 @@ pub enum Error {
     RingCryptoError(String),
     #[error("RustCrypto error {0}")]
     RustCryptoError(String),
+    #[error("Hpke error {0}")]
+    HpkeError(String),
     #[error("unsupported CipherSuite")]
     UnsupportedCipherSuite,
     #[error("unsupported HKPE KEM")]

@@ -14,8 +14,12 @@ thiserror = "1"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rand = "0.8.5"
 
-#hpke = "0.10.0"
+####CryptoProvider#####
+# Common
+hpke = "0.10.0"
+x25519-dalek = {version = "2.0.0-pre.1", default-features = false, features = ["u64_backend"]}
 
 # RingCryptoProvider
 ring = "0.16.20"

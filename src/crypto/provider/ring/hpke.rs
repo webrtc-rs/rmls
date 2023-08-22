@@ -56,4 +56,20 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
             Kdf::KDF_HKDF_SHA512 => SHA512_OUTPUT_LEN,
         }
     }
+
+    // key_size returns the size in bytes of the keys used by the AEAD cipher.
+    fn aead_key_size(&self) -> usize {
+        match self.aead {
+            Aead::AEAD_AES128GCM => 16,
+            Aead::AEAD_AES256GCM => 32,
+            Aead::AEAD_ChaCha20Poly1305 => 32,
+        }
+    }
+
+    // nonce_size returns the size in bytes of the nonce used by the AEAD cipher.
+    fn aead_nonce_size(&self) -> usize {
+        match self.aead {
+            Aead::AEAD_AES128GCM | Aead::AEAD_AES256GCM | Aead::AEAD_ChaCha20Poly1305 => 12,
+        }
+    }
 }

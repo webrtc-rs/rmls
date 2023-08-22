@@ -24,48 +24,55 @@ fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
 pub(crate) struct SecretTree(pub(crate) Vec<Option<Bytes>>);
 
 fn derive_secret_tree(
-    cs: CipherSuite,
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
     n: NumLeaves,
     encryption_secret: Bytes,
 ) -> Result<SecretTree> {
     let mut tree = SecretTree(vec![None; n.width() as usize]);
     tree.set(n.root(), encryption_secret);
-    tree.derive_children(cs, n.root())?;
+    tree.derive_children(crypto_provider, cipher_suite, n.root())?;
     Ok(tree)
 }
 
 impl SecretTree {
-    fn derive_children(&self, _cs: CipherSuite, x: NodeIndex) -> Result<()> {
-        let (_l, _r, ok) = x.children();
+    fn derive_children(
+        &mut self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        x: NodeIndex,
+    ) -> Result<()> {
+        let (l, r, ok) = x.children();
         if !ok {
             return Ok(());
         }
-        /*TODO(yngrtc):
-        parentSecret := tree.get(x)
-        _, kdf, _ := cs.hpke().Params()
-        nh := uint16(kdf.ExtractSize())
-        leftSecret, err := cs.expandWithLabel(parentSecret, []byte("tree"), []byte("left"), nh)
-        if err != nil {
-            return err
-        }
-        rightSecret, err := cs.expandWithLabel(parentSecret, []byte("tree"), []byte("right"), nh)
-        if err != nil {
-            return err
-        }
 
-        tree.set(l, leftSecret)
-        tree.set(r, rightSecret)
+        let parent_secret = self
+            .get(x)
+            .ok_or(Error::InvalidParentNode)?
+            .as_ref()
+            .ok_or(Error::InvalidParentNode)?;
+        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let left_secret =
+            crypto_provider.expand_with_label(cipher_suite, parent_secret, b"tree", b"left", nh)?;
+        let right_secret = crypto_provider.expand_with_label(
+            cipher_suite,
+            parent_secret,
+            b"tree",
+            b"right",
+            nh,
+        )?;
 
-        if err := tree.deriveChildren(cs, l); err != nil {
-            return err
-        }
-        if err := tree.deriveChildren(cs, r); err != nil {
-            return err
-        }*/
+        self.set(l, left_secret);
+        self.set(r, right_secret);
+
+        self.derive_children(crypto_provider, cipher_suite, l)?;
+        self.derive_children(crypto_provider, cipher_suite, r)?;
 
         Ok(())
     }
 
+    //TODO(yngrtc): really Option<&Option<Bytes>>?
     fn get(&self, ni: NodeIndex) -> Option<&Option<Bytes>> {
         self.0.get(ni.0 as usize)
     }
@@ -76,14 +83,27 @@ impl SecretTree {
         }
     }
 
-    // deriveRatchetRoot derives the root of a ratchet for a tree node.
-    /*TODO(yngrtc):fn deriveRatchetRoot(&self, cs: CipherSuite, ni: NodeIndex, label: &RatchetLabel) ->Result<RatchetSecret> {
-        _, kdf, _ := cs.hpke().Params()
-        nh := uint16(kdf.ExtractSize())
-        root, err := cs.expandWithLabel(tree.get(ni), []byte(label), nil, nh)
-        return ratchetSecret{root, 0}, err
+    // derive_ratchet_root derives the root of a ratchet for a tree node.
+    fn derive_ratchet_root(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        ni: NodeIndex,
+        label: &RatchetLabel,
+    ) -> Result<RatchetSecret> {
+        let parent_secret = self
+            .get(ni)
+            .ok_or(Error::InvalidParentNode)?
+            .as_ref()
+            .ok_or(Error::InvalidParentNode)?;
+        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let secret =
+            crypto_provider.expand_with_label(cipher_suite, parent_secret, label, &[], nh)?;
+        Ok(RatchetSecret {
+            secret,
+            generation: 0,
+        })
     }
-    */
 }
 
 pub(crate) struct RatchetSecret {
@@ -91,29 +111,59 @@ pub(crate) struct RatchetSecret {
     generation: u32,
 }
 
-/*
-impl RatchetSecret  {
-    fn deriveNonce(&self, cs: CipherSuite) ->Result<Bytes> {
-        _, _, aead := cs.hpke().Params()
-        nn := uint16(aead.NonceSize())
-        return derive_tree_secret(cs, secret.secret, []byte("nonce"), secret.generation, nn)
+impl RatchetSecret {
+    fn derive_nonce(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+    ) -> Result<Bytes> {
+        let nn = crypto_provider.hpke(cipher_suite).aead_nonce_size() as u16;
+        derive_tree_secret(
+            crypto_provider,
+            cipher_suite,
+            &self.secret,
+            b"nonce",
+            self.generation,
+            nn,
+        )
     }
 
-    fn deriveKey(cs cipherSuite) ([]byte, error) {
-        _, _, aead := cs.hpke().Params()
-        nk := uint16(aead.KeySize())
-        return derive_tree_secret(cs, secret.secret, []byte("key"), secret.generation, nk)
+    fn derive_key(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+    ) -> Result<Bytes> {
+        let nk = crypto_provider.hpke(cipher_suite).aead_key_size() as u16;
+        derive_tree_secret(
+            crypto_provider,
+            cipher_suite,
+            &self.secret,
+            b"key",
+            self.generation,
+            nk,
+        )
     }
 
-    fn deriveNext(cs cipherSuite) (ratchetSecret, error) {
-        _, kdf, _ := cs.hpke().Params()
-        nh := uint16(kdf.ExtractSize())
-        next, err := derive_tree_secret(cs, secret.secret, []byte("secret"), secret.generation, nh)
-        return ratchetSecret{next, secret.generation + 1}, err
+    fn derive_next(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+    ) -> Result<RatchetSecret> {
+        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let secret = derive_tree_secret(
+            crypto_provider,
+            cipher_suite,
+            &self.secret,
+            b"secret",
+            self.generation,
+            nh,
+        )?;
+        Ok(RatchetSecret {
+            secret,
+            generation: self.generation + 1,
+        })
     }
-
 }
-*/
 
 pub fn derive_tree_secret(
     crypto_provider: &impl CryptoProvider,

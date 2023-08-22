@@ -6,10 +6,7 @@ use crate::codec::*;
 use crate::error::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use hpke::{
-    aead::AesGcm128, kdf::HkdfSha256, kem::X25519HkdfSha256, Deserializable, OpModeR, OpModeS,
-    Serializable,
-};
+use hpke::{Deserializable, Serializable};
 use rand::{rngs::StdRng, SeedableRng};
 
 pub const MLS_PREFIX: &str = "MLS 1.0 ";
@@ -130,18 +127,22 @@ pub trait CryptoProvider {
         let info = mls_prefix_label_data(label, context)?;
         match cipher_suite {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => {
-                let x25519_public_key =
+                let public_key =
                     <hpke::kem::X25519HkdfSha256 as hpke::Kem>::PublicKey::from_bytes(public_key)
                         .map_err(|err| Error::HpkeError(err.to_string()))?;
 
-                let (kem_output, mut encryption_context) =
-                    hpke::setup_sender::<AesGcm128, HkdfSha256, X25519HkdfSha256, _>(
-                        &OpModeS::Base,
-                        &x25519_public_key,
-                        &info,
-                        &mut StdRng::from_entropy(),
-                    )
-                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+                let (kem_output, mut encryption_context) = hpke::setup_sender::<
+                    hpke::aead::AesGcm128,
+                    hpke::kdf::HkdfSha256,
+                    hpke::kem::X25519HkdfSha256,
+                    _,
+                >(
+                    &hpke::OpModeS::Base,
+                    &public_key,
+                    &info,
+                    &mut StdRng::from_entropy(),
+                )
+                .map_err(|err| Error::HpkeError(err.to_string()))?;
 
                 let ciphertext = encryption_context
                     .seal(plaintext, &[])
@@ -152,10 +153,56 @@ pub trait CryptoProvider {
                 ))
             }
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => {
-                Ok((Bytes::new(), Bytes::new()))
+                let public_key =
+                    <hpke::kem::DhP256HkdfSha256 as hpke::Kem>::PublicKey::from_bytes(public_key)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let (kem_output, mut encryption_context) = hpke::setup_sender::<
+                    hpke::aead::AesGcm128,
+                    hpke::kdf::HkdfSha256,
+                    hpke::kem::DhP256HkdfSha256,
+                    _,
+                >(
+                    &hpke::OpModeS::Base,
+                    &public_key,
+                    &info,
+                    &mut StdRng::from_entropy(),
+                )
+                .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let ciphertext = encryption_context
+                    .seal(plaintext, &[])
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+                Ok((
+                    Bytes::from(kem_output.to_bytes().to_vec()),
+                    Bytes::from(ciphertext),
+                ))
             }
             CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
-                Ok((Bytes::new(), Bytes::new()))
+                let public_key =
+                    <hpke::kem::X25519HkdfSha256 as hpke::Kem>::PublicKey::from_bytes(public_key)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let (kem_output, mut encryption_context) = hpke::setup_sender::<
+                    hpke::aead::ChaCha20Poly1305,
+                    hpke::kdf::HkdfSha256,
+                    hpke::kem::X25519HkdfSha256,
+                    _,
+                >(
+                    &hpke::OpModeS::Base,
+                    &public_key,
+                    &info,
+                    &mut StdRng::from_entropy(),
+                )
+                .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let ciphertext = encryption_context
+                    .seal(plaintext, &[])
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+                Ok((
+                    Bytes::from(kem_output.to_bytes().to_vec()),
+                    Bytes::from(ciphertext),
+                ))
             }
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
             | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
@@ -178,7 +225,7 @@ pub trait CryptoProvider {
         let info = mls_prefix_label_data(label, context)?;
         match cipher_suite {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519 => {
-                let x25519_private_key =
+                let private_key =
                     <hpke::kem::X25519HkdfSha256 as hpke::Kem>::PrivateKey::from_bytes(private_key)
                         .map_err(|err| Error::HpkeError(err.to_string()))?;
                 let encapped_key =
@@ -186,12 +233,11 @@ pub trait CryptoProvider {
                         .map_err(|err| Error::HpkeError(err.to_string()))?;
 
                 let mut decryption_context =
-                    hpke::setup_receiver::<AesGcm128, HkdfSha256, X25519HkdfSha256>(
-                        &OpModeR::Base,
-                        &x25519_private_key,
-                        &encapped_key,
-                        &info,
-                    )
+                    hpke::setup_receiver::<
+                        hpke::aead::AesGcm128,
+                        hpke::kdf::HkdfSha256,
+                        hpke::kem::X25519HkdfSha256,
+                    >(&hpke::OpModeR::Base, &private_key, &encapped_key, &info)
                     .map_err(|err| Error::HpkeError(err.to_string()))?;
 
                 let plaintext = decryption_context
@@ -200,8 +246,50 @@ pub trait CryptoProvider {
 
                 Ok(Bytes::from(plaintext))
             }
-            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Ok(Bytes::new()),
-            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => Ok(Bytes::new()),
+            CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => {
+                let private_key =
+                    <hpke::kem::DhP256HkdfSha256 as hpke::Kem>::PrivateKey::from_bytes(private_key)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+                let encapped_key =
+                    <hpke::kem::DhP256HkdfSha256 as hpke::Kem>::EncappedKey::from_bytes(kem_output)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let mut decryption_context =
+                    hpke::setup_receiver::<
+                        hpke::aead::AesGcm128,
+                        hpke::kdf::HkdfSha256,
+                        hpke::kem::DhP256HkdfSha256,
+                    >(&hpke::OpModeR::Base, &private_key, &encapped_key, &info)
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let plaintext = decryption_context
+                    .open(ciphertext, &[])
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                Ok(Bytes::from(plaintext))
+            }
+            CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519 => {
+                let private_key =
+                    <hpke::kem::X25519HkdfSha256 as hpke::Kem>::PrivateKey::from_bytes(private_key)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+                let encapped_key =
+                    <hpke::kem::X25519HkdfSha256 as hpke::Kem>::EncappedKey::from_bytes(kem_output)
+                        .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let mut decryption_context =
+                    hpke::setup_receiver::<
+                        hpke::aead::ChaCha20Poly1305,
+                        hpke::kdf::HkdfSha256,
+                        hpke::kem::X25519HkdfSha256,
+                    >(&hpke::OpModeR::Base, &private_key, &encapped_key, &info)
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                let plaintext = decryption_context
+                    .open(ciphertext, &[])
+                    .map_err(|err| Error::HpkeError(err.to_string()))?;
+
+                Ok(Bytes::from(plaintext))
+            }
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
             | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
             | CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448

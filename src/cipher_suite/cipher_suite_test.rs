@@ -198,29 +198,68 @@ struct EncryptWithLabelTest {
     kem_output: String,
     ciphertext: String,
 }
-/*
-func testEncryptWithLabel(t *testing.T, cs cipherSuite, tc *encryptWithLabelTest) {
-    plaintext, err := cs.decryptWithLabel([]byte(tc.Priv), []byte(tc.Label), []byte(tc.Context), []byte(tc.KEMOutput), []byte(tc.Ciphertext))
-    if err != nil {
-        t.Fatalf("decryptWithLabel() = %v", err)
-    }
-    if !bytes.Equal([]byte(tc.Plaintext), plaintext) {
-        t.Fatalf("decrypting reference ciphertext: got %v, want %v", plaintext, tc.Plaintext)
+
+fn test_encrypt_with_label(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &EncryptWithLabelTest,
+) -> Result<()> {
+    if !(cipher_suite == CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
+        || cipher_suite == CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256
+        || cipher_suite == CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519)
+    {
+        //TODO(yngrtc): implement other CipherSuite
+        println!("\t test_encrypt_with_label {:?} skipped", cipher_suite);
+        return Ok(());
     }
 
-    kemOutput, ciphertext, err := cs.encryptWithLabel([]byte(tc.Pub), []byte(tc.Label), []byte(tc.Context), []byte(tc.Plaintext))
-    if err != nil {
-        t.Fatalf("encryptWithLabel() = %v", err)
-    }
-    plaintext, err = cs.decryptWithLabel([]byte(tc.Priv), []byte(tc.Label), []byte(tc.Context), kemOutput, ciphertext)
-    if err != nil {
-        t.Fatalf("decryptWithLabel() = %v", err)
-    }
-    if !bytes.Equal([]byte(tc.Plaintext), plaintext) {
-        t.Fatalf("decrypting reference ciphertext: got %v, want %v", plaintext, tc.Plaintext)
-    }
+    let private_key = hex_to_bytes(&tc.r#priv);
+    let public_key = hex_to_bytes(&tc.r#pub);
+    let label = tc.label.as_bytes();
+    let context = hex_to_bytes(&tc.context);
+    let expect_kem_output = hex_to_bytes(&tc.kem_output);
+    let expect_plaintext = hex_to_bytes(&tc.plaintext);
+    let expect_ciphertext = hex_to_bytes(&tc.ciphertext);
+
+    let actual_plaintext = crypto_provider.decrypt_with_label(
+        cipher_suite,
+        &private_key,
+        label,
+        &context,
+        &expect_kem_output,
+        &expect_ciphertext,
+    )?;
+    assert_eq!(
+        &actual_plaintext, &expect_plaintext,
+        "decrypting reference ciphertext: got {:?}, want {:?}",
+        &actual_plaintext, &expect_plaintext
+    );
+
+    let (actual_kem_output, actual_ciphertext) = crypto_provider.encrypt_with_label(
+        cipher_suite,
+        &public_key,
+        label,
+        &context,
+        &expect_plaintext,
+    )?;
+
+    let actual_plaintext = crypto_provider.decrypt_with_label(
+        cipher_suite,
+        &private_key,
+        label,
+        &context,
+        &actual_kem_output,
+        &actual_ciphertext,
+    )?;
+
+    assert_eq!(
+        &actual_plaintext, &expect_plaintext,
+        "decrypting reference ciphertext: got {:?}, want {:?}",
+        &actual_plaintext, &expect_plaintext
+    );
+
+    Ok(())
 }
-*/
 
 fn test_crypto_basics_with_crypto_provider(
     tests: &[CryptoBasicsTest],
@@ -239,10 +278,8 @@ fn test_crypto_basics_with_crypto_provider(
         test_derive_tree_secret(crypto_provider, cipher_suite, &tc.derive_tree_secret)?;
 
         test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
-        /*
-        t.Run("encrypt_with_label", func(t *testing.T) {
-            testEncryptWithLabel(t, tc.CipherSuite, &tc.EncryptWithLabel)
-        })*/
+
+        test_encrypt_with_label(crypto_provider, cipher_suite, &tc.encrypt_with_label)?;
     }
 
     Ok(())

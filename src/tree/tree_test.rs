@@ -79,7 +79,9 @@ fn test_tree_validation_with_crypto_provider(
             cipher_suite, cipher_suite as u16
         );
 
-        tree_validation_test(crypto_provider, cipher_suite, tc)?;
+        if crypto_provider.supports(cipher_suite).is_ok() {
+            tree_validation_test(crypto_provider, cipher_suite, tc)?;
+        }
     }
 
     Ok(())

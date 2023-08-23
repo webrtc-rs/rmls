@@ -15,16 +15,25 @@ pub enum CredentialType {
     #[default]
     Basic = 0x0001,
     X509 = 0x0002,
+    Unknown(u16),
 }
 
-impl TryFrom<u16> for CredentialType {
-    type Error = Error;
-
-    fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
+impl From<u16> for CredentialType {
+    fn from(v: u16) -> Self {
         match v {
-            0x0001 => Ok(CredentialType::Basic),
-            0x0002 => Ok(CredentialType::X509),
-            _ => Err(Error::InvalidCredentialTypeValue(v)),
+            0x0001 => CredentialType::Basic,
+            0x0002 => CredentialType::X509,
+            _ => CredentialType::Unknown(v),
+        }
+    }
+}
+
+impl From<CredentialType> for u16 {
+    fn from(val: CredentialType) -> u16 {
+        match val {
+            CredentialType::Basic => 0x0001,
+            CredentialType::X509 => 0x0002,
+            CredentialType::Unknown(v) => v,
         }
     }
 }
@@ -47,7 +56,7 @@ impl Reader for Credential {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        self.credential_type = buf.get_u16().try_into()?;
+        self.credential_type = buf.get_u16().into();
 
         match self.credential_type {
             CredentialType::Basic => {
@@ -59,6 +68,7 @@ impl Reader for Credential {
                 self.certificates.push(cert);
                 Ok(())
             }),
+            _ => Err(Error::InvalidCredentialTypeValue),
         }
     }
 }
@@ -69,7 +79,7 @@ impl Writer for Credential {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.credential_type as u16);
+        buf.put_u16(self.credential_type.into());
         match self.credential_type {
             CredentialType::Basic => write_opaque_vec(&self.identity, buf),
             CredentialType::X509 => write_vector(
@@ -79,6 +89,7 @@ impl Writer for Credential {
                     write_opaque_vec(&self.certificates[i], b)
                 },
             ),
+            _ => Err(Error::InvalidCredentialTypeValue),
         }
     }
 }

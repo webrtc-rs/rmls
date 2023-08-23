@@ -243,7 +243,7 @@ impl RatchetTree {
         false
     }
 
-    fn compute_root_tree_hash(
+    pub(crate) fn compute_root_tree_hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -583,7 +583,7 @@ impl RatchetTree {
         Ok(path)
     }
 
-    fn merge_update_path(
+    pub(crate) fn merge_update_path(
         &mut self,
         crypto_provide: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -618,43 +618,46 @@ impl RatchetTree {
         let mut prev_parent_hash = None;
         for i in (0..filtered_direct_path.len()).rev() {
             let ni = filtered_direct_path[i];
-            let node_parent_hash = if let Some(Node::Parent(parent_node)) = self.get(ni) {
-                let (l, r, ok) = ni.children();
-                if !ok {
-                    return Err(Error::InvalidChildren);
-                }
-
-                let mut s = l;
-                let mut found = false;
-                for ni in &direct_path {
-                    if *ni == s {
-                        found = true;
-                        break;
+            let (node_parent_hash, tree_hash) =
+                if let Some(Node::Parent(_parent_node)) = self.get(ni) {
+                    let (l, r, ok) = ni.children();
+                    if !ok {
+                        return Err(Error::InvalidChildren);
                     }
-                }
-                if s == sender_node_index || found {
-                    s = r;
-                }
 
-                let tree_hash =
-                    self.compute_tree_hash(crypto_provide, cipher_suite, s, &exclude)?;
+                    let mut s = l;
+                    let mut found = false;
+                    for ni in &direct_path {
+                        if *ni == s {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if s == sender_node_index || found {
+                        s = r;
+                    }
 
-                let node_parent_hash = prev_parent_hash.take();
-                prev_parent_hash = Some(parent_node.compute_parent_hash(
+                    let tree_hash =
+                        self.compute_tree_hash(crypto_provide, cipher_suite, s, &exclude)?;
+
+                    (prev_parent_hash.take(), tree_hash)
+                } else {
+                    (None, Bytes::new())
+                };
+
+            //workaround to assign node.parent_hash
+            if let Some(Node::Parent(parent_node)) = self.get_mut(ni) {
+                if let Some(node_parent_hash) = node_parent_hash {
+                    parent_node.parent_hash = node_parent_hash;
+                } else {
+                    parent_node.parent_hash = Bytes::new();
+                }
+                let h = parent_node.compute_parent_hash(
                     crypto_provide,
                     cipher_suite,
                     tree_hash.as_ref(),
-                )?);
-                node_parent_hash
-            } else {
-                None
-            };
-
-            //workaround to assign node.parent_hash
-            if let Some(node_parent_hash) = node_parent_hash {
-                if let Some(Node::Parent(parent_node)) = self.get_mut(ni) {
-                    parent_node.parent_hash = Bytes::from(node_parent_hash.as_ref().to_vec());
-                }
+                )?;
+                prev_parent_hash = Some(h);
             }
         }
 

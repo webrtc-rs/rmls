@@ -153,7 +153,7 @@ impl Writer for LeafNodeSource {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct Capabilities {
     versions: Vec<ProtocolVersion>,
-    cipher_suites: Vec<CipherSuite>,
+    cipher_suites: Vec<CipherSuiteCapability>,
     extensions: Vec<ExtensionType>,
     proposals: Vec<ProposalType>,
     credentials: Vec<CredentialType>,
@@ -182,8 +182,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let cs: CipherSuite = b.get_u16().try_into()?;
-            self.cipher_suites.push(cs);
+            self.cipher_suites.push(CipherSuiteCapability(b.get_u16()));
             Ok(())
         })?;
 
@@ -191,7 +190,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let et: ExtensionType = b.get_u16().try_into()?;
+            let et: ExtensionType = b.get_u16().into();
             self.extensions.push(et);
             Ok(())
         })?;
@@ -200,7 +199,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let pt: ProposalType = b.get_u16().try_into()?;
+            let pt: ProposalType = b.get_u16().into();
             self.proposals.push(pt);
             Ok(())
         })?;
@@ -209,7 +208,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let ct: CredentialType = b.get_u16().try_into()?;
+            let ct: CredentialType = b.get_u16().into();
             self.credentials.push(ct);
             Ok(())
         })?;
@@ -237,7 +236,7 @@ impl Writer for Capabilities {
             self.cipher_suites.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.cipher_suites[i] as u16);
+                b.put_u16(self.cipher_suites[i].0);
                 Ok(())
             },
         )?;
@@ -246,7 +245,7 @@ impl Writer for Capabilities {
             self.extensions.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.extensions[i] as u16);
+                b.put_u16(self.extensions[i].into());
                 Ok(())
             },
         )?;
@@ -255,7 +254,7 @@ impl Writer for Capabilities {
             self.proposals.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.proposals[i] as u16);
+                b.put_u16(self.proposals[i].into());
                 Ok(())
             },
         )?;
@@ -264,7 +263,7 @@ impl Writer for Capabilities {
             self.credentials.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.credentials[i] as u16);
+                b.put_u16(self.credentials[i].into());
                 Ok(())
             },
         )?;
@@ -348,19 +347,32 @@ pub(crate) enum ExtensionType {
     RequiredCapabilities = 0x0003,
     ExternalPub = 0x0004,
     ExternalSenders = 0x0005,
+    /// A currently unknown extension type.
+    Unknown(u16),
 }
 
-impl TryFrom<u16> for ExtensionType {
-    type Error = Error;
-
-    fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
+impl From<u16> for ExtensionType {
+    fn from(v: u16) -> Self {
         match v {
-            0x0001 => Ok(ExtensionType::ApplicationId),
-            0x0002 => Ok(ExtensionType::RatchetTree),
-            0x0003 => Ok(ExtensionType::RequiredCapabilities),
-            0x0004 => Ok(ExtensionType::ExternalPub),
-            0x0005 => Ok(ExtensionType::ExternalSenders),
-            _ => Err(Error::InvalidExtensionTypeValue(v)),
+            0x0001 => ExtensionType::ApplicationId,
+            0x0002 => ExtensionType::RatchetTree,
+            0x0003 => ExtensionType::RequiredCapabilities,
+            0x0004 => ExtensionType::ExternalPub,
+            0x0005 => ExtensionType::ExternalSenders,
+            _ => ExtensionType::Unknown(v),
+        }
+    }
+}
+
+impl From<ExtensionType> for u16 {
+    fn from(val: ExtensionType) -> Self {
+        match val {
+            ExtensionType::ApplicationId => 0x0001,
+            ExtensionType::RatchetTree => 0x0002,
+            ExtensionType::RequiredCapabilities => 0x0003,
+            ExtensionType::ExternalPub => 0x0004,
+            ExtensionType::ExternalSenders => 0x0005,
+            ExtensionType::Unknown(v) => v,
         }
     }
 }
@@ -377,7 +389,7 @@ fn unmarshal_extension_vec<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
         if b.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        let extension_type: ExtensionType = b.get_u16().try_into()?;
+        let extension_type: ExtensionType = b.get_u16().into();
         let extension_data = read_opaque_vec(b)?;
         exts.push(Extension {
             extension_type,
@@ -393,7 +405,7 @@ fn marshal_extension_vec<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<(
         exts.len(),
         buf,
         |i: usize, b: &mut BytesMut| -> Result<()> {
-            b.put_u16(exts[i].extension_type as u16);
+            b.put_u16(exts[i].extension_type.into());
             write_opaque_vec(&exts[i].extension_data, b)
         },
     )
@@ -540,12 +552,14 @@ impl LeafNode {
             return Err(Error::LeafNodeSignatureVerificationFailed);
         }
 
+        // TODO: check required_capabilities group extension
+
         if !options
             .supported_creds
             .contains(&self.credential.credential_type)
         {
             return Err(Error::CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(
-                self.credential.credential_type as u16,
+                self.credential.credential_type.into(),
             ));
         }
 
@@ -564,7 +578,7 @@ impl LeafNode {
             if !supported_exts.contains(&ext.extension_type) {
                 return Err(
                     Error::ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(
-                        ext.extension_type as u16,
+                        ext.extension_type.into(),
                     ),
                 );
             }

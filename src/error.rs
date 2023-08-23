@@ -32,8 +32,8 @@ pub enum Error {
     InvalidExtensionTypeValue(u16),
     #[error("invalid proposal type value {0}")]
     InvalidProposalTypeValue(u16),
-    #[error("invalid credential type value {0}")]
-    InvalidCredentialTypeValue(u16),
+    #[error("invalid credential type value")]
+    InvalidCredentialTypeValue,
     #[error("invalid content type value {0}")]
     InvalidContentTypeValue(u8),
     #[error("invalid cipher suite value {0}")]

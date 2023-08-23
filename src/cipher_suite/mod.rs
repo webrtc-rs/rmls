@@ -41,3 +41,6 @@ impl Display for CipherSuite {
         write!(f, "{self:?}")
     }
 }
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct CipherSuiteCapability(pub(crate) u16);

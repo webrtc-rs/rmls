@@ -142,50 +142,71 @@ struct TreeKEMTest {
     pub leaves_private: Vec<LeafPrivateTest>,
     pub update_paths: Vec<PathTest>,
 }
-/*
-func testTreeKEM(t *testing.T, tc *treeKEMTest) {
+
+fn tree_kem_test(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &TreeKEMTest,
+) -> Result<()> {
     // TODO: test leaves_private
 
-    for _, updatePathTest := range tc.UpdatePaths {
-        var tree ratchetTree
-        if err := unmarshal([]byte(tc.RatchetTree), &tree); err != nil {
-            t.Fatalf("unmarshal(ratchetTree) = %v", err)
-        }
+    for update_path_test in &tc.update_paths {
+        let mut tree = RatchetTree::default();
+        let mut buf = tc.ratchet_tree.as_ref();
+        read(&mut tree, &mut buf)?;
 
-        var up updatePath
-        if err := unmarshal([]byte(updatePathTest.UpdatePath), &up); err != nil {
-            t.Fatalf("unmarshal(updatePath) = %v", err)
-        }
+        let mut up = UpdatePath::default();
+        let mut buf = update_path_test.update_path.as_ref();
+        read(&mut up, &mut buf)?;
 
         // TODO: verify that UpdatePath is parent-hash valid relative to ratchet tree
         // TODO: process UpdatePath using private leaves
 
-        if err := tree.mergeUpdatePath(tc.CipherSuite, updatePathTest.Sender, &up); err != nil {
-            t.Fatalf("ratchetTree.mergeUpdatePath() = %v", err)
-        }
+        tree.merge_update_path(
+            crypto_provider,
+            cipher_suite,
+            LeafIndex(update_path_test.sender),
+            up,
+        )?;
 
-        treeHash, err := tree.computeRootTreeHash(tc.CipherSuite)
-        if err != nil {
-            t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
-        } else if !bytes.Equal(treeHash, []byte(updatePathTest.TreeHashAfter)) {
-            t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, updatePathTest.TreeHashAfter)
-        }
+        let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
+        assert_eq!(
+            &tree_hash, &update_path_test.tree_hash_after,
+            "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
+            tree_hash, update_path_test.tree_hash_after
+        );
 
         // TODO: create and verify new update path
     }
+
+    Ok(())
 }
 
-func TestTreeKEM(t *testing.T) {
-    var tests []treeKEMTest
-    loadTestVector(t, "testdata/treekem.json", &tests)
+fn test_tree_kem_with_crypto_provider(
+    tests: &[TreeKEMTest],
+    crypto_provider: &impl CryptoProvider,
+) -> Result<()> {
+    for (i, tc) in tests.iter().enumerate() {
+        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        println!("test_tree_kem {}:{}", i, cipher_suite);
 
-    for i, tc := range tests {
-        t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-            testTreeKEM(t, &tc)
-        })
+        if crypto_provider.supports(cipher_suite).is_ok() {
+            tree_kem_test(crypto_provider, cipher_suite, tc)?;
+        }
     }
+
+    Ok(())
 }
-*/
+
+#[test]
+fn test_tree_kem() -> Result<()> {
+    let tests: Vec<TreeKEMTest> = load_test_vector("test-vectors/treekem.json")?;
+
+    test_tree_kem_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_tree_kem_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+
+    Ok(())
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct TreeOperationsTest {
@@ -203,21 +224,24 @@ struct TreeOperationsTest {
     #[serde(with = "hex")]
     tree_hash_before: Vec<u8>,
 }
-/*
-func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
-    var tree ratchetTree
-    if err := unmarshal([]byte(tc.TreeBefore), &tree); err != nil {
-        t.Fatalf("unmarshal(tree) = %v", err)
-    }
 
-    treeHash, err := tree.computeRootTreeHash(tc.CipherSuite)
-    if err != nil {
-        t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
-    } else if !bytes.Equal(treeHash, []byte(tc.TreeHashBefore)) {
-        t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, tc.TreeHashBefore)
-    }
+fn tree_operations_test(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &TreeOperationsTest,
+) -> Result<()> {
+    let mut tree = RatchetTree::default();
+    let mut buf = tc.tree_before.as_ref();
+    read(&mut tree, &mut buf)?;
 
-    var prop proposal
+    let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
+    assert_eq!(
+        &tree_hash, &tc.tree_hash_before,
+        "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
+        tree_hash, tc.tree_hash_before
+    );
+    /*TODO(yngrtc):
+    let mut prop = Proposal::
     if err := unmarshal([]byte(tc.Proposal), &prop); err != nil {
         t.Fatalf("unmarshal(proposal) = %v", err)
     }
@@ -263,25 +287,25 @@ func testTreeOperations(t *testing.T, tc *treeOperationsTest) {
         t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
     }
 
-    treeHash, err = tree.computeRootTreeHash(tc.CipherSuite)
+    tree_hash, err = tree.computeRootTreeHash(tc.CipherSuite)
     if err != nil {
         t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
-    } else if !bytes.Equal(treeHash, []byte(tc.TreeHashAfter)) {
-        t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", treeHash, tc.TreeHashAfter)
+    } else if !bytes.Equal(tree_hash, []byte(tc.TreeHashAfter)) {
+        t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", tree_hash, tc.TreeHashAfter)
     }
+     */
+    Ok(())
 }
-
-*/
 
 fn test_tree_operations_with_crypto_provider(
     tests: &[TreeOperationsTest],
-    _crypto_provider: &impl CryptoProvider,
+    crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("test_tree_operations {}", cipher_suite);
 
-        //TODO: testTreeOperations(t, &tc);
+        tree_operations_test(crypto_provider, cipher_suite, &tc)?;
     }
 
     Ok(())

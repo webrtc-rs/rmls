@@ -14,21 +14,35 @@ pub(crate) enum ProposalType {
     Reinit = 0x0005,
     ExternalInit = 0x0006,
     GroupContextExtensions = 0x0007,
+    Unknown(u16),
 }
 
-impl TryFrom<u16> for ProposalType {
-    type Error = Error;
-
-    fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
+impl From<u16> for ProposalType {
+    fn from(v: u16) -> Self {
         match v {
-            0x0001 => Ok(ProposalType::Add),
-            0x0002 => Ok(ProposalType::Update),
-            0x0003 => Ok(ProposalType::Remove),
-            0x0004 => Ok(ProposalType::Psk),
-            0x0005 => Ok(ProposalType::Reinit),
-            0x0006 => Ok(ProposalType::ExternalInit),
-            0x0007 => Ok(ProposalType::GroupContextExtensions),
-            _ => Err(Error::InvalidProposalTypeValue(v)),
+            0x0001 => ProposalType::Add,
+            0x0002 => ProposalType::Update,
+            0x0003 => ProposalType::Remove,
+            0x0004 => ProposalType::Psk,
+            0x0005 => ProposalType::Reinit,
+            0x0006 => ProposalType::ExternalInit,
+            0x0007 => ProposalType::GroupContextExtensions,
+            _ => ProposalType::Unknown(v),
+        }
+    }
+}
+
+impl From<ProposalType> for u16 {
+    fn from(val: ProposalType) -> Self {
+        match val {
+            ProposalType::Add => 0x0001,
+            ProposalType::Update => 0x0002,
+            ProposalType::Remove => 0x0003,
+            ProposalType::Psk => 0x0004,
+            ProposalType::Reinit => 0x0005,
+            ProposalType::ExternalInit => 0x0006,
+            ProposalType::GroupContextExtensions => 0x0007,
+            ProposalType::Unknown(v) => v,
         }
     }
 }
@@ -42,7 +56,7 @@ impl Reader for ProposalType {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        *self = buf.get_u16().try_into()?;
+        *self = buf.get_u16().into();
         Ok(())
     }
 }
@@ -53,7 +67,7 @@ impl Writer for ProposalType {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(*self as u16);
+        buf.put_u16((*self).into());
         Ok(())
     }
 }

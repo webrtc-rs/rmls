@@ -383,7 +383,7 @@ pub(crate) struct Extension {
     extension_data: Bytes,
 }
 
-fn unmarshal_extension_vec<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
+pub(crate) fn read_extensions<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
     let mut exts = vec![];
     read_vector(buf, |b: &mut Bytes| -> Result<()> {
         if b.remaining() < 2 {
@@ -400,7 +400,7 @@ fn unmarshal_extension_vec<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
     Ok(exts)
 }
 
-fn marshal_extension_vec<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<()> {
+pub(crate) fn write_extensions<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<()> {
     write_vector(
         exts.len(),
         buf,
@@ -422,11 +422,11 @@ fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct LeafNode {
-    encryption_key: HpkePublicKey,
-    signature_key: SignaturePublicKey,
+    pub(crate) encryption_key: HpkePublicKey,
+    pub(crate) signature_key: SignaturePublicKey,
     credential: Credential,
     capabilities: Capabilities,
-    leaf_node_source: LeafNodeSource,
+    pub(crate) leaf_node_source: LeafNodeSource,
     extensions: Vec<Extension>,
 
     signature: Bytes,
@@ -440,7 +440,7 @@ impl LeafNode {
         self.capabilities.write(buf)?;
         self.leaf_node_source.write(buf)?;
 
-        marshal_extension_vec(&self.extensions, buf)
+        write_extensions(&self.extensions, buf)
     }
 }
 
@@ -459,7 +459,7 @@ impl Reader for LeafNode {
         self.capabilities.read(buf)?;
         self.leaf_node_source.read(buf)?;
 
-        self.extensions = unmarshal_extension_vec(buf)?;
+        self.extensions = read_extensions(buf)?;
         self.signature = read_opaque_vec(buf)?;
 
         Ok(())

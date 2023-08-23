@@ -88,6 +88,16 @@ pub enum Error {
     UnsupportedCipherSuite,
     #[error("unsupported HKPE KEM")]
     UnsupportedHkpeKem,
+    #[error("key package version doesn't match group context")]
+    KeyPackageVersionNotMatchGroupContext,
+    #[error("cipher suite doesn't match group context")]
+    CipherSuiteNotMatchGroupContext,
+    #[error("key package contains a leaf node with an invalid source")]
+    KeyPackageContainsLeafNodeWithInvalidSource,
+    #[error("invalid key package signature")]
+    InvalidKeyPackageSignature,
+    #[error("key package encryption key and init key are identical")]
+    KeyPackageEncryptionKeyAndInitKeyIdentical,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

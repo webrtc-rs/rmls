@@ -70,13 +70,16 @@ fn tree_validation_test(
 
 fn test_tree_validation_with_crypto_provider(
     tests: &[TreeValidationTest],
-    _crypto_provider: &impl CryptoProvider,
+    crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_tree_validation {}", cipher_suite);
+        println!(
+            "test_tree_validation {}:{}",
+            cipher_suite, cipher_suite as u16
+        );
 
-        //TODO: tree_validation_test(crypto_provider, cipher_suite, tc)?;
+        tree_validation_test(crypto_provider, cipher_suite, tc)?;
     }
 
     Ok(())

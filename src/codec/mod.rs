@@ -78,8 +78,8 @@ pub(crate) fn read_vector<B: Buf>(
 
     let mut v = buf.copy_to_bytes(n);
     let ss = &mut v;
-    while !ss.has_remaining() {
-        f(ss)?
+    while ss.has_remaining() {
+        f(ss)?;
     }
     Ok(())
 }

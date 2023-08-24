@@ -15,7 +15,7 @@ use crate::crypto::provider::CryptoProvider;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
-use crate::group::*;
+use crate::messages::proposal::*;
 use tree_math::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -155,7 +155,7 @@ pub(crate) struct Capabilities {
     versions: Vec<ProtocolVersion>,
     cipher_suites: Vec<CipherSuiteCapability>,
     extensions: Vec<ExtensionType>,
-    proposals: Vec<ProposalType>,
+    proposals: Vec<ProposalTypeCapability>,
     credentials: Vec<CredentialType>,
 }
 
@@ -199,7 +199,7 @@ impl Reader for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let pt: ProposalType = b.get_u16().into();
+            let pt: ProposalTypeCapability = b.get_u16().into();
             self.proposals.push(pt);
             Ok(())
         })?;

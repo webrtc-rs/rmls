@@ -42,6 +42,8 @@ pub enum Error {
     InvalidPskTypeValue(u8),
     #[error("invalid sender type value {0}")]
     InvalidSenderTypeValue(u8),
+    #[error("invalid ProposalOrRef value {0}")]
+    InvalidProposalOrRefValue(u8),
     #[error("invalid wire format value {0}")]
     InvalidWireFormatValue(u16),
     #[error("invalid cipher suite value {0}")]

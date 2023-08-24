@@ -113,6 +113,8 @@ pub enum Error {
     Sec1(#[source] sec1::Error),
     #[error("{0}")]
     Ecdsa(#[source] ecdsa::Error),
+    #[error("{0}")]
+    SignatureDigest(#[source] signature::digest::InvalidLength),
 
     #[error("{0}")]
     Other(String),
@@ -149,5 +151,11 @@ impl From<sec1::Error> for Error {
 impl From<ecdsa::Error> for Error {
     fn from(e: ecdsa::Error) -> Self {
         Error::Ecdsa(e)
+    }
+}
+
+impl From<signature::digest::InvalidLength> for Error {
+    fn from(e: signature::digest::InvalidLength) -> Self {
+        Error::SignatureDigest(e)
     }
 }

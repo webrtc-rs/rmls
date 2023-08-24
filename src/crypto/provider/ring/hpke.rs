@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use ring::digest::{SHA256_OUTPUT_LEN, SHA384_OUTPUT_LEN, SHA512_OUTPUT_LEN};
 use ring::hkdf::{KeyType, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
+use ring::hmac;
 
 use crate::crypto::*;
 
@@ -47,6 +48,15 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
             .map_err(|err| Error::RingCryptoError(err.to_string()))?;
 
         Ok(Bytes::from(out))
+    }
+
+    fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes> {
+        let salt = match self.kdf {
+            Kdf::KDF_HKDF_SHA256 => hmac::Key::new(hmac::HMAC_SHA256, salt),
+            Kdf::KDF_HKDF_SHA384 => hmac::Key::new(hmac::HMAC_SHA384, salt),
+            Kdf::KDF_HKDF_SHA512 => hmac::Key::new(hmac::HMAC_SHA512, salt),
+        };
+        Ok(Bytes::from(hmac::sign(&salt, secret).as_ref().to_vec()))
     }
 
     fn kdf_extract_size(&self) -> usize {

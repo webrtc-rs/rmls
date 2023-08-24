@@ -19,6 +19,7 @@ pub trait Hash: Send + Sync {
 
 pub trait Hpke: Send + Sync {
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes>;
+    fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes>;
     fn kdf_extract_size(&self) -> usize;
 
     fn aead_nonce_size(&self) -> usize;

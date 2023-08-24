@@ -1,5 +1,8 @@
 use crate::codec::{Reader, Writer};
 use crate::error::*;
+use crate::key_package::KeyPackage;
+use crate::tree::tree_math::LeafIndex;
+use crate::tree::LeafNode;
 use bytes::{Buf, BufMut};
 
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types
@@ -137,51 +140,88 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
         panic("unreachable")
     }
 }
+*/
 
-type add struct {
-    keyPackage keyPackage
+pub struct AddProposal {
+    key_package: KeyPackage,
 }
 
-func (a *add) unmarshal(s *cryptobyte.String) error {
-    *a = add{}
-    return a.keyPackage.unmarshal(s)
-}
-
-func (a *add) marshal(b *cryptobyte.Builder) {
-    a.keyPackage.marshal(b)
-}
-
-type update struct {
-    leafNode leafNode
-}
-
-func (upd *update) unmarshal(s *cryptobyte.String) error {
-    *upd = update{}
-    return upd.leafNode.unmarshal(s)
-}
-
-func (upd *update) marshal(b *cryptobyte.Builder) {
-    upd.leafNode.marshal(b)
-}
-
-type remove struct {
-    removed leafIndex
-}
-
-func (rm *remove) unmarshal(s *cryptobyte.String) error {
-    *rm = remove{}
-    if !s.ReadUint32((*uint32)(&rm.removed)) {
-        return io.ErrUnexpectedEOF
+impl Reader for AddProposal {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.key_package.read(buf)
     }
-    return nil
 }
 
-func (rm *remove) marshal(b *cryptobyte.Builder) {
-    b.AddUint32(uint32(rm.removed))
+impl Writer for AddProposal {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.key_package.write(buf)
+    }
 }
 
-type preSharedKey struct {
-    psk preSharedKeyID
+pub struct UpdateProposal {
+    leaf_node: LeafNode,
+}
+
+impl Reader for UpdateProposal {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.leaf_node.read(buf)
+    }
+}
+
+impl Writer for UpdateProposal {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.leaf_node.write(buf)
+    }
+}
+
+pub struct RemoveProposal {
+    removed: LeafIndex,
+}
+
+impl Reader for RemoveProposal {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 4 {
+            return Err(Error::BufferTooSmall);
+        }
+        self.removed = LeafIndex(buf.get_u32());
+        Ok(())
+    }
+}
+
+impl Writer for RemoveProposal {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u32(self.removed.0);
+
+        Ok(())
+    }
+}
+/*
+pub struct  PreSharedKeyProposal  {
+    psk :PreSharedKeyID,
 }
 
 func (psk *preSharedKey) unmarshal(s *cryptobyte.String) error {
@@ -392,7 +432,7 @@ func verifyProposalList(proposals []proposal, senders []leafIndex, committer lea
 
         switch prop.proposalType {
         case proposalTypeAdd:
-            k := string(prop.add.keyPackage.leafNode.signatureKey)
+            k := string(prop.add.key_package.leaf_node.signatureKey)
             if _, dup := add[k]; dup {
                 return fmt.Errorf("mls: multiple add proposals have the same signature key")
             }

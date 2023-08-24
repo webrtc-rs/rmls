@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use hkdf::Hkdf;
+use hmac::{Hmac, Mac};
 use sha2::{Sha256, Sha384, Sha512};
 
 use crate::crypto::*;
@@ -44,6 +45,26 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
         };
 
         Ok(Bytes::from(out))
+    }
+
+    fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes> {
+        match self.kdf {
+            Kdf::KDF_HKDF_SHA256 => {
+                let mut m = Hmac::<Sha256>::new_from_slice(salt)?;
+                m.update(secret);
+                Ok(Bytes::from(m.finalize().into_bytes().to_vec()))
+            }
+            Kdf::KDF_HKDF_SHA384 => {
+                let mut m = Hmac::<Sha384>::new_from_slice(salt)?;
+                m.update(secret);
+                Ok(Bytes::from(m.finalize().into_bytes().to_vec()))
+            }
+            Kdf::KDF_HKDF_SHA512 => {
+                let mut m = Hmac::<Sha512>::new_from_slice(salt)?;
+                m.update(secret);
+                Ok(Bytes::from(m.finalize().into_bytes().to_vec()))
+            }
+        }
     }
 
     fn kdf_extract_size(&self) -> usize {

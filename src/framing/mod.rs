@@ -1,11 +1,13 @@
 use crate::cipher_suite::CipherSuite;
-use bytes::{Buf, BufMut, Bytes};
-
 use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 
+use bytes::{Buf, BufMut, Bytes};
+
 pub(crate) type ProtocolVersion = u16;
+
+pub(crate) const PROTOCOL_VERSION_MLS10: ProtocolVersion = 1;
 
 // GroupID is an application-specific group identifier.
 pub(crate) type GroupID = Bytes;

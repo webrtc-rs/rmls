@@ -87,7 +87,7 @@ impl GroupContext {
         )
     }
 
-    fn extract_epoch_secret(
+    pub(crate) fn extract_epoch_secret(
         &self,
         crypto_provider: &impl CryptoProvider,
         joiner_secret: &[u8],
@@ -127,15 +127,15 @@ fn extract_welcome_secret(
     crypto_provider.derive_secret(cipher_suite, &extracted, b"welcome")
 }
 
-const SECRET_LABEL_INIT: &[u8] = b"init";
-const SECRET_LABEL_SENDER_DATA: &[u8] = b"sender data";
-const SECRET_LABEL_ENCRYPTION: &[u8] = b"encryption";
-const SECRET_LABEL_EXPORTER: &[u8] = b"exporter";
-const SECRET_LABEL_EXTERNAL: &[u8] = b"external";
-const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
-const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
-const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
-const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
+pub const SECRET_LABEL_INIT: &[u8] = b"init";
+pub const SECRET_LABEL_SENDER_DATA: &[u8] = b"sender data";
+pub const SECRET_LABEL_ENCRYPTION: &[u8] = b"encryption";
+pub const SECRET_LABEL_EXPORTER: &[u8] = b"exporter";
+pub const SECRET_LABEL_EXTERNAL: &[u8] = b"external";
+pub const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
+pub const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
+pub const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
+pub const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
 /*
 struct confirmedTranscriptHashInput {
     WireFormat: WireFormat,
@@ -186,7 +186,7 @@ func nextInterimTranscriptHash(cs cipherSuite, confirmedTranscriptHash, confirma
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
-enum ResumptionPSKUsage {
+pub enum ResumptionPSKUsage {
     #[default]
     Application = 1,
     Reinit = 2,
@@ -231,14 +231,14 @@ impl Writer for ResumptionPSKUsage {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct Resumption {
-    usage: ResumptionPSKUsage,
+pub struct Resumption {
+    pub(crate) usage: ResumptionPSKUsage,
     psk_group_id: GroupID,
     psk_epoch: u64,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum Psk {
+pub enum Psk {
     External(Bytes),        //  = 1,
     Resumption(Resumption), //  = 2,
 }
@@ -251,7 +251,7 @@ impl Default for Psk {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PreSharedKeyID {
-    psk: Psk,
+    pub(crate) psk: Psk,
     psk_nonce: Bytes,
 }
 

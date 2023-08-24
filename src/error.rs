@@ -50,6 +50,8 @@ pub enum Error {
     InvalidCipherSuiteValue(u16),
     #[error("leaf node signature verification failed")]
     LeafNodeSignatureVerificationFailed,
+    #[error("verify confirmation tag failed")]
+    VerifyConfirmationTagFailed,
     #[error("credential type {0} used by leaf node not supported by all members")]
     CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(u16),
     #[error("lifetime verification failed")]

@@ -1,5 +1,5 @@
 pub mod external;
-mod group_info;
+pub mod group_info;
 pub mod proposal;
 
 /*

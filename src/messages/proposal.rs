@@ -6,6 +6,7 @@ use crate::key_package::KeyPackage;
 use crate::key_schedule::PreSharedKeyID;
 use crate::tree::tree_math::LeafIndex;
 use crate::tree::{read_extensions, write_extensions, Extension, LeafNode};
+
 use bytes::{Buf, BufMut, Bytes};
 
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types

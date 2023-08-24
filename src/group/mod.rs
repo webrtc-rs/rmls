@@ -1,6 +1,7 @@
 use crate::codec::{Reader, Writer};
 use crate::error::*;
 use crate::key_package::KeyPackage;
+use crate::key_schedule::PreSharedKeyID;
 use crate::tree::tree_math::LeafIndex;
 use crate::tree::LeafNode;
 use bytes::{Buf, BufMut};
@@ -142,6 +143,7 @@ func (prop *proposal) marshal(b *cryptobyte.Builder) {
 }
 */
 
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct AddProposal {
     key_package: KeyPackage,
 }
@@ -166,6 +168,7 @@ impl Writer for AddProposal {
     }
 }
 
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct UpdateProposal {
     leaf_node: LeafNode,
 }
@@ -190,6 +193,7 @@ impl Writer for UpdateProposal {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RemoveProposal {
     removed: LeafIndex,
 }
@@ -219,21 +223,33 @@ impl Writer for RemoveProposal {
         Ok(())
     }
 }
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct PreSharedKeyProposal {
+    psk: PreSharedKeyID,
+}
+
+impl Reader for PreSharedKeyProposal {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.psk.read(buf)
+    }
+}
+impl Writer for PreSharedKeyProposal {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.psk.write(buf)
+    }
+}
+
 /*
-pub struct  PreSharedKeyProposal  {
-    psk :PreSharedKeyID,
-}
-
-func (psk *preSharedKey) unmarshal(s *cryptobyte.String) error {
-    *psk = preSharedKey{}
-    return psk.psk.unmarshal(s)
-}
-
-func (psk *preSharedKey) marshal(b *cryptobyte.Builder) {
-    psk.psk.marshal(b)
-}
-
-type reInit struct {
+struct reInit {
     groupID     GroupID
     version     protocolVersion
     cipherSuite cipherSuite
@@ -261,8 +277,8 @@ func (ri *reInit) marshal(b *cryptobyte.Builder) {
     b.AddUint16(uint16(ri.version))
     b.AddUint16(uint16(ri.cipherSuite))
     marshalExtensionVec(b, ri.extensions)
-}
-
+}*/
+/*
 type externalInit struct {
     kemOutput []byte
 }

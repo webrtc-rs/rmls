@@ -95,10 +95,8 @@ impl GroupContext {
     ) -> Result<Bytes> {
         let cipher_suite = self.cipher_suite;
 
-        // TODO de-duplicate with extractWelcomeSecret
-        if psk_secret.is_empty() {
-            //psk_secret = make([]byte, kdf.ExtractSize())
-        }
+        // TODO de-duplicate with extract_welcome_secret
+
         let extracted = crypto_provider
             .hpke(cipher_suite)
             .kdf_extract(psk_secret, joiner_secret)?;
@@ -115,42 +113,47 @@ impl GroupContext {
         )
     }
 }
+
+fn extract_welcome_secret(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    joiner_secret: &[u8],
+    psk_secret: &[u8],
+) -> Result<Bytes> {
+    let extracted = crypto_provider
+        .hpke(cipher_suite)
+        .kdf_extract(psk_secret, joiner_secret)?;
+
+    crypto_provider.derive_secret(cipher_suite, &extracted, b"welcome")
+}
+
+const SECRET_LABEL_INIT: &[u8] = b"init";
+const SECRET_LABEL_SENDER_DATA: &[u8] = b"sender data";
+const SECRET_LABEL_ENCRYPTION: &[u8] = b"encryption";
+const SECRET_LABEL_EXPORTER: &[u8] = b"exporter";
+const SECRET_LABEL_EXTERNAL: &[u8] = b"external";
+const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
+const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
+const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
+const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
 /*
-func extractWelcomeSecret(cs cipherSuite, joinerSecret, pskSecret []byte) ([]byte, error) {
-    _, kdf, _ := cs.hpke().Params()
-
-    if pskSecret == nil {
-        pskSecret = make([]byte, kdf.ExtractSize())
-    }
-    extracted := kdf.Extract(pskSecret, joinerSecret)
-
-    return cs.deriveSecret(extracted, []byte("welcome"))
+struct confirmedTranscriptHashInput {
+    WireFormat: WireFormat,
+    content: FramedContent,
+    signature: Bytes,
 }
 
-var (
-    secretLabelInit           = []byte("init")
-    secretLabelSenderData     = []byte("sender data")
-    secretLabelEncryption     = []byte("encryption")
-    secretLabelExporter       = []byte("exporter")
-    secretLabelExternal       = []byte("external")
-    secretLabelConfirm        = []byte("confirm")
-    secretLabelMembership     = []byte("membership")
-    secretLabelResumption     = []byte("resumption")
-    secretLabelAuthentication = []byte("authentication")
-)
-
-type confirmedTranscriptHashInput struct {
-    wireFormat wireFormat
-    content    framedContent
-    signature  []byte
-}
-
-func (input *confirmedTranscriptHashInput) marshal(b *cryptobyte.Builder) {
+impl Writer for confirmedTranscriptHashInput {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
     if input.content.contentType != contentTypeCommit {
         b.SetError(fmt.Errorf("mls: confirmedTranscriptHashInput can only contain contentTypeCommit"))
         return
     }
-    input.wireFormat.marshal(b)
+    input.WireFormat.marshal(b)
     input.content.marshal(b)
     writeOpaqueVec(b, input.signature)
 }
@@ -179,114 +182,136 @@ func nextInterimTranscriptHash(cs cipherSuite, confirmedTranscriptHash, confirma
     h.Write(confirmedTranscriptHash)
     h.Write(rawInput)
     return h.Sum(nil), nil
+}*/
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u8)]
+enum ResumptionPSKUsage {
+    #[default]
+    Application = 1,
+    Reinit = 2,
+    Branch = 3,
 }
 
-type pskType uint8
+impl TryFrom<u8> for ResumptionPSKUsage {
+    type Error = Error;
 
-const (
-    pskTypeExternal   pskType = 1
-    pskTypeResumption pskType = 2
-)
-
-func (t *pskType) unmarshal(s *cryptobyte.String) error {
-    if !s.ReadUint8((*uint8)(t)) {
-        return io.ErrUnexpectedEOF
-    }
-    switch *t {
-    case pskTypeExternal, pskTypeResumption:
-        return nil
-    default:
-        return fmt.Errorf("mls: invalid PSK type %d", *t)
-    }
-}
-
-func (t pskType) marshal(b *cryptobyte.Builder) {
-    b.AddUint8(uint8(t))
-}
-
-type resumptionPSKUsage uint8
-
-const (
-    resumptionPSKUsageApplication resumptionPSKUsage = 1
-    resumptionPSKUsageReinit      resumptionPSKUsage = 2
-    resumptionPSKUsageBranch      resumptionPSKUsage = 3
-)
-
-func (usage *resumptionPSKUsage) unmarshal(s *cryptobyte.String) error {
-    if !s.ReadUint8((*uint8)(usage)) {
-        return io.ErrUnexpectedEOF
-    }
-    switch *usage {
-    case resumptionPSKUsageApplication, resumptionPSKUsageReinit, resumptionPSKUsageBranch:
-        return nil
-    default:
-        return fmt.Errorf("mls: invalid resumption PSK usage %d", *usage)
-    }
-}
-
-func (usage resumptionPSKUsage) marshal(b *cryptobyte.Builder) {
-    b.AddUint8(uint8(usage))
-}
-
-type preSharedKeyID struct {
-    pskType pskType
-
-    // for pskTypeExternal
-    pskID []byte
-
-    // for pskTypeResumption
-    usage      resumptionPSKUsage
-    pskGroupID GroupID
-    pskEpoch   uint64
-
-    pskNonce []byte
-}
-
-func (id *preSharedKeyID) unmarshal(s *cryptobyte.String) error {
-    *id = preSharedKeyID{}
-
-    if err := id.pskType.unmarshal(s); err != nil {
-        return err
-    }
-
-    switch id.pskType {
-    case pskTypeExternal:
-        if !readOpaqueVec(s, &id.pskID) {
-            return io.ErrUnexpectedEOF
+    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
+        match v {
+            0x01 => Ok(ResumptionPSKUsage::Application),
+            0x02 => Ok(ResumptionPSKUsage::Reinit),
+            0x03 => Ok(ResumptionPSKUsage::Branch),
+            _ => Err(Error::InvalidResumptionPSKUsageValue(v)),
         }
-    case pskTypeResumption:
-        if err := id.usage.unmarshal(s); err != nil {
-            return err
-        }
-        if !readOpaqueVec(s, (*[]byte)(&id.pskGroupID)) || !s.ReadUint64(&id.pskEpoch) {
-            return io.ErrUnexpectedEOF
-        }
-    default:
-        panic("unreachable")
     }
-
-    if !readOpaqueVec(s, &id.pskNonce) {
-        return io.ErrUnexpectedEOF
-    }
-
-    return nil
 }
 
-func (id *preSharedKeyID) marshal(b *cryptobyte.Builder) {
-    id.pskType.marshal(b)
-    switch id.pskType {
-    case pskTypeExternal:
-        writeOpaqueVec(b, id.pskID)
-    case pskTypeResumption:
-        id.usage.marshal(b)
-        writeOpaqueVec(b, []byte(id.pskGroupID))
-        b.AddUint64(id.pskEpoch)
-    default:
-        panic("unreachable")
+impl Reader for ResumptionPSKUsage {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+        *self = buf.get_u8().try_into()?;
+        Ok(())
     }
-    writeOpaqueVec(b, id.pskNonce)
+}
+impl Writer for ResumptionPSKUsage {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u8(*self as u8);
+        Ok(())
+    }
 }
 
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct Resumption {
+    usage: ResumptionPSKUsage,
+    psk_group_id: GroupID,
+    psk_epoch: u64,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum Psk {
+    External(Bytes),        //  = 1,
+    Resumption(Resumption), //  = 2,
+}
+
+impl Default for Psk {
+    fn default() -> Self {
+        Psk::External(Bytes::new())
+    }
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct PreSharedKeyID {
+    psk: Psk,
+    psk_nonce: Bytes,
+}
+
+impl Reader for PreSharedKeyID {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+        let v = buf.get_u8();
+        match v {
+            1 => {
+                self.psk = Psk::External(read_opaque_vec(buf)?);
+            }
+            2 => {
+                let mut resumption = Resumption::default();
+                resumption.usage.read(buf)?;
+                resumption.psk_group_id = read_opaque_vec(buf)?;
+                if buf.remaining() < 8 {
+                    return Err(Error::BufferTooSmall);
+                }
+                resumption.psk_epoch = buf.get_u64();
+                self.psk = Psk::Resumption(resumption);
+            }
+            _ => return Err(Error::InvalidPskTypeValue(v)),
+        }
+
+        self.psk_nonce = read_opaque_vec(buf)?;
+
+        Ok(())
+    }
+}
+impl Writer for PreSharedKeyID {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        match &self.psk {
+            Psk::External(psk_id) => {
+                buf.put_u8(1);
+                write_opaque_vec(psk_id, buf)?;
+            }
+            Psk::Resumption(resumption) => {
+                buf.put_u8(2);
+
+                resumption.usage.write(buf)?;
+                write_opaque_vec(&resumption.psk_group_id, buf)?;
+                buf.put_u64(resumption.psk_epoch);
+            }
+        }
+
+        write_opaque_vec(&self.psk_nonce, buf)
+    }
+}
+
+/*
 func extractPSKSecret(cs cipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([]byte, error) {
     if len(pskIDs) != len(psks) {
         return nil, fmt.Errorf("mls: got %v PSK IDs and %v PSKs, want same number", len(pskIDs), len(psks))
@@ -318,8 +343,8 @@ func extractPSKSecret(cs cipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([
     }
 
     return pskSecret, nil
-}
-
+}*/
+/*
 type pskLabel struct {
     id    preSharedKeyID
     index uint16

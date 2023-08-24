@@ -11,6 +11,7 @@ use crate::tree::*;
 
 pub type KeyPackageRef = Bytes;
 
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct KeyPackage {
     version: ProtocolVersion,
     cipher_suite: CipherSuite,

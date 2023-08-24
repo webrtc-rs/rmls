@@ -36,6 +36,14 @@ pub enum Error {
     InvalidCredentialTypeValue,
     #[error("invalid content type value {0}")]
     InvalidContentTypeValue(u8),
+    #[error("invalid resumption PSK usage value {0}")]
+    InvalidResumptionPSKUsageValue(u8),
+    #[error("invalid PSK type value {0}")]
+    InvalidPskTypeValue(u8),
+    #[error("invalid sender type value {0}")]
+    InvalidSenderTypeValue(u8),
+    #[error("invalid wire format value {0}")]
+    InvalidWireFormatValue(u16),
     #[error("invalid cipher suite value {0}")]
     InvalidCipherSuiteValue(u16),
     #[error("leaf node signature verification failed")]

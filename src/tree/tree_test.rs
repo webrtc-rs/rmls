@@ -2,6 +2,7 @@ use super::*;
 use crate::codec::codec_test::load_test_vector;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
+use crate::key_schedule::GroupContext;
 use crate::tree::ratchet_tree::RatchetTree;
 
 use serde::{Deserialize, Serialize};
@@ -240,60 +241,62 @@ fn tree_operations_test(
         "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
         tree_hash, tc.tree_hash_before
     );
-    /*TODO(yngrtc):
-    let mut prop = Proposal::
-    if err := unmarshal([]byte(tc.Proposal), &prop); err != nil {
-        t.Fatalf("unmarshal(proposal) = %v", err)
+
+    let mut prop = Proposal::default();
+    let mut buf = tc.proposal.as_ref();
+    read(&mut prop, &mut buf)?;
+
+    match &prop {
+        Proposal::Add(add) => {
+            let ctx = GroupContext {
+                version: add.key_package.version,
+                cipher_suite: add.key_package.cipher_suite,
+                ..Default::default()
+            };
+            add.key_package.verify(crypto_provider, &ctx)?;
+            tree.add(add.key_package.leaf_node.clone());
+        }
+        Proposal::Update(update) => {
+            let (signature_keys, encryption_keys) = tree.keys();
+            update.leaf_node.verify(
+                crypto_provider,
+                LeafNodeVerifyOptions {
+                    cipher_suite,
+                    group_id: &Bytes::new(),
+                    leaf_index: LeafIndex(tc.proposal_sender),
+                    supported_creds: &tree.supported_creds(),
+                    signature_keys: &signature_keys,
+                    encryption_keys: &encryption_keys,
+                    now: &|| -> SystemTime { UNIX_EPOCH },
+                },
+            )?;
+            tree.update(LeafIndex(tc.proposal_sender), update.leaf_node.clone());
+        }
+        Proposal::Remove(remove) => {
+            assert!(
+                tree.get_leaf(remove.removed).is_some(),
+                "leaf node {:?} is blank",
+                remove.removed
+            );
+            tree.remove(remove.removed);
+        }
+        _ => assert!(false),
     }
 
-    switch prop.proposalType {
-    case proposalTypeAdd:
-        ctx := groupContext{
-            version:     prop.add.keyPackage.version,
-            cipherSuite: prop.add.keyPackage.cipherSuite,
-        }
-        if err := prop.add.keyPackage.verify(&ctx); err != nil {
-            t.Errorf("keyPackage.verify() = %v", err)
-        }
-        tree.add(&prop.add.keyPackage.leafNode)
-    case proposalTypeUpdate:
-        signatureKeys, encryptionKeys := tree.keys()
-        err := prop.update.leafNode.verify(&leafNodeVerifyOptions{
-            cipherSuite:    tc.CipherSuite,
-            groupID:        nil,
-            leafIndex:      tc.ProposalSender,
-            supportedCreds: tree.supportedCreds(),
-            signatureKeys:  signatureKeys,
-            encryptionKeys: encryptionKeys,
-            now:            func() time.Time { return time.Time{} },
-        })
-        if err != nil {
-            t.Errorf("leafNode.verify() = %v", err)
-        }
-        tree.update(tc.ProposalSender, &prop.update.leafNode)
-    case proposalTypeRemove:
-        if tree.getLeaf(prop.remove.removed) == nil {
-            t.Errorf("leaf node %v is blank", prop.remove.removed)
-        }
-        tree.remove(prop.remove.removed)
-    default:
-        panic("unreachable")
-    }
+    let raw_tree = write(&tree)?;
+    assert_eq!(
+        &raw_tree, &tc.tree_after,
+        "marshal(tree) = {:?}, want {:?}",
+        raw_tree, tc.tree_after
+    );
 
-    rawTree, err := marshal(&tree)
-    if err != nil {
-        t.Fatalf("marshal(tree) = %v", err)
-    } else if !bytes.Equal(rawTree, []byte(tc.TreeAfter)) {
-        t.Errorf("marshal(tree) = %v, want %v", rawTree, tc.TreeAfter)
-    }
+    let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
+    assert_eq!(
+        &tree_hash, &tc.tree_hash_after,
+        "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
+        tree_hash, tc.tree_hash_after
+    );
 
-    tree_hash, err = tree.computeRootTreeHash(tc.CipherSuite)
-    if err != nil {
-        t.Errorf("ratchetTree.computeRootTreeHash() = %v", err)
-    } else if !bytes.Equal(tree_hash, []byte(tc.TreeHashAfter)) {
-        t.Errorf("ratchetTree.computeRootTreeHash() = %v, want %v", tree_hash, tc.TreeHashAfter)
-    }
-     */
     Ok(())
 }
 
@@ -301,9 +304,9 @@ fn test_tree_operations_with_crypto_provider(
     tests: &[TreeOperationsTest],
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
-    for tc in tests {
+    for (i, tc) in tests.iter().enumerate() {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_tree_operations {}", cipher_suite);
+        println!("test_tree_operations {}:{}", i, cipher_suite);
 
         tree_operations_test(crypto_provider, cipher_suite, &tc)?;
     }

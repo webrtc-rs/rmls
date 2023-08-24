@@ -13,10 +13,10 @@ pub type KeyPackageRef = Bytes;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct KeyPackage {
-    version: ProtocolVersion,
-    cipher_suite: CipherSuite,
+    pub(crate) version: ProtocolVersion,
+    pub(crate) cipher_suite: CipherSuite,
     init_key: HpkePublicKey,
-    leaf_node: LeafNode,
+    pub(crate) leaf_node: LeafNode,
     extensions: Vec<Extension>,
     signature: Bytes,
 }
@@ -80,7 +80,11 @@ impl KeyPackage {
     }
 
     // verify performs KeyPackage verification as described in RFC 9420 section 10.1.
-    fn verify(&self, crypto_provider: &impl CryptoProvider, ctx: &GroupContext) -> Result<()> {
+    pub(crate) fn verify(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        ctx: &GroupContext,
+    ) -> Result<()> {
         if self.version != ctx.version {
             return Err(Error::KeyPackageVersionNotMatchGroupContext);
         }

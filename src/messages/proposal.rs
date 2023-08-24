@@ -90,6 +90,12 @@ pub enum Proposal {
     GroupContextExtensions(GroupContextExtensionsProposal),
 }
 
+impl Default for Proposal {
+    fn default() -> Self {
+        Proposal::Remove(RemoveProposal::default())
+    }
+}
+
 impl Reader for Proposal {
     fn read<B>(&mut self, buf: &mut B) -> Result<()>
     where
@@ -185,7 +191,7 @@ impl Writer for Proposal {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct AddProposal {
-    key_package: KeyPackage,
+    pub(crate) key_package: KeyPackage,
 }
 
 impl Reader for AddProposal {
@@ -210,7 +216,7 @@ impl Writer for AddProposal {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct UpdateProposal {
-    leaf_node: LeafNode,
+    pub(crate) leaf_node: LeafNode,
 }
 
 impl Reader for UpdateProposal {
@@ -235,7 +241,7 @@ impl Writer for UpdateProposal {
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RemoveProposal {
-    removed: LeafIndex,
+    pub(crate) removed: LeafIndex,
 }
 
 impl Reader for RemoveProposal {
@@ -400,7 +406,7 @@ impl Reader for ProposalOrRef {
         let v = buf.get_u8();
         match v {
             1 => {
-                let mut proposal = Proposal::Update(UpdateProposal::default());
+                let mut proposal = Proposal::default();
                 proposal.read(buf)?;
                 *self = ProposalOrRef::Proposal(proposal);
             }

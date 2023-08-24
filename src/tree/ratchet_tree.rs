@@ -81,7 +81,7 @@ impl RatchetTree {
         }
     }
 
-    fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
+    pub(crate) fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
         if let Some(Node::Leaf(leaf_node)) = self.get(li.node_index()) {
             Some(leaf_node)
         } else {
@@ -112,7 +112,7 @@ impl RatchetTree {
         }
     }
 
-    fn supported_creds(&self) -> HashSet<CredentialType> {
+    pub(crate) fn supported_creds(&self) -> HashSet<CredentialType> {
         let mut num_members = 0;
         let mut supported_creds_count = HashMap::<CredentialType, usize>::new();
         for li in 0..self.num_leaves().0 {
@@ -138,7 +138,7 @@ impl RatchetTree {
         supported_creds
     }
 
-    fn keys(&self) -> (HashSet<Bytes>, HashSet<Bytes>) {
+    pub(crate) fn keys(&self) -> (HashSet<Bytes>, HashSet<Bytes>) {
         let mut signature_keys = HashSet::new();
         let mut encryption_keys = HashSet::new();
         for li in 0..self.num_leaves().0 {
@@ -465,7 +465,7 @@ impl RatchetTree {
         (LeafIndex(0), false)
     }
 
-    fn add(&mut self, leaf_node: LeafNode) {
+    pub(crate) fn add(&mut self, leaf_node: LeafNode) {
         let mut li = LeafIndex(0);
         let mut ni: NodeIndex;
         let mut found = false;
@@ -504,7 +504,7 @@ impl RatchetTree {
         self.set(ni, Some(Node::Leaf(leaf_node)));
     }
 
-    fn update(&mut self, li: LeafIndex, leaf_node: LeafNode) {
+    pub(crate) fn update(&mut self, li: LeafIndex, leaf_node: LeafNode) {
         let mut ni = li.node_index();
 
         self.set(ni, Some(Node::Leaf(leaf_node)));
@@ -520,7 +520,7 @@ impl RatchetTree {
         }
     }
 
-    fn remove(&mut self, mut li: LeafIndex) {
+    pub(crate) fn remove(&mut self, mut li: LeafIndex) {
         let mut ni = li.node_index();
 
         let num_leaves = self.num_leaves();
@@ -676,26 +676,26 @@ impl RatchetTree {
         Ok(())
     }
 
-    /*TODO(yngrtc): fn apply(&mut self, proposals []proposal, senders []leaf_index) {
+    fn apply(&mut self, proposals: &[Proposal], senders: &[LeafIndex]) {
         // Apply all update proposals
-        for i, prop := range proposals {
-            if prop.proposalType == PROPOSAL_TYPE_UPDATE {
-                tree.update(senders[i], &prop.update.leaf_node)
+        for (i, prop) in proposals.iter().enumerate() {
+            if let Proposal::Update(update) = prop {
+                self.update(senders[i], update.leaf_node.clone()); //TODO(yngrtc): optimize it
             }
         }
 
         // Apply all remove proposals
-        for _, prop := range proposals {
-            if prop.proposalType == PROPOSAL_TYPE_REMOVE {
-                tree.remove(prop.remove.removed)
+        for prop in proposals {
+            if let Proposal::Remove(remove) = prop {
+                self.remove(remove.removed);
             }
         }
 
         // Apply all add proposals
-        for _, prop := range proposals {
-            if prop.proposalType == PROPOSAL_TYPE_ADD {
-                tree.add(&prop.add.keyPackage.leaf_node)
+        for prop in proposals {
+            if let Proposal::Add(add) = prop {
+                self.add(add.key_package.leaf_node.clone()); //TODO(yngrtc): optimize it
             }
         }
-    }*/
+    }
 }

@@ -565,7 +565,7 @@ impl LeafNode {
 
         if let LeafNodeSource::KeyPackage(lifetime) = &self.leaf_node_source {
             let t = (options.now)();
-            if !lifetime.verify(t) {
+            if t > UNIX_EPOCH && !lifetime.verify(t) {
                 return Err(Error::LifetimeVerificationFailed);
             }
         }

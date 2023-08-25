@@ -1,8 +1,9 @@
+#[cfg(test)]
+mod tree_test;
+
 pub(crate) mod ratchet_tree;
 pub(crate) mod secret_tree;
 pub(crate) mod tree_math;
-#[cfg(test)]
-mod tree_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;

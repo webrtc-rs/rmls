@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod messages_test;
+
 pub mod external;
 pub mod group_info;
 pub mod proposal;

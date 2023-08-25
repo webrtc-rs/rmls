@@ -1,11 +1,16 @@
+#[cfg(test)]
+mod key_schedule_test;
+
 use crate::cipher_suite::CipherSuite;
 use crate::codec::*;
+use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
-use crate::framing::{GroupID, ProtocolVersion, PROTOCOL_VERSION_MLS10};
+use crate::framing::{
+    Content, FramedContent, GroupID, ProtocolVersion, WireFormat, PROTOCOL_VERSION_MLS10,
+};
 use crate::tree::{read_extensions, write_extensions, Extension};
 
-use crate::crypto::provider::CryptoProvider;
-use bytes::{Buf, BufMut, Bytes};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct GroupContext {
@@ -136,53 +141,85 @@ pub const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
 pub const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
 pub const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
 pub const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
-/*
-struct confirmedTranscriptHashInput {
-    WireFormat: WireFormat,
-    content: FramedContent,
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct ConfirmedTranscriptHashInput {
+    wire_format: WireFormat,
+    framed_content: FramedContent,
     signature: Bytes,
 }
 
-impl Writer for confirmedTranscriptHashInput {
+impl Reader for ConfirmedTranscriptHashInput {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.wire_format.read(buf)?;
+        self.framed_content.read(buf)?;
+        match self.framed_content.content {
+            Content::Application(_) | Content::Proposal(_) => {
+                return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
+            }
+            Content::Commit(_) => {}
+        };
+        self.signature = read_opaque_vec(buf)?;
+        Ok(())
+    }
+}
+impl Writer for ConfirmedTranscriptHashInput {
     fn write<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-    if input.content.contentType != contentTypeCommit {
-        b.SetError(fmt.Errorf("mls: confirmedTranscriptHashInput can only contain contentTypeCommit"))
-        return
+        match self.framed_content.content {
+            Content::Application(_) | Content::Proposal(_) => {
+                return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
+            }
+            Content::Commit(_) => {}
+        };
+
+        self.wire_format.write(buf)?;
+        self.framed_content.write(buf)?;
+        write_opaque_vec(&self.signature, buf)
     }
-    input.WireFormat.marshal(b)
-    input.content.marshal(b)
-    writeOpaqueVec(b, input.signature)
 }
 
-func (input *confirmedTranscriptHashInput) hash(cs cipherSuite, interimTranscriptHashBefore []byte) ([]byte, error) {
-    rawInput, err := marshal(input)
-    if err != nil {
-        return nil, err
+impl ConfirmedTranscriptHashInput {
+    fn hash(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        interim_transcript_hash_before: &[u8],
+    ) -> Result<Bytes> {
+        let mut buf = BytesMut::new();
+        let raw_input = write(self)?;
+
+        buf.extend_from_slice(interim_transcript_hash_before);
+        buf.put(raw_input);
+
+        Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
     }
 
-    h := cs.hash().New()
-    h.Write(interimTranscriptHashBefore)
-    h.Write(rawInput)
-    return h.Sum(nil), nil
+    fn next_interim_transcript_hash(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        confirmed_transcript_hash: &[u8],
+        confirmation_tag: &[u8],
+    ) -> Result<Bytes> {
+        let mut buf = BytesMut::new();
+        write_opaque_vec(confirmation_tag, &mut buf)?;
+        let raw_input = buf.freeze();
+
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(confirmed_transcript_hash);
+        buf.put(raw_input);
+
+        Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
+    }
 }
-
-func nextInterimTranscriptHash(cs cipherSuite, confirmedTranscriptHash, confirmationTag []byte) ([]byte, error) {
-    var b cryptobyte.Builder
-    writeOpaqueVec(&b, confirmationTag)
-    rawInput, err := b.Bytes()
-    if err != nil {
-        return nil, err
-    }
-
-    h := cs.hash().New()
-    h.Write(confirmedTranscriptHash)
-    h.Write(rawInput)
-    return h.Sum(nil), nil
-}*/
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -311,49 +348,81 @@ impl Writer for PreSharedKeyID {
     }
 }
 
-/*
-func extractPSKSecret(cs cipherSuite, pskIDs []preSharedKeyID, psks [][]byte) ([]byte, error) {
-    if len(pskIDs) != len(psks) {
-        return nil, fmt.Errorf("mls: got %v PSK IDs and %v PSKs, want same number", len(pskIDs), len(psks))
+fn extract_psk_secret(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    psk_ids: &[PreSharedKeyID],
+    psks: &[Bytes],
+) -> Result<Bytes> {
+    if psk_ids.len() != psks.len() {
+        return Err(Error::PskIDsAndPskLenNotMatch);
     }
 
-    _, kdf, _ := cs.hpke().Params()
-    zero := make([]byte, kdf.ExtractSize())
+    let kdf_extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+    let zero = vec![0u8; kdf_extract_size];
 
-    pskSecret := zero
-    for i := range pskIDs {
-        pskExtracted := kdf.Extract(psks[i], zero)
+    let mut psk_secret = Bytes::from(zero.clone());
+    for i in 0..psk_ids.len() {
+        let psk_extracted = crypto_provider
+            .hpke(cipher_suite)
+            .kdf_extract(&psks[i], &zero)?;
 
-        pskLabel := pskLabel{
-            id:    pskIDs[i],
-            index: uint16(i),
-            count: uint16(len(pskIDs)),
-        }
-        rawPSKLabel, err := marshal(&pskLabel)
-        if err != nil {
-            return nil, err
-        }
+        let psk_label = PskLabel {
+            id: psk_ids[i].clone(),
+            index: i as u16,
+            count: psk_ids.len() as u16,
+        };
+        let raw_psklabel = write(&psk_label)?;
 
-        pskInput, err := cs.expandWithLabel(pskExtracted, []byte("derived psk"), rawPSKLabel, uint16(kdf.ExtractSize()))
-        if err != nil {
-            return nil, err
-        }
+        let psk_input = crypto_provider.expand_with_label(
+            cipher_suite,
+            &psk_extracted,
+            b"derived psk",
+            &raw_psklabel,
+            kdf_extract_size as u16,
+        )?;
 
-        pskSecret = kdf.Extract(pskSecret, pskInput)
+        psk_secret = crypto_provider
+            .hpke(cipher_suite)
+            .kdf_extract(&psk_secret, &psk_input)?;
     }
 
-    return pskSecret, nil
-}*/
-/*
-type pskLabel struct {
-    id    preSharedKeyID
-    index uint16
-    count uint16
+    Ok(psk_secret)
 }
 
-func (label *pskLabel) marshal(b *cryptobyte.Builder) {
-    label.id.marshal(b)
-    b.AddUint16(label.index)
-    b.AddUint16(label.count)
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct PskLabel {
+    id: PreSharedKeyID,
+    index: u16,
+    count: u16,
 }
-*/
+
+impl Reader for PskLabel {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.id.read(buf)?;
+        if buf.remaining() < 4 {
+            return Err(Error::BufferTooSmall);
+        }
+        self.index = buf.get_u16();
+        self.count = buf.get_u16();
+
+        Ok(())
+    }
+}
+
+impl Writer for PskLabel {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.id.write(buf)?;
+        buf.put_u16(self.index);
+        buf.put_u16(self.count);
+        Ok(())
+    }
+}

@@ -1,10 +1,12 @@
+use bytes::{Buf, BufMut, Bytes};
+
 use crate::cipher_suite::CipherSuite;
 use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
-
+use crate::messages::proposal::Proposal;
+use crate::messages::Commit;
 use crate::tree::tree_math::LeafIndex;
-use bytes::{Buf, BufMut, Bytes};
 
 pub(crate) type ProtocolVersion = u16;
 
@@ -52,6 +54,74 @@ impl Writer for ContentType {
         B: BufMut,
     {
         buf.put_u8(*self as u8);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum Content {
+    Application(Bytes),
+    Proposal(Proposal),
+    Commit(Commit),
+}
+
+impl Default for Content {
+    fn default() -> Self {
+        Content::Application(Bytes::new())
+    }
+}
+
+impl Reader for Content {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+        let v = buf.get_u8();
+        match v {
+            0x01 => {
+                *self = Content::Application(read_opaque_vec(buf)?);
+            }
+            0x02 => {
+                let mut proposal = Proposal::default();
+                proposal.read(buf)?;
+                *self = Content::Proposal(proposal);
+            }
+            0x03 => {
+                let mut commit = Commit::default();
+                commit.read(buf)?;
+                *self = Content::Commit(commit);
+            }
+            _ => return Err(Error::InvalidContentTypeValue(v)),
+        }
+
+        Ok(())
+    }
+}
+impl Writer for Content {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        match self {
+            Content::Application(application) => {
+                buf.put_u8(1);
+                write_opaque_vec(application, buf)?;
+            }
+            Content::Proposal(proposal) => {
+                buf.put_u8(2);
+                proposal.write(buf)?;
+            }
+            Content::Commit(commit) => {
+                buf.put_u8(3);
+                commit.write(buf)?
+            }
+        }
+
         Ok(())
     }
 }
@@ -184,69 +254,46 @@ impl Writer for WireFormat {
 
 // GroupID is an application-specific group identifier.
 pub(crate) type GroupID = Bytes;
-/*
-pub(crate) struct framedContent {
-    groupID           :GroupID,
-    epoch             :u64,
-    sender            :Sender,
-    authenticatedData :Bytes,
 
-    contentType     :ContentType,
-    applicationData :[]byte    // for contentTypeApplication
-    proposal        *proposal // for contentTypeProposal
-    commit          *commit   // for contentTypeCommit
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct FramedContent {
+    group_id: GroupID,
+    epoch: u64,
+    sender: Sender,
+    authenticated_data: Bytes,
+    pub(crate) content: Content,
 }
 
-func (content *framedContent) unmarshal(s *cryptobyte.String) error {
-    *content = framedContent{}
-
-    if !readOpaqueVec(s, (*[]byte)(&content.groupID)) || !s.ReadUint64(&content.epoch) {
-        return io.ErrUnexpectedEOF
-    }
-    if err := content.sender.unmarshal(s); err != nil {
-        return err
-    }
-    if !readOpaqueVec(s, &content.authenticatedData) {
-        return io.ErrUnexpectedEOF
-    }
-    if err := content.contentType.unmarshal(s); err != nil {
-        return err
-    }
-
-    switch content.contentType {
-    case contentTypeApplication:
-        if !readOpaqueVec(s, &content.applicationData) {
-            return io.ErrUnexpectedEOF
+impl Reader for FramedContent {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.group_id = read_opaque_vec(buf)?;
+        if buf.remaining() < 8 {
+            return Err(Error::BufferTooSmall);
         }
-        return nil
-    case contentTypeProposal:
-        content.proposal = new(proposal)
-        return content.proposal.unmarshal(s)
-    case contentTypeCommit:
-        content.commit = new(commit)
-        return content.commit.unmarshal(s)
-    default:
-        panic("unreachable")
+        self.epoch = buf.get_u64();
+        self.sender.read(buf)?;
+        self.authenticated_data = read_opaque_vec(buf)?;
+        self.content.read(buf)
     }
 }
 
-func (content *framedContent) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(content.groupID))
-    b.AddUint64(content.epoch)
-    content.sender.marshal(b)
-    writeOpaqueVec(b, content.authenticatedData)
-    content.contentType.marshal(b)
-    switch content.contentType {
-    case contentTypeApplication:
-        writeOpaqueVec(b, content.applicationData)
-    case contentTypeProposal:
-        content.proposal.marshal(b)
-    case contentTypeCommit:
-        content.commit.marshal(b)
-    default:
-        panic("unreachable")
+impl Writer for FramedContent {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        write_opaque_vec(&self.group_id, buf)?;
+        buf.put_u64(self.epoch);
+        self.sender.write(buf)?;
+        write_opaque_vec(&self.authenticated_data, buf)?;
+        self.content.write(buf)
     }
-}*/
+}
 
 pub(crate) fn expand_sender_data_key(
     crypto_provider: &impl CryptoProvider,

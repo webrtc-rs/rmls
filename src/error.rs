@@ -130,6 +130,10 @@ pub enum Error {
     ExternalInitProposalNotAllowed,
     #[error("encrypted group secrets not found for provided key package ref")]
     EncryptedGroupSecretsNotFoundForProvidedKeyPackageRef,
+    #[error("PSK IDs and PSKs len doesn't match")]
+    PskIDsAndPskLenNotMatch,
+    #[error("ConfirmedTranscriptHashInput can only contain Content::Commit")]
+    ConfirmedTranscriptHashInputContainContentCommitOnly,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

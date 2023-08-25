@@ -134,6 +134,8 @@ pub enum Error {
     PskIDsAndPskLenNotMatch,
     #[error("ConfirmedTranscriptHashInput can only contain Content::Commit")]
     ConfirmedTranscriptHashInputContainContentCommitOnly,
+    #[error("senderTypeMember and senderTypeNewMemberCommit should have GroupContext")]
+    SenderMemberAndNewMemberCommitNoGroupContext,
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

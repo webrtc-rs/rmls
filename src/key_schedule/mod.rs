@@ -143,10 +143,10 @@ pub const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
 pub const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct ConfirmedTranscriptHashInput {
-    wire_format: WireFormat,
-    framed_content: FramedContent,
-    signature: Bytes,
+pub(crate) struct ConfirmedTranscriptHashInput {
+    pub(crate) wire_format: WireFormat,
+    pub(crate) content: FramedContent,
+    pub(crate) signature: Bytes,
 }
 
 impl Reader for ConfirmedTranscriptHashInput {
@@ -156,8 +156,8 @@ impl Reader for ConfirmedTranscriptHashInput {
         B: Buf,
     {
         self.wire_format.read(buf)?;
-        self.framed_content.read(buf)?;
-        match self.framed_content.content {
+        self.content.read(buf)?;
+        match self.content.content {
             Content::Application(_) | Content::Proposal(_) => {
                 return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
             }
@@ -167,13 +167,14 @@ impl Reader for ConfirmedTranscriptHashInput {
         Ok(())
     }
 }
+
 impl Writer for ConfirmedTranscriptHashInput {
     fn write<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        match self.framed_content.content {
+        match self.content.content {
             Content::Application(_) | Content::Proposal(_) => {
                 return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
             }
@@ -181,7 +182,7 @@ impl Writer for ConfirmedTranscriptHashInput {
         };
 
         self.wire_format.write(buf)?;
-        self.framed_content.write(buf)?;
+        self.content.write(buf)?;
         write_opaque_vec(&self.signature, buf)
     }
 }

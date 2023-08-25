@@ -231,22 +231,30 @@ fn test_key_schedule() -> Result<()> {
 
     Ok(())
 }
-/*
-type transcriptHashesTest struct {
-    CipherSuite cipherSuite `json:"cipher_suite"`
 
-    ConfirmationKey             testBytes `json:"confirmation_key"`
-    AuthenticatedContent        testBytes `json:"authenticated_content"`
-    InterimTranscriptHashBefore testBytes `json:"interim_transcript_hash_before"`
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct TranscriptHashesTest {
+    cipher_suite: u16,
 
-    ConfirmedTranscriptHashAfter testBytes `json:"confirmed_transcript_hash_after"`
-    InterimTranscriptHashAfter   testBytes `json:"interim_transcript_hash_after"`
+    #[serde(with = "hex::serde")]
+    pub confirmation_key: Vec<u8>,
+    #[serde(with = "hex::serde")]
+    pub authenticated_content: Vec<u8>,
+    #[serde(with = "hex::serde")]
+    pub interim_transcript_hash_before: Vec<u8>,
+
+    #[serde(with = "hex::serde")]
+    pub confirmed_transcript_hash_after: Vec<u8>,
+    #[serde(with = "hex::serde")]
+    pub interim_transcript_hash_after: Vec<u8>,
 }
 
-func testTranscriptHashes(t *testing.T, tc *transcriptHashesTest) {
-    cs := tc.CipherSuite
-
-    var authContent authenticatedContent
+fn transcript_hashes_test(
+    _crypto_provider: &impl CryptoProvider,
+    _cipher_suite: CipherSuite,
+    _tc: &TranscriptHashesTest,
+) -> Result<()> {
+    /*TODO: let mut authContent = AuthenticatedContent
     if err := unmarshal([]byte(tc.AuthenticatedContent), &authContent); err != nil {
         t.Fatalf("unmarshal() = %v", err)
     } else if authContent.content.contentType != contentTypeCommit {
@@ -269,17 +277,36 @@ func testTranscriptHashes(t *testing.T, tc *transcriptHashesTest) {
         t.Fatalf("nextInterimTranscriptHash() = %v", err)
     } else if !bytes.Equal(interimTranscriptHashAfter, []byte(tc.InterimTranscriptHashAfter)) {
         t.Errorf("nextInterimTranscriptHash() = %v, want %v", interimTranscriptHashAfter, tc.InterimTranscriptHashAfter)
-    }
+    }*/
+
+    Ok(())
 }
 
-func TestTranscriptHashes(t *testing.T) {
-    var tests []transcriptHashesTest
-    loadTestVector(t, "testdata/transcript-hashes.json", &tests)
+fn test_transcript_hashes_with_crypto_provider(
+    tests: &[TranscriptHashesTest],
+    crypto_provider: &impl CryptoProvider,
+) -> Result<()> {
+    for tc in tests {
+        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        println!(
+            "test_transcript_hashes {}:{}",
+            cipher_suite, cipher_suite as u16
+        );
 
-    for i, tc := range tests {
-        t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-            testTranscriptHashes(t, &tc)
-        })
+        if crypto_provider.supports(cipher_suite).is_ok() {
+            transcript_hashes_test(crypto_provider, cipher_suite, tc)?;
+        }
     }
+
+    Ok(())
 }
-*/
+
+#[test]
+fn test_transcript_hashes() -> Result<()> {
+    let tests: Vec<TranscriptHashesTest> = load_test_vector("test-vectors/transcript-hashes.json")?;
+
+    test_transcript_hashes_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_transcript_hashes_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+
+    Ok(())
+}

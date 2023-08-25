@@ -120,6 +120,7 @@ pub(crate) fn write_optional<B: BufMut>(present: bool, buf: &mut B) -> Result<()
     Ok(())
 }
 
+//TODO(yngrtc): rename it to Serialize/Deserialize? or encode/decode?
 pub(crate) trait Reader {
     fn read<B>(&mut self, buf: &mut B) -> Result<()>
     where

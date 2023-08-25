@@ -4,9 +4,11 @@ use crate::cipher_suite::CipherSuite;
 use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
+use crate::key_package::KeyPackage;
 use crate::key_schedule::{ConfirmedTranscriptHashInput, GroupContext};
+use crate::messages::group_info::GroupInfo;
 use crate::messages::proposal::Proposal;
-use crate::messages::Commit;
+use crate::messages::{Commit, Welcome};
 use crate::tree::tree_math::LeafIndex;
 
 pub(crate) type ProtocolVersion = u16;
@@ -296,17 +298,28 @@ impl Writer for FramedContent {
     }
 }
 
-/*
-type mlsMessage struct {
-    version        protocolVersion
-    wire_format     wire_format
-    publicMessage  *publicMessage  // for wireFormatMLSPublicMessage
-    privateMessage *privateMessage // for wireFormatMLSPrivateMessage
-    welcome        *welcome        // for wireFormatMLSWelcome
-    groupInfo      *groupInfo      // for wireFormatMLSGroupInfo
-    keyPackage     *keyPackage     // for wireFormatMLSKeyPackage
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum WireFormatMessage {
+    PublicMessage(PublicMessage),
+    PrivateMessage(PrivateMessage),
+    Welcome(Welcome),
+    GroupInfo(GroupInfo),
+    KeyPackage(KeyPackage),
 }
 
+impl Default for WireFormatMessage {
+    fn default() -> Self {
+        WireFormatMessage::Welcome(Welcome::default())
+    }
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct MlsMessage {
+    version: ProtocolVersion,
+    wire_format: WireFormat,
+    message: WireFormatMessage,
+}
+/*
 func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
     *msg = mlsMessage{}
 
@@ -592,13 +605,14 @@ impl Writer for FramedContentTBS {
     }
 }
 
-/*
-type publicMessage struct {
-    content       framedContent
-    auth          framedContentAuthData
-    membershipTag []byte // for senderTypeMember
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct PublicMessage {
+    content: FramedContent,
+    auth: FramedContentAuthData,
+    membership_tag: Option<Bytes>, // for senderTypeMember
 }
 
+/*
 func signPublicMessage(cs cipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
     authContent, err := sign_authenticated_content(cs, signKey, wireFormatMLSPublicMessage, content, ctx)
     if err != nil {
@@ -616,12 +630,12 @@ func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
     if err := msg.content.unmarshal(s); err != nil {
         return err
     }
-    if err := msg.auth.unmarshal(s, msg.content.contentType); err != nil {
+    if err := msg.auth.unmarshal(s, msg.content.content_type); err != nil {
         return err
     }
 
     if msg.content.sender.senderType == senderTypeMember {
-        if !readOpaqueVec(s, &msg.membershipTag) {
+        if !readOpaqueVec(s, &msg.membership_tag) {
             return io.ErrUnexpectedEOF
         }
     }
@@ -631,10 +645,10 @@ func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
 
 func (msg *publicMessage) marshal(b *cryptobyte.Builder) {
     msg.content.marshal(b)
-    msg.auth.marshal(b, msg.content.contentType)
+    msg.auth.marshal(b, msg.content.content_type)
 
     if msg.content.sender.senderType == senderTypeMember {
-        writeOpaqueVec(b, msg.membershipTag)
+        writeOpaqueVec(b, msg.membership_tag)
     }
 }
 
@@ -661,7 +675,7 @@ func (msg *publicMessage) signMembershipTag(cs cipherSuite, membershipKey []byte
     if err != nil {
         return err
     }
-    msg.membershipTag = cs.signMAC(membershipKey, rawAuthContentTBM)
+    msg.membership_tag = cs.signMAC(membershipKey, rawAuthContentTBM)
     return nil
 }
 
@@ -673,7 +687,7 @@ func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []by
     if err != nil {
         return false
     }
-    return cs.verifyMAC(membershipKey, rawAuthContentTBM, msg.membershipTag)
+    return cs.verifyMAC(membershipKey, rawAuthContentTBM, msg.membership_tag)
 }
 
 type authenticatedContentTBM struct {
@@ -683,49 +697,52 @@ type authenticatedContentTBM struct {
 
 func (tbm *authenticatedContentTBM) marshal(b *cryptobyte.Builder) {
     tbm.contentTBS.marshal(b)
-    tbm.auth.marshal(b, tbm.contentTBS.content.contentType)
+    tbm.auth.marshal(b, tbm.contentTBS.content.content_type)
+}
+*/
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct PrivateMessage {
+    group_id: GroupID,
+    epoch: u64,
+    content_type: ContentType,
+    authenticated_data: Bytes,
+    encrypted_sender_data: Bytes,
+    ciphertext: Bytes,
 }
 
-type privateMessage struct {
-    groupID             GroupID
-    epoch               uint64
-    contentType         contentType
-    authenticatedData   []byte
-    encryptedSenderData []byte
-    ciphertext          []byte
-}
-
+/*
 func encryptPrivateMessage(cs cipherSuite, signPriv []byte, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
     ciphertext, err := encryptPrivateMessageContent(cs, signPriv, secret, content, ctx, senderData.reuseGuard)
     if err != nil {
         return nil, err
     }
-    encryptedSenderData, err := encryptSenderData(cs, senderDataSecret, senderData, content, ciphertext)
+    encrypted_sender_data, err := encryptSenderData(cs, senderDataSecret, senderData, content, ciphertext)
     if err != nil {
         return nil, err
     }
     return &privateMessage{
-        groupID:             content.groupID,
+        group_id:             content.group_id,
         epoch:               content.epoch,
-        contentType:         content.contentType,
-        authenticatedData:   content.authenticatedData,
-        encryptedSenderData: encryptedSenderData,
+        content_type:         content.content_type,
+        authenticated_data:   content.authenticated_data,
+        encrypted_sender_data: encrypted_sender_data,
         ciphertext:          ciphertext,
     }, nil
 }
 
 func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
     *msg = privateMessage{}
-    ok := readOpaqueVec(s, (*[]byte)(&msg.groupID)) &&
+    ok := readOpaqueVec(s, (*[]byte)(&msg.group_id)) &&
         s.ReadUint64(&msg.epoch)
     if !ok {
         return io.ErrUnexpectedEOF
     }
-    if err := msg.contentType.unmarshal(s); err != nil {
+    if err := msg.content_type.unmarshal(s); err != nil {
         return err
     }
-    ok = readOpaqueVec(s, &msg.authenticatedData) &&
-        readOpaqueVec(s, &msg.encryptedSenderData) &&
+    ok = readOpaqueVec(s, &msg.authenticated_data) &&
+        readOpaqueVec(s, &msg.encrypted_sender_data) &&
         readOpaqueVec(s, &msg.ciphertext)
     if !ok {
         return io.ErrUnexpectedEOF
@@ -734,11 +751,11 @@ func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
 }
 
 func (msg *privateMessage) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(msg.groupID))
+    writeOpaqueVec(b, []byte(msg.group_id))
     b.AddUint64(msg.epoch)
-    msg.contentType.marshal(b)
-    writeOpaqueVec(b, msg.authenticatedData)
-    writeOpaqueVec(b, msg.encryptedSenderData)
+    msg.content_type.marshal(b)
+    writeOpaqueVec(b, msg.authenticated_data)
+    writeOpaqueVec(b, msg.encrypted_sender_data)
     writeOpaqueVec(b, msg.ciphertext)
 }
 
@@ -753,9 +770,9 @@ func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []
     }
 
     aad := senderDataAAD{
-        groupID:     msg.groupID,
+        group_id:     msg.group_id,
         epoch:       msg.epoch,
-        contentType: msg.contentType,
+        content_type: msg.content_type,
     }
     rawAAD, err := marshal(&aad)
     if err != nil {
@@ -768,7 +785,7 @@ func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []
         return nil, err
     }
 
-    rawSenderData, err := cipher.Open(nil, nonce, msg.encryptedSenderData, rawAAD)
+    rawSenderData, err := cipher.Open(nil, nonce, msg.encrypted_sender_data, rawAAD)
     if err != nil {
         return nil, err
     }
@@ -788,10 +805,10 @@ func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, 
     }
 
     aad := privateContentAAD{
-        groupID:           msg.groupID,
+        group_id:           msg.group_id,
         epoch:             msg.epoch,
-        contentType:       msg.contentType,
-        authenticatedData: msg.authenticatedData,
+        content_type:       msg.content_type,
+        authenticated_data: msg.authenticated_data,
     }
     rawAAD, err := marshal(&aad)
     if err != nil {
@@ -811,7 +828,7 @@ func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, 
 
     s := cryptobyte.String(rawContent)
     var content privateMessageContent
-    if err := content.unmarshal(&s, msg.contentType); err != nil {
+    if err := content.unmarshal(&s, msg.content_type); err != nil {
         return nil, err
     }
 
@@ -845,14 +862,14 @@ func (msg *privateMessage) authenticatedContent(senderData *senderData, content 
     return &authenticatedContent{
         wire_format: wireFormatMLSPrivateMessage,
         content: framedContent{
-            groupID: msg.groupID,
+            group_id: msg.group_id,
             epoch:   msg.epoch,
             sender: sender{
                 senderType: senderTypeMember,
                 leafIndex:  senderData.leafIndex,
             },
-            authenticatedData: msg.authenticatedData,
-            contentType:       msg.contentType,
+            authenticated_data: msg.authenticated_data,
+            content_type:       msg.content_type,
             applicationData:   content.applicationData,
             proposal:          content.proposal,
             commit:            content.commit,
@@ -862,29 +879,29 @@ func (msg *privateMessage) authenticatedContent(senderData *senderData, content 
 }
 
 type senderDataAAD struct {
-    groupID     GroupID
+    group_id     GroupID
     epoch       uint64
-    contentType contentType
+    content_type content_type
 }
 
 func (aad *senderDataAAD) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(aad.groupID))
+    writeOpaqueVec(b, []byte(aad.group_id))
     b.AddUint64(aad.epoch)
-    aad.contentType.marshal(b)
+    aad.content_type.marshal(b)
 }
 
 type privateContentAAD struct {
-    groupID           GroupID
+    group_id           GroupID
     epoch             uint64
-    contentType       contentType
-    authenticatedData []byte
+    content_type       content_type
+    authenticated_data []byte
 }
 
 func (aad *privateContentAAD) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(aad.groupID))
+    writeOpaqueVec(b, []byte(aad.group_id))
     b.AddUint64(aad.epoch)
-    aad.contentType.marshal(b)
-    writeOpaqueVec(b, aad.authenticatedData)
+    aad.content_type.marshal(b)
+    writeOpaqueVec(b, aad.authenticated_data)
 }
 
 type privateMessageContent struct {
@@ -895,7 +912,7 @@ type privateMessageContent struct {
     auth framedContentAuthData
 }
 
-func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct contentType) error {
+func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct content_type) error {
     *content = privateMessageContent{}
 
     var err error
@@ -920,7 +937,7 @@ func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct content
     return content.auth.unmarshal(s, ct)
 }
 
-func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct contentType) {
+func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct content_type) {
     switch ct {
     case contentTypeApplication:
         writeOpaqueVec(b, content.applicationData)
@@ -947,7 +964,7 @@ func encryptPrivateMessageContent(cs cipherSuite, signKey []byte, secret ratchet
         auth:            authContent.auth,
     }
     var b cryptobyte.Builder
-    privContent.marshal(&b, content.contentType)
+    privContent.marshal(&b, content.content_type)
     plaintext, err := b.Bytes()
     if err != nil {
         return nil, err
@@ -959,10 +976,10 @@ func encryptPrivateMessageContent(cs cipherSuite, signKey []byte, secret ratchet
     }
 
     aad := privateContentAAD{
-        groupID:           content.groupID,
+        group_id:           content.group_id,
         epoch:             content.epoch,
-        contentType:       content.contentType,
-        authenticatedData: content.authenticatedData,
+        content_type:       content.content_type,
+        authenticated_data: content.authenticated_data,
     }
     rawAAD, err := marshal(&aad)
     if err != nil {
@@ -989,9 +1006,9 @@ func encryptSenderData(cs cipherSuite, senderDataSecret []byte, senderData *send
     }
 
     aad := senderDataAAD{
-        groupID:     content.groupID,
+        group_id:     content.group_id,
         epoch:       content.epoch,
-        contentType: content.contentType,
+        content_type: content.content_type,
     }
     rawAAD, err := marshal(&aad)
     if err != nil {

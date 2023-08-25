@@ -101,16 +101,16 @@ fn test_tree_validation() -> Result<()> {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct PathSecretTest {
     node: u32,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     path_secret: Vec<u8>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct LeafPrivateTest {
     index: u32,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     encryption_priv: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     signature_priv: Vec<u8>,
     path_secrets: Vec<PathSecretTest>,
 }
@@ -118,12 +118,12 @@ struct LeafPrivateTest {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct PathTest {
     sender: u32,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     update_path: Vec<u8>,
     path_secrets: Vec<Option<String>>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     commit_secret: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     tree_hash_after: Vec<u8>,
 }
 
@@ -131,13 +131,13 @@ struct PathTest {
 struct TreeKEMTest {
     cipher_suite: u16,
 
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     group_id: Vec<u8>,
     epoch: u64,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     confirmed_transcript_hash: Vec<u8>,
 
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     ratchet_tree: Vec<u8>,
 
     pub leaves_private: Vec<LeafPrivateTest>,

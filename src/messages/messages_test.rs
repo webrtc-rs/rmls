@@ -8,13 +8,13 @@ use crate::error::*;
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {
     cipher_suite: u16,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     init_priv: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     signer_pub: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     key_package: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     welcome: Vec<u8>,
 }
 

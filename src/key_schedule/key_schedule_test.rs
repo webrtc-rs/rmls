@@ -237,16 +237,16 @@ fn test_key_schedule() -> Result<()> {
 struct TranscriptHashesTest {
     cipher_suite: u16,
 
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     pub confirmation_key: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     pub authenticated_content: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     pub interim_transcript_hash_before: Vec<u8>,
 
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     pub confirmed_transcript_hash_after: Vec<u8>,
-    #[serde(with = "hex::serde")]
+    #[serde(with = "hex")]
     pub interim_transcript_hash_after: Vec<u8>,
 }
 

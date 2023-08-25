@@ -20,8 +20,10 @@ struct CryptoBasicsTest {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct RefHashTest {
     label: String,
-    out: String,
-    value: String,
+    #[serde(with = "hex")]
+    out: Vec<u8>,
+    #[serde(with = "hex")]
+    value: Vec<u8>,
 }
 
 fn test_ref_hash(
@@ -29,29 +31,21 @@ fn test_ref_hash(
     cipher_suite: CipherSuite,
     tc: &RefHashTest,
 ) -> Result<()> {
-    let label = tc.label.as_bytes();
-    let value = hex_to_bytes(&tc.value);
-    let expect_out = hex_to_bytes(&tc.out);
-    let actual_out = crypto_provider.ref_hash(cipher_suite, label, &value)?;
-
-    assert_eq!(
-        actual_out.as_ref(),
-        &expect_out,
-        "got {:?}, want {:?}",
-        actual_out.as_ref(),
-        &expect_out,
-    );
-
+    let out = crypto_provider.ref_hash(cipher_suite, tc.label.as_bytes(), &tc.value)?;
+    assert_eq!(out.as_ref(), &tc.out);
     Ok(())
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct ExpandWithLabelTest {
-    secret: String,
+    #[serde(with = "hex")]
+    secret: Vec<u8>,
     label: String,
-    context: String,
+    #[serde(with = "hex")]
+    context: Vec<u8>,
     length: u16,
-    out: String,
+    #[serde(with = "hex")]
+    out: Vec<u8>,
 }
 
 fn test_expand_with_label(
@@ -59,29 +53,24 @@ fn test_expand_with_label(
     cipher_suite: CipherSuite,
     tc: &ExpandWithLabelTest,
 ) -> Result<()> {
-    let secret = hex_to_bytes(&tc.secret);
-    let label = tc.label.as_bytes();
-    let context = hex_to_bytes(&tc.context);
-    let expect_out = hex_to_bytes(&tc.out);
-    let actual_out =
-        crypto_provider.expand_with_label(cipher_suite, &secret, &label, &context, tc.length)?;
-
-    assert_eq!(
-        actual_out.as_ref(),
-        &expect_out,
-        "got {:?}, want {:?}",
-        actual_out.as_ref(),
-        &expect_out,
-    );
-
+    let out = crypto_provider.expand_with_label(
+        cipher_suite,
+        &tc.secret,
+        tc.label.as_bytes(),
+        &tc.context,
+        tc.length,
+    )?;
+    assert_eq!(out.as_ref(), &tc.out);
     Ok(())
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct DeriveSecretTest {
     label: String,
-    out: String,
-    secret: String,
+    #[serde(with = "hex")]
+    out: Vec<u8>,
+    #[serde(with = "hex")]
+    secret: Vec<u8>,
 }
 
 fn test_derive_secret(
@@ -89,28 +78,20 @@ fn test_derive_secret(
     cipher_suite: CipherSuite,
     tc: &DeriveSecretTest,
 ) -> Result<()> {
-    let label = tc.label.as_bytes();
-    let secret = hex_to_bytes(&tc.secret);
-    let expect_out = hex_to_bytes(&tc.out);
-    let actual_out = crypto_provider.derive_secret(cipher_suite, &secret, label)?;
-    assert_eq!(
-        actual_out.as_ref(),
-        &expect_out,
-        "got {:?}, want {:?}",
-        actual_out.as_ref(),
-        &expect_out,
-    );
-
+    let out = crypto_provider.derive_secret(cipher_suite, &tc.secret, tc.label.as_bytes())?;
+    assert_eq!(out.as_ref(), &tc.out,);
     Ok(())
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct DeriveTreeSecretTest {
-    secret: String,
+    #[serde(with = "hex")]
+    secret: Vec<u8>,
     label: String,
     generation: u32,
     length: u16,
-    out: String,
+    #[serde(with = "hex")]
+    out: Vec<u8>,
 }
 
 fn test_derive_tree_secret(
@@ -118,36 +99,29 @@ fn test_derive_tree_secret(
     cipher_suite: CipherSuite,
     tc: &DeriveTreeSecretTest,
 ) -> Result<()> {
-    let secret = hex_to_bytes(&tc.secret);
-    let label = tc.label.as_bytes();
-    let expect_out = hex_to_bytes(&tc.out);
-    let actual_out = derive_tree_secret(
+    let out = derive_tree_secret(
         crypto_provider,
         cipher_suite,
-        &secret,
-        label,
+        &tc.secret,
+        tc.label.as_bytes(),
         tc.generation,
         tc.length,
     )?;
-
-    assert_eq!(
-        actual_out.as_ref(),
-        &expect_out,
-        "got {:?}, want {:?}",
-        actual_out.as_ref(),
-        &expect_out,
-    );
-
+    assert_eq!(out.as_ref(), &tc.out,);
     Ok(())
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct SignWithLabelTest {
-    r#priv: String,
-    r#pub: String,
-    content: String,
+    #[serde(with = "hex")]
+    r#priv: Vec<u8>,
+    #[serde(with = "hex")]
+    r#pub: Vec<u8>,
+    #[serde(with = "hex")]
+    content: Vec<u8>,
     label: String,
-    signature: String,
+    #[serde(with = "hex")]
+    signature: Vec<u8>,
 }
 
 fn test_sign_with_label(
@@ -163,24 +137,36 @@ fn test_sign_with_label(
         println!("\t test_sign_with_label {:?} skipped", cipher_suite);
         return Ok(());
     }
-    let private = hex_to_bytes(&tc.r#priv);
-    let public = hex_to_bytes(&tc.r#pub);
-    let content = hex_to_bytes(&tc.content);
-    let label = tc.label.as_bytes();
-    let signature = hex_to_bytes(&tc.signature);
 
     assert!(
         crypto_provider
-            .verify_with_label(cipher_suite, &public, label, &content, &signature)
+            .verify_with_label(
+                cipher_suite,
+                &tc.r#pub,
+                tc.label.as_bytes(),
+                &tc.content,
+                &tc.signature
+            )
             .is_ok(),
         "reference signature did not verify"
     );
 
-    let sign_value = crypto_provider.sign_with_label(cipher_suite, &private, label, &content)?;
+    let out = crypto_provider.sign_with_label(
+        cipher_suite,
+        &tc.r#priv,
+        tc.label.as_bytes(),
+        &tc.content,
+    )?;
 
     assert!(
         crypto_provider
-            .verify_with_label(cipher_suite, &public, label, &content, &sign_value)
+            .verify_with_label(
+                cipher_suite,
+                &tc.r#pub,
+                tc.label.as_bytes(),
+                &tc.content,
+                &out
+            )
             .is_ok(),
         "generated signature did not verify"
     );
@@ -190,13 +176,19 @@ fn test_sign_with_label(
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct EncryptWithLabelTest {
-    r#priv: String,
-    r#pub: String,
+    #[serde(with = "hex")]
+    r#priv: Vec<u8>,
+    #[serde(with = "hex")]
+    r#pub: Vec<u8>,
     label: String,
-    context: String,
-    plaintext: String,
-    kem_output: String,
-    ciphertext: String,
+    #[serde(with = "hex")]
+    context: Vec<u8>,
+    #[serde(with = "hex")]
+    plaintext: Vec<u8>,
+    #[serde(with = "hex")]
+    kem_output: Vec<u8>,
+    #[serde(with = "hex")]
+    ciphertext: Vec<u8>,
 }
 
 fn test_encrypt_with_label(
@@ -213,50 +205,34 @@ fn test_encrypt_with_label(
         return Ok(());
     }
 
-    let private_key = hex_to_bytes(&tc.r#priv);
-    let public_key = hex_to_bytes(&tc.r#pub);
-    let label = tc.label.as_bytes();
-    let context = hex_to_bytes(&tc.context);
-    let expect_kem_output = hex_to_bytes(&tc.kem_output);
-    let expect_plaintext = hex_to_bytes(&tc.plaintext);
-    let expect_ciphertext = hex_to_bytes(&tc.ciphertext);
-
-    let actual_plaintext = crypto_provider.decrypt_with_label(
+    let plaintext = crypto_provider.decrypt_with_label(
         cipher_suite,
-        &private_key,
-        label,
-        &context,
-        &expect_kem_output,
-        &expect_ciphertext,
+        &tc.r#priv,
+        tc.label.as_bytes(),
+        &tc.context,
+        &tc.kem_output,
+        &tc.ciphertext,
     )?;
-    assert_eq!(
-        &actual_plaintext, &expect_plaintext,
-        "decrypting reference ciphertext: got {:?}, want {:?}",
-        &actual_plaintext, &expect_plaintext
-    );
+    assert_eq!(plaintext.as_ref(), &tc.plaintext);
 
-    let (actual_kem_output, actual_ciphertext) = crypto_provider.encrypt_with_label(
+    let (kem_output, ciphertext) = crypto_provider.encrypt_with_label(
         cipher_suite,
-        &public_key,
-        label,
-        &context,
-        &expect_plaintext,
+        &tc.r#pub,
+        tc.label.as_bytes(),
+        &tc.context,
+        &tc.plaintext,
     )?;
 
-    let actual_plaintext = crypto_provider.decrypt_with_label(
+    let plaintext = crypto_provider.decrypt_with_label(
         cipher_suite,
-        &private_key,
-        label,
-        &context,
-        &actual_kem_output,
-        &actual_ciphertext,
+        &tc.r#priv,
+        tc.label.as_bytes(),
+        &tc.context,
+        &kem_output,
+        &ciphertext,
     )?;
 
-    assert_eq!(
-        &actual_plaintext, &expect_plaintext,
-        "decrypting reference ciphertext: got {:?}, want {:?}",
-        &actual_plaintext, &expect_plaintext
-    );
+    assert_eq!(plaintext.as_ref(), &tc.plaintext);
 
     Ok(())
 }

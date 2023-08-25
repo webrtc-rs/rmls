@@ -20,10 +20,10 @@ rand = "0.8.5"
 # Common
 hpke = "0.10.0"
 
-# RingCryptoProvider
+# RingCryptoProvider: TODO(yngrtc): use ring feature
 ring = "0.16.20"
 
-# RustCryptoProvider
+# RustCryptoProvider: TODO(yngrtc): use rust feature
 sha2 = "0.10.7"
 hmac = "0.12.1"
 hkdf = "0.12.3"

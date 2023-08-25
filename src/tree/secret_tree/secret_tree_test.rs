@@ -1,5 +1,5 @@
 use super::*;
-use crate::codec::codec_test::{hex_to_bytes, load_test_vector};
+use crate::codec::codec_test::load_test_vector;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
 
@@ -7,26 +7,35 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct SenderData {
-    sender_data_secret: String,
-    ciphertext: String,
-    key: String,
-    nonce: String,
+    #[serde(with = "hex")]
+    sender_data_secret: Vec<u8>,
+    #[serde(with = "hex")]
+    ciphertext: Vec<u8>,
+    #[serde(with = "hex")]
+    key: Vec<u8>,
+    #[serde(with = "hex")]
+    nonce: Vec<u8>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct Leaf {
     generation: u32,
-    handshake_key: String,
-    handshake_nonce: String,
-    application_key: String,
-    application_nonce: String,
+    #[serde(with = "hex")]
+    handshake_key: Vec<u8>,
+    #[serde(with = "hex")]
+    handshake_nonce: Vec<u8>,
+    #[serde(with = "hex")]
+    application_key: Vec<u8>,
+    #[serde(with = "hex")]
+    application_nonce: Vec<u8>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct SecretTreeTest {
     cipher_suite: u16,
     sender_data: SenderData,
-    encryption_secret: String,
+    #[serde(with = "hex")]
+    encryption_secret: Vec<u8>,
     leaves: Vec<Vec<Leaf>>,
 }
 
@@ -35,41 +44,27 @@ fn secret_tree_test(
     cipher_suite: CipherSuite,
     tc: &SecretTreeTest,
 ) -> Result<()> {
-    let sender_data_secret = hex_to_bytes(&tc.sender_data.sender_data_secret);
-    let ciphertext = hex_to_bytes(&tc.sender_data.ciphertext);
-    let encryption_secret = hex_to_bytes(&tc.encryption_secret);
-    let expect_key = hex_to_bytes(&tc.sender_data.key);
-    let expect_nonce = hex_to_bytes(&tc.sender_data.nonce);
-
     let key = expand_sender_data_key(
         crypto_provider,
         cipher_suite,
-        &sender_data_secret,
-        &ciphertext,
+        &tc.sender_data.sender_data_secret,
+        &tc.sender_data.ciphertext,
     )?;
-    assert_eq!(
-        &key, &expect_key,
-        "expand_sender_data_key() = {:?}, want {:?}",
-        key, expect_key
-    );
+    assert_eq!(&key, &tc.sender_data.key,);
 
     let nonce = expand_sender_data_nonce(
         crypto_provider,
         cipher_suite,
-        &sender_data_secret,
-        &ciphertext,
+        &tc.sender_data.sender_data_secret,
+        &tc.sender_data.ciphertext,
     )?;
-    assert_eq!(
-        &nonce, &expect_nonce,
-        "expand_sender_data_nonce() = {:?}, want {:?}",
-        nonce, expect_nonce
-    );
+    assert_eq!(&nonce, &tc.sender_data.nonce,);
 
     let tree = derive_secret_tree(
         crypto_provider,
         cipher_suite,
         NumLeaves(tc.leaves.len() as u32),
-        &encryption_secret,
+        &tc.encryption_secret,
     )?;
 
     for (i, gens) in tc.leaves.iter().enumerate() {
@@ -115,29 +110,15 @@ fn test_ratchet_secret(
         }
 
         let (want_key, want_nonce) = match label {
-            RatchetLabel::Handshake => (
-                hex_to_bytes(&gen.handshake_key),
-                hex_to_bytes(&gen.handshake_nonce),
-            ),
-            RatchetLabel::Application => (
-                hex_to_bytes(&gen.application_key),
-                hex_to_bytes(&gen.application_nonce),
-            ),
+            RatchetLabel::Handshake => (&gen.handshake_key, &gen.handshake_nonce),
+            RatchetLabel::Application => (&gen.application_key, &gen.application_nonce),
         };
 
         let key = secret.derive_key(crypto_provider, cipher_suite)?;
-        assert_eq!(
-            &key, &want_key,
-            "deriveKey() = {:?}, want {:?}",
-            key, want_key
-        );
+        assert_eq!(&key, &want_key,);
 
         let nonce = secret.derive_nonce(crypto_provider, cipher_suite)?;
-        assert_eq!(
-            &nonce, &want_nonce,
-            "deriveNonce() = {:?}, want {:?}",
-            nonce, want_nonce
-        );
+        assert_eq!(&nonce, &want_nonce,);
     }
 
     Ok(())

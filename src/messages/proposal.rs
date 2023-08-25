@@ -434,11 +434,11 @@ impl Writer for ProposalOrRef {
     {
         match self {
             ProposalOrRef::Proposal(proposal) => {
-                buf.put_u16(1);
+                buf.put_u8(1);
                 proposal.write(buf)
             }
             ProposalOrRef::Reference(proposal_ref) => {
-                buf.put_u16(2);
+                buf.put_u8(2);
                 write_opaque_vec(proposal_ref, buf)
             }
         }

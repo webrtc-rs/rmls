@@ -363,9 +363,9 @@ func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct AuthenticatedContent {
-    wire_format: WireFormat,
-    content: FramedContent,
-    auth: FramedContentAuthData,
+    pub(crate) wire_format: WireFormat,
+    pub(crate) content: FramedContent,
+    pub(crate) auth: FramedContentAuthData,
 }
 
 impl Reader for AuthenticatedContent {
@@ -413,7 +413,7 @@ fn sign_authenticated_content(
 }
 
 impl AuthenticatedContent {
-    fn confirmed_transcript_hash_input(&self) -> ConfirmedTranscriptHashInput {
+    pub(crate) fn confirmed_transcript_hash_input(&self) -> ConfirmedTranscriptHashInput {
         ConfirmedTranscriptHashInput {
             wire_format: self.wire_format,
             content: self.content.clone(),
@@ -449,7 +449,7 @@ impl AuthenticatedContent {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FramedContentAuthData {
     signature: Bytes,
-    confirmation_tag: Option<Bytes>, // for contentTypeCommit
+    pub(crate) confirmation_tag: Option<Bytes>, // for contentTypeCommit
 }
 
 impl FramedContentAuthData {
@@ -483,7 +483,7 @@ impl FramedContentAuthData {
         Ok(())
     }
 
-    fn verify_confirmation_tag(
+    pub(crate) fn verify_confirmation_tag(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,

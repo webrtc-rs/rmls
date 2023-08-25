@@ -3,14 +3,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::cipher_suite::CipherSuite;
 use crate::codec::codec_test::load_test_vector;
-use crate::codec::write;
+use crate::codec::{write, Reader};
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
-use crate::framing::PROTOCOL_VERSION_MLS10;
+use crate::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
 use crate::key_schedule::{
-    extract_psk_secret, extract_welcome_secret, GroupContext, PreSharedKeyID, Psk,
-    SECRET_LABEL_CONFIRM, SECRET_LABEL_ENCRYPTION, SECRET_LABEL_EXPORTER, SECRET_LABEL_EXTERNAL,
-    SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION, SECRET_LABEL_SENDER_DATA,
+    extract_psk_secret, extract_welcome_secret, next_interim_transcript_hash, GroupContext,
+    PreSharedKeyID, Psk, SECRET_LABEL_CONFIRM, SECRET_LABEL_ENCRYPTION, SECRET_LABEL_EXPORTER,
+    SECRET_LABEL_EXTERNAL, SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION,
+    SECRET_LABEL_SENDER_DATA,
 };
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -250,34 +251,50 @@ struct TranscriptHashesTest {
 }
 
 fn transcript_hashes_test(
-    _crypto_provider: &impl CryptoProvider,
-    _cipher_suite: CipherSuite,
-    _tc: &TranscriptHashesTest,
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &TranscriptHashesTest,
 ) -> Result<()> {
-    /*TODO: let mut authContent = AuthenticatedContent
-    if err := unmarshal([]byte(tc.AuthenticatedContent), &authContent); err != nil {
-        t.Fatalf("unmarshal() = %v", err)
-    } else if authContent.content.contentType != contentTypeCommit {
-        t.Fatalf("contentType = %v, want %v", authContent.content.contentType, contentTypeCommit)
-    }
+    let mut auth_content = AuthenticatedContent::default();
+    let mut buf = tc.authenticated_content.as_ref();
+    auth_content.read(&mut buf)?;
+    match auth_content.content.content {
+        Content::Commit(_) => {}
+        _ => assert!(
+            false,
+            "content type want Commit, but got {:?}",
+            auth_content.content.content
+        ),
+    };
 
-    if !authContent.auth.verifyConfirmationTag(cs, []byte(tc.ConfirmationKey), []byte(tc.ConfirmedTranscriptHashAfter)) {
-        t.Errorf("verifyConfirmationTag() failed")
-    }
+    assert!(auth_content.auth.verify_confirmation_tag(
+        crypto_provider,
+        cipher_suite,
+        &tc.confirmation_key,
+        &tc.confirmed_transcript_hash_after
+    ));
 
-    confirmedTranscriptHashAfter, err := authContent.confirmedTranscriptHashInput().hash(cs, []byte(tc.InterimTranscriptHashBefore))
-    if err != nil {
-        t.Fatalf("confirmedTranscriptHashInput.hash() = %v", err)
-    } else if !bytes.Equal(confirmedTranscriptHashAfter, []byte(tc.ConfirmedTranscriptHashAfter)) {
-        t.Errorf("confirmedTranscriptHashInput.hash() = %v, want %v", confirmedTranscriptHashAfter, tc.ConfirmedTranscriptHashAfter)
-    }
+    let confirmed_transcript_hash_after = auth_content.confirmed_transcript_hash_input().hash(
+        crypto_provider,
+        cipher_suite,
+        &tc.interim_transcript_hash_before,
+    )?;
+    assert_eq!(
+        confirmed_transcript_hash_after.as_ref(),
+        &tc.confirmed_transcript_hash_after
+    );
 
-    interimTranscriptHashAfter, err := nextInterimTranscriptHash(cs, confirmedTranscriptHashAfter, authContent.auth.confirmationTag)
-    if err != nil {
-        t.Fatalf("nextInterimTranscriptHash() = %v", err)
-    } else if !bytes.Equal(interimTranscriptHashAfter, []byte(tc.InterimTranscriptHashAfter)) {
-        t.Errorf("nextInterimTranscriptHash() = %v, want %v", interimTranscriptHashAfter, tc.InterimTranscriptHashAfter)
-    }*/
+    assert!(auth_content.auth.confirmation_tag.is_some());
+    let interim_transcript_hash_after = next_interim_transcript_hash(
+        crypto_provider,
+        cipher_suite,
+        &confirmed_transcript_hash_after,
+        &auth_content.auth.confirmation_tag.as_ref().unwrap(),
+    )?;
+    assert_eq!(
+        interim_transcript_hash_after.as_ref(),
+        &tc.interim_transcript_hash_after
+    );
 
     Ok(())
 }

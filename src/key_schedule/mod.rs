@@ -202,24 +202,23 @@ impl ConfirmedTranscriptHashInput {
 
         Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
     }
+}
 
-    fn next_interim_transcript_hash(
-        &self,
-        crypto_provider: &impl CryptoProvider,
-        cipher_suite: CipherSuite,
-        confirmed_transcript_hash: &[u8],
-        confirmation_tag: &[u8],
-    ) -> Result<Bytes> {
-        let mut buf = BytesMut::new();
-        write_opaque_vec(confirmation_tag, &mut buf)?;
-        let raw_input = buf.freeze();
+pub(crate) fn next_interim_transcript_hash(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    confirmed_transcript_hash: &[u8],
+    confirmation_tag: &[u8],
+) -> Result<Bytes> {
+    let mut buf = BytesMut::new();
+    write_opaque_vec(confirmation_tag, &mut buf)?;
+    let raw_input = buf.freeze();
 
-        let mut buf = BytesMut::new();
-        buf.extend_from_slice(confirmed_transcript_hash);
-        buf.put(raw_input);
+    let mut buf = BytesMut::new();
+    buf.extend_from_slice(confirmed_transcript_hash);
+    buf.put(raw_input);
 
-        Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
-    }
+    Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]

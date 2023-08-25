@@ -24,6 +24,20 @@ pub trait Hpke: Send + Sync {
 
     fn aead_nonce_size(&self) -> usize;
     fn aead_key_size(&self) -> usize;
+    fn aead_open(
+        &self,
+        key: &[u8],
+        nonce: &[u8],
+        ciphertext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<Bytes>;
+    fn aead_seal(
+        &self,
+        key: &[u8],
+        nonce: &[u8],
+        plaintext: &[u8],
+        additional_data: &[u8],
+    ) -> Result<Bytes>;
 }
 
 pub trait Signature: Send + Sync {

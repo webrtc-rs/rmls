@@ -96,8 +96,8 @@ impl Writer for Credential {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct HpkeCiphertext {
-    kem_output: Bytes,
-    ciphertext: Bytes,
+    pub(crate) kem_output: Bytes,
+    pub(crate) ciphertext: Bytes,
 }
 
 impl Reader for HpkeCiphertext {

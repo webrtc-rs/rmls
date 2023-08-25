@@ -172,7 +172,7 @@ impl NodeIndex {
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub(crate) struct LeafIndex(pub(crate) u32);
+pub struct LeafIndex(pub(crate) u32);
 
 impl LeafIndex {
     // NodeIndex returns the index of the node from a leaf index.

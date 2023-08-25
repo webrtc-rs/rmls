@@ -114,7 +114,7 @@ impl GroupContext {
     }
 }
 
-fn extract_welcome_secret(
+pub(crate) fn extract_welcome_secret(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     joiner_secret: &[u8],

@@ -19,7 +19,7 @@ impl HpkeSuite {
     }
 }
 
-impl crate::crypto::provider::Hpke for HpkeSuite {
+impl provider::Hpke for HpkeSuite {
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
         let mut out = vec![0u8; length as usize];
 
@@ -89,5 +89,37 @@ impl crate::crypto::provider::Hpke for HpkeSuite {
         match self.aead {
             Aead::AEAD_AES128GCM | Aead::AEAD_AES256GCM | Aead::AEAD_ChaCha20Poly1305 => 12,
         }
+    }
+
+    fn aead_open(
+        &self,
+        _key: &[u8],
+        _nonce: &[u8],
+        _ciphertext: &[u8],
+        _additional_data: &[u8],
+    ) -> Result<Bytes> {
+        //TODO:(yngrtc)
+        match self.aead {
+            Aead::AEAD_AES128GCM => {}
+            Aead::AEAD_AES256GCM => {}
+            Aead::AEAD_ChaCha20Poly1305 => {}
+        }
+        Ok(Bytes::new())
+    }
+
+    fn aead_seal(
+        &self,
+        _key: &[u8],
+        _nonce: &[u8],
+        _plaintext: &[u8],
+        _additional_data: &[u8],
+    ) -> Result<Bytes> {
+        //TODO:(yngrtc)
+        match self.aead {
+            Aead::AEAD_AES128GCM => {}
+            Aead::AEAD_AES256GCM => {}
+            Aead::AEAD_ChaCha20Poly1305 => {}
+        }
+        Ok(Bytes::new())
     }
 }

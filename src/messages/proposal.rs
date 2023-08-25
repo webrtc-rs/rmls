@@ -272,7 +272,7 @@ impl Writer for RemoveProposal {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PreSharedKeyProposal {
-    psk: PreSharedKeyID,
+    pub(crate) psk: PreSharedKeyID,
 }
 
 impl Reader for PreSharedKeyProposal {
@@ -389,9 +389,15 @@ impl Writer for GroupContextExtensionsProposal {
 pub type ProposalRef = Bytes;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum ProposalOrRef {
+pub enum ProposalOrRef {
     Proposal(Proposal),     // = 1,
     Reference(ProposalRef), // = 2,
+}
+
+impl Default for ProposalOrRef {
+    fn default() -> Self {
+        ProposalOrRef::Reference(Bytes::new())
+    }
 }
 
 impl Reader for ProposalOrRef {

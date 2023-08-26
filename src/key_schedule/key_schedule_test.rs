@@ -284,12 +284,11 @@ fn transcript_hashes_test(
         &tc.confirmed_transcript_hash_after
     );
 
-    assert!(auth_content.auth.confirmation_tag.is_some());
     let interim_transcript_hash_after = next_interim_transcript_hash(
         crypto_provider,
         cipher_suite,
         &confirmed_transcript_hash_after,
-        &auth_content.auth.confirmation_tag.as_ref().unwrap(),
+        &auth_content.auth.confirmation_tag,
     )?;
     assert_eq!(
         interim_transcript_hash_after.as_ref(),

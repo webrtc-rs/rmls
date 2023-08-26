@@ -1,11 +1,21 @@
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher_suite::CipherSuite;
 use crate::codec::codec_test::load_test_vector;
-use crate::codec::Reader;
+use crate::codec::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, CryptoProvider};
 use crate::error::*;
-use crate::framing::{MlsMessage, WireFormat, WireFormatMessage};
+use crate::framing::{
+    encrypt_private_message, sign_public_message, Content, FramedContent, MlsMessage,
+    PrivateMessage, PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,
+    WireFormatMessage, PROTOCOL_VERSION_MLS10,
+};
+use crate::key_schedule::GroupContext;
+use crate::tree::secret_tree::{
+    derive_secret_tree, ratchet_label_from_content_type, RatchetSecret,
+};
+use crate::tree::tree_math::{LeafIndex, NumLeaves};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {
@@ -89,217 +99,291 @@ fn test_welcome() -> Result<()> {
 
     Ok(())
 }
-/*
-type messageProtectionTest struct {
-    CipherSuite cipherSuite `json:"cipher_suite"`
 
-    GroupID                 testBytes `json:"group_id"`
-    Epoch                   uint64    `json:"epoch"`
-    TreeHash                testBytes `json:"tree_hash"`
-    ConfirmedTranscriptHash testBytes `json:"confirmed_transcript_hash"`
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+struct MessageProtectionTest {
+    cipher_suite: u16,
 
-    SignaturePriv testBytes `json:"signature_priv"`
-    SignaturePub  testBytes `json:"signature_pub"`
+    #[serde(with = "hex")]
+    group_id: Vec<u8>,
+    epoch: u64,
+    #[serde(with = "hex")]
+    tree_hash: Vec<u8>,
+    #[serde(with = "hex")]
+    confirmed_transcript_hash: Vec<u8>,
 
-    EncryptionSecret testBytes `json:"encryption_secret"`
-    SenderDataSecret testBytes `json:"sender_data_secret"`
-    MembershipKey    testBytes `json:"membership_key"`
+    #[serde(with = "hex")]
+    signature_priv: Vec<u8>,
+    #[serde(with = "hex")]
+    signature_pub: Vec<u8>,
 
-    Proposal     testBytes `json:"proposal"`
-    ProposalPub  testBytes `json:"proposal_pub"`
-    ProposalPriv testBytes `json:"proposal_priv"`
+    #[serde(with = "hex")]
+    encryption_secret: Vec<u8>,
+    #[serde(with = "hex")]
+    sender_data_secret: Vec<u8>,
+    #[serde(with = "hex")]
+    membership_key: Vec<u8>,
 
-    Commit     testBytes `json:"commit"`
-    CommitPub  testBytes `json:"commit_pub"`
-    CommitPriv testBytes `json:"commit_priv"`
+    #[serde(with = "hex")]
+    proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    proposal_pub: Vec<u8>,
+    #[serde(with = "hex")]
+    proposal_priv: Vec<u8>,
 
-    Application     testBytes `json:"application"`
-    ApplicationPriv testBytes `json:"application_priv"`
+    #[serde(with = "hex")]
+    commit: Vec<u8>,
+    #[serde(with = "hex")]
+    commit_pub: Vec<u8>,
+    #[serde(with = "hex")]
+    commit_priv: Vec<u8>,
+
+    #[serde(with = "hex")]
+    application: Vec<u8>,
+    #[serde(with = "hex")]
+    application_priv: Vec<u8>,
 }
 
-func testMessageProtectionPub(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPub []byte) {
-    var msg mlsMessage
-    if err := unmarshal(rawPub, &msg); err != nil {
-        t.Fatalf("unmarshal() = %v", err)
-    } else if msg.wireFormat != wireFormatMLSPublicMessage {
-        t.Fatalf("unmarshal(): wireFormat = %v, want %v", msg.wireFormat, wireFormatMLSPublicMessage)
-    }
-    pubMsg := msg.publicMessage
+fn test_message_protection_pub(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &MessageProtectionTest,
+    ctx: &GroupContext,
+    want_raw: &[u8],
+    raw_pub: &[u8],
+) -> Result<()> {
+    let mut msg = MlsMessage::default();
+    let mut buf = raw_pub;
+    msg.read(&mut buf)?;
+    assert_eq!(msg.wire_format, WireFormat::PublicMessage);
+    let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
+        pub_msg
+    } else {
+        return Err(Error::Other("unreachable".to_string()));
+    };
 
-    verifyPublicMessage(t, tc, ctx, pubMsg, wantRaw)
+    verify_public_message(crypto_provider, cipher_suite, tc, ctx, &pub_msg, want_raw)?;
 
-    pubMsg, err := signPublicMessage(tc.CipherSuite, []byte(tc.SignaturePriv), &pubMsg.content, ctx)
-    if err != nil {
-        t.Errorf("signPublicMessage() = %v", err)
-    }
-    if err := pubMsg.signMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx); err != nil {
-        t.Errorf("signMembershipTag() = %v", err)
-    }
-    verifyPublicMessage(t, tc, ctx, pubMsg, wantRaw)
+    let mut pub_msg = sign_public_message(
+        crypto_provider,
+        cipher_suite,
+        &tc.signature_priv,
+        &pub_msg.content,
+        ctx,
+    )?;
+
+    pub_msg.sign_membership_tag(crypto_provider, cipher_suite, &tc.membership_key, ctx)?;
+
+    verify_public_message(crypto_provider, cipher_suite, tc, ctx, &pub_msg, want_raw)
 }
 
-func verifyPublicMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, pubMsg *publicMessage, wantRaw []byte) {
-    authContent := pubMsg.authenticatedContent()
-    if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
-        t.Errorf("verifySignature() failed")
-    }
-    if !pubMsg.verifyMembershipTag(tc.CipherSuite, []byte(tc.MembershipKey), ctx) {
-        t.Errorf("verifyMembershipTag() failed")
-    }
+fn verify_public_message(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &MessageProtectionTest,
+    ctx: &GroupContext,
+    pub_msg: &PublicMessage,
+    want_raw: &[u8],
+) -> Result<()> {
+    let auth_content = pub_msg.authenticated_content();
+    assert!(auth_content
+        .verify_signature(crypto_provider, cipher_suite, &tc.signature_pub, ctx)
+        .is_ok());
+    assert!(pub_msg.verify_membership_tag(crypto_provider, cipher_suite, &tc.membership_key, ctx));
 
-    var (
-        raw []byte
-        err error
-    )
-    switch pubMsg.content.contentType {
-    case contentTypeApplication:
-        raw = pubMsg.content.applicationData
-    case contentTypeProposal:
-        raw, err = marshal(pubMsg.content.proposal)
-    case contentTypeCommit:
-        raw, err = marshal(pubMsg.content.commit)
-    default:
-        t.Errorf("unexpected content type %v", pubMsg.content.contentType)
-    }
-    if err != nil {
-        t.Errorf("marshal() = %v", err)
-    } else if !bytes.Equal(raw, wantRaw) {
-        t.Errorf("marshal() = %v, want %v", raw, wantRaw)
-    }
+    let raw = match &pub_msg.content.content {
+        Content::Application(application) => application.clone(),
+        Content::Proposal(proposal) => write(proposal)?,
+        Content::Commit(commit) => write(commit)?,
+    };
+    assert_eq!(raw.as_ref(), want_raw);
+
+    Ok(())
 }
 
-func testMessageProtectionPriv(t *testing.T, tc *messageProtectionTest, ctx *groupContext, wantRaw, rawPriv []byte) {
-    var msg mlsMessage
-    if err := unmarshal(rawPriv, &msg); err != nil {
-        t.Fatalf("unmarshal() = %v", err)
-    } else if msg.wireFormat != wireFormatMLSPrivateMessage {
-        t.Fatalf("unmarshal(): wireFormat = %v, want %v", msg.wireFormat, wireFormatMLSPrivateMessage)
-    }
-    privMsg := msg.privateMessage
+fn test_message_protection_priv(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &MessageProtectionTest,
+    ctx: &GroupContext,
+    want_raw: &[u8],
+    raw_priv: &[u8],
+) -> Result<()> {
+    let mut msg = MlsMessage::default();
+    let mut buf = raw_priv;
+    msg.read(&mut buf)?;
+    assert_eq!(msg.wire_format, WireFormat::PrivateMessage);
+    let priv_msg = if let WireFormatMessage::PrivateMessage(priv_msg) = msg.message {
+        priv_msg
+    } else {
+        return Err(Error::Other("unreachable".to_string()));
+    };
 
-    tree, err := deriveSecretTree(tc.CipherSuite, numLeaves(2), []byte(tc.EncryptionSecret))
-    if err != nil {
-        t.Fatalf("deriveSecretTree() = %v", err)
-    }
+    let tree = derive_secret_tree(
+        crypto_provider,
+        cipher_suite,
+        NumLeaves(2),
+        &tc.encryption_secret,
+    )?;
 
-    label := ratchetLabelFromContentType(privMsg.contentType)
-    li := leafIndex(1)
-    secret, err := tree.deriveRatchetRoot(tc.CipherSuite, li.nodeIndex(), label)
-    if err != nil {
-        t.Fatalf("deriveRatchetRoot() = %v", err)
-    }
+    let label = ratchet_label_from_content_type(priv_msg.content_type)?;
+    let li = LeafIndex(1);
+    let secret = tree.derive_ratchet_root(crypto_provider, cipher_suite, li.node_index(), label)?;
 
-    content := decryptPrivateMessage(t, tc, ctx, secret, privMsg, wantRaw)
+    let content = decrypt_private_message(
+        crypto_provider,
+        cipher_suite,
+        tc,
+        ctx,
+        secret.clone(),
+        &priv_msg,
+        want_raw,
+    )?;
 
-    senderData, err := newSenderData(li, 0) // TODO: set generation > 0
-    if err != nil {
-        t.Fatalf("newSenderData() = %v", err)
-    }
-    framedContent := framedContent{
-        groupID: GroupID(tc.GroupID),
-        epoch:   tc.Epoch,
-        sender: sender{
-            senderType: senderTypeMember,
-            leafIndex:  li,
-        },
-        contentType:     privMsg.contentType,
-        applicationData: content.applicationData,
-        proposal:        content.proposal,
-        commit:          content.commit,
-    }
-    privMsg, err = encryptPrivateMessage(tc.CipherSuite, []byte(tc.SignaturePriv), secret, []byte(tc.SenderDataSecret), &framedContent, senderData, ctx)
-    if err != nil {
-        t.Fatalf("encryptPrivateMessage() = %v", err)
-    }
-    decryptPrivateMessage(t, tc, ctx, secret, privMsg, wantRaw)
+    // TODO: set generation > 0
+    let sender_data = SenderData::new(li, 0);
+    let framed_content = FramedContent {
+        group_id: tc.group_id.clone().into(),
+        epoch: tc.epoch,
+        sender: Sender::Member(li),
+        authenticated_data: Bytes::new(),
+        content: content.content.clone(),
+    };
+
+    let priv_msg = encrypt_private_message(
+        crypto_provider,
+        cipher_suite,
+        &tc.signature_priv,
+        &secret,
+        &tc.sender_data_secret,
+        &framed_content,
+        &sender_data,
+        ctx,
+    )?;
+
+    decrypt_private_message(
+        crypto_provider,
+        cipher_suite,
+        tc,
+        ctx,
+        secret.clone(),
+        &priv_msg,
+        want_raw,
+    )?;
+
+    Ok(())
 }
 
-func decryptPrivateMessage(t *testing.T, tc *messageProtectionTest, ctx *groupContext, secret ratchetSecret, privMsg *privateMessage, wantRaw []byte) *privateMessageContent {
-    senderData, err := privMsg.decryptSenderData(tc.CipherSuite, []byte(tc.SenderDataSecret))
-    if err != nil {
-        t.Fatalf("decryptSenderData() = %v", err)
+fn decrypt_private_message(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &MessageProtectionTest,
+    ctx: &GroupContext,
+    mut secret: RatchetSecret,
+    priv_msg: &PrivateMessage,
+    want_raw: &[u8],
+) -> Result<PrivateMessageContent> {
+    let sender_data =
+        priv_msg.decrypt_sender_data(crypto_provider, cipher_suite, &tc.sender_data_secret)?;
+
+    while secret.generation != sender_data.generation {
+        secret = secret.derive_next(crypto_provider, cipher_suite)?;
     }
 
-    for secret.generation != senderData.generation {
-        secret, err = secret.deriveNext(tc.CipherSuite)
-        if err != nil {
-            t.Fatalf("deriveNext() = %v", err)
+    let content = priv_msg.decrypt_content(
+        crypto_provider,
+        cipher_suite,
+        &secret,
+        &sender_data.reuse_guard,
+    )?;
+
+    let auth_content = priv_msg.authenticated_content(&sender_data, &content);
+    assert!(auth_content
+        .verify_signature(crypto_provider, cipher_suite, &tc.signature_pub, ctx)
+        .is_ok());
+
+    let raw = match &content.content {
+        Content::Application(application) => application.clone(),
+        Content::Proposal(proposal) => write(proposal)?,
+        Content::Commit(commit) => write(commit)?,
+    };
+    assert_eq!(raw.as_ref(), want_raw);
+
+    Ok(content)
+}
+
+fn message_protection_test(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    tc: &MessageProtectionTest,
+) -> Result<()> {
+    let ctx = GroupContext {
+        version: PROTOCOL_VERSION_MLS10,
+        cipher_suite,
+        group_id: tc.group_id.clone().into(),
+        epoch: tc.epoch,
+        tree_hash: tc.tree_hash.clone().into(),
+        confirmed_transcript_hash: tc.confirmed_transcript_hash.clone().into(),
+        extensions: vec![],
+    };
+
+    let wire_formats = vec![
+        (
+            "proposal",
+            tc.proposal.clone(),
+            tc.proposal_pub.clone(),
+            tc.proposal_priv.clone(),
+        ),
+        (
+            "commit",
+            tc.commit.clone(),
+            tc.commit_pub.clone(),
+            tc.commit_priv.clone(),
+        ),
+        (
+            "application",
+            tc.application.clone(),
+            vec![],
+            tc.application_priv.clone(),
+        ),
+    ];
+    for wf in wire_formats {
+        println!("testing {}", wf.0);
+        if !wf.2.is_empty() {
+            test_message_protection_pub(crypto_provider, cipher_suite, tc, &ctx, &wf.1, &wf.2)?;
+        }
+        test_message_protection_priv(crypto_provider, cipher_suite, tc, &ctx, &wf.1, &wf.3)?;
+    }
+
+    Ok(())
+}
+
+fn test_message_protection_with_crypto_provider(
+    tests: &[MessageProtectionTest],
+    crypto_provider: &impl CryptoProvider,
+) -> Result<()> {
+    for tc in tests {
+        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        println!(
+            "test_message_protection {}:{}",
+            cipher_suite, cipher_suite as u16
+        );
+
+        if crypto_provider.supports(cipher_suite).is_ok() {
+            message_protection_test(crypto_provider, cipher_suite, tc)?;
         }
     }
 
-    content, err := privMsg.decryptContent(tc.CipherSuite, secret, senderData.reuseGuard)
-    if err != nil {
-        t.Fatalf("decryptContent() = %v", err)
-    }
-
-    authContent := privMsg.authenticatedContent(senderData, content)
-    if !authContent.verifySignature(tc.CipherSuite, []byte(tc.SignaturePub), ctx) {
-        t.Errorf("verifySignature() failed")
-    }
-
-    var raw []byte
-    switch privMsg.contentType {
-    case contentTypeApplication:
-        raw = content.applicationData
-    case contentTypeProposal:
-        raw, err = marshal(content.proposal)
-    case contentTypeCommit:
-        raw, err = marshal(content.commit)
-    default:
-        t.Errorf("unexpected content type %v", privMsg.contentType)
-    }
-    if err != nil {
-        t.Errorf("marshal() = %v", err)
-    } else if !bytes.Equal(raw, wantRaw) {
-        t.Errorf("marshal() = %v, want %v", raw, wantRaw)
-    }
-
-    return content
+    Ok(())
 }
 
-func testMessageProtection(t *testing.T, tc *messageProtectionTest) {
-    ctx := groupContext{
-        version:                 protocolVersionMLS10,
-        cipherSuite:             tc.CipherSuite,
-        groupID:                 GroupID(tc.GroupID),
-        epoch:                   tc.Epoch,
-        treeHash:                []byte(tc.TreeHash),
-        confirmedTranscriptHash: []byte(tc.ConfirmedTranscriptHash),
-    }
+#[test]
+fn test_message_protection() -> Result<()> {
+    let tests: Vec<MessageProtectionTest> =
+        load_test_vector("test-vectors/message-protection.json")?;
 
-    wireFormats := []struct {
-        name           string
-        raw, pub, priv testBytes
-    }{
-        {"proposal", tc.Proposal, tc.ProposalPub, tc.ProposalPriv},
-        {"commit", tc.Commit, tc.CommitPub, tc.CommitPriv},
-        {"application", tc.Application, nil, tc.ApplicationPriv},
-    }
-    for _, wireFormat := range wireFormats {
-        t.Run(wireFormat.name, func(t *testing.T) {
-            raw := []byte(wireFormat.raw)
-            pub := []byte(wireFormat.pub)
-            priv := []byte(wireFormat.priv)
-            if wireFormat.pub != nil {
-                t.Run("pub", func(t *testing.T) {
-                    testMessageProtectionPub(t, tc, &ctx, raw, pub)
-                })
-            }
-            t.Run("priv", func(t *testing.T) {
-                testMessageProtectionPriv(t, tc, &ctx, raw, priv)
-            })
-        })
-    }
+    test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    //TODO(yngrtc): test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+
+    Ok(())
 }
-
-func TestMessageProtection(t *testing.T) {
-    var tests []messageProtectionTest
-    loadTestVector(t, "testdata/message-protection.json", &tests)
-
-    for i, tc := range tests {
-        t.Run(fmt.Sprintf("[%v]", i), func(t *testing.T) {
-            testMessageProtection(t, &tc)
-        })
-    }
-}
- */

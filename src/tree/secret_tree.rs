@@ -29,10 +29,10 @@ impl Display for RatchetLabel {
     }
 }
 
-fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
+pub(crate) fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
     match ct {
-        ContentType::Application => Ok(RatchetLabel::Handshake),
-        ContentType::Proposal | ContentType::Commit => Ok(RatchetLabel::Application),
+        ContentType::Application => Ok(RatchetLabel::Application),
+        ContentType::Proposal | ContentType::Commit => Ok(RatchetLabel::Handshake),
     }
 }
 
@@ -41,7 +41,7 @@ fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct SecretTree(pub(crate) Vec<Option<Bytes>>);
 
-fn derive_secret_tree(
+pub(crate) fn derive_secret_tree(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     n: NumLeaves,
@@ -102,7 +102,7 @@ impl SecretTree {
     }
 
     // derive_ratchet_root derives the root of a ratchet for a tree node.
-    fn derive_ratchet_root(
+    pub(crate) fn derive_ratchet_root(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -129,6 +129,7 @@ impl SecretTree {
     }
 }
 
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct RatchetSecret {
     pub(crate) secret: Bytes,
     pub(crate) generation: u32,
@@ -167,7 +168,7 @@ impl RatchetSecret {
         )
     }
 
-    fn derive_next(
+    pub(crate) fn derive_next(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,

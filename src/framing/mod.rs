@@ -272,10 +272,10 @@ pub(crate) type GroupID = Bytes;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FramedContent {
-    group_id: GroupID,
-    epoch: u64,
-    sender: Sender,
-    authenticated_data: Bytes,
+    pub(crate) group_id: GroupID,
+    pub(crate) epoch: u64,
+    pub(crate) sender: Sender,
+    pub(crate) authenticated_data: Bytes,
     pub(crate) content: Content,
 }
 
@@ -477,7 +477,7 @@ impl AuthenticatedContent {
         }
     }
 
-    fn verify_signature(
+    pub(crate) fn verify_signature(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -496,7 +496,7 @@ impl AuthenticatedContent {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FramedContentAuthData {
     signature: Bytes,
-    pub(crate) confirmation_tag: Option<Bytes>, // for contentTypeCommit
+    pub(crate) confirmation_tag: Bytes, // for contentTypeCommit
 }
 
 impl FramedContentAuthData {
@@ -507,9 +507,7 @@ impl FramedContentAuthData {
     {
         self.signature = read_opaque_vec(buf)?;
         if ct == ContentType::Commit {
-            self.confirmation_tag = Some(read_opaque_vec(buf)?);
-        } else {
-            self.confirmation_tag = None;
+            self.confirmation_tag = read_opaque_vec(buf)?;
         }
 
         Ok(())
@@ -523,9 +521,7 @@ impl FramedContentAuthData {
         write_opaque_vec(&self.signature, buf)?;
 
         if ct == ContentType::Commit {
-            if let Some(confirmation_tag) = &self.confirmation_tag {
-                write_opaque_vec(confirmation_tag, buf)?;
-            }
+            write_opaque_vec(&self.confirmation_tag, buf)?;
         }
         Ok(())
     }
@@ -537,19 +533,15 @@ impl FramedContentAuthData {
         confirmation_key: &[u8],
         confirmed_transcript_hash: &[u8],
     ) -> bool {
-        if let Some(confirmation_tag) = &self.confirmation_tag {
-            if confirmation_tag.is_empty() {
-                false
-            } else {
-                crypto_provider.verify_mac(
-                    cipher_suite,
-                    confirmation_key,
-                    confirmed_transcript_hash,
-                    confirmation_tag,
-                )
-            }
-        } else {
+        if self.confirmation_tag.is_empty() {
             false
+        } else {
+            crypto_provider.verify_mac(
+                cipher_suite,
+                confirmation_key,
+                confirmed_transcript_hash,
+                &self.confirmation_tag,
+            )
         }
     }
 
@@ -641,12 +633,12 @@ impl Writer for FramedContentTBS {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PublicMessage {
-    content: FramedContent,
+    pub(crate) content: FramedContent,
     auth: FramedContentAuthData,
     membership_tag: Option<Bytes>, // for senderTypeMember
 }
 
-fn sign_public_message(
+pub(crate) fn sign_public_message(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     sign_key: &[u8],
@@ -705,7 +697,7 @@ impl Writer for PublicMessage {
 }
 
 impl PublicMessage {
-    fn authenticated_content(&self) -> AuthenticatedContent {
+    pub(crate) fn authenticated_content(&self) -> AuthenticatedContent {
         AuthenticatedContent {
             wire_format: WireFormat::PublicMessage,
             content: self.content.clone(),
@@ -720,7 +712,7 @@ impl PublicMessage {
         }
     }
 
-    fn sign_membership_tag(
+    pub(crate) fn sign_membership_tag(
         &mut self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -739,7 +731,7 @@ impl PublicMessage {
         Ok(())
     }
 
-    fn verify_membership_tag(
+    pub(crate) fn verify_membership_tag(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -792,14 +784,14 @@ impl Writer for AuthenticatedContentTBM {
 pub struct PrivateMessage {
     group_id: GroupID,
     epoch: u64,
-    content_type: ContentType,
+    pub(crate) content_type: ContentType,
     authenticated_data: Bytes,
     encrypted_sender_data: Bytes,
     ciphertext: Bytes,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn encrypt_private_message(
+pub(crate) fn encrypt_private_message(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     sign_priv: &[u8],
@@ -872,7 +864,7 @@ impl Writer for PrivateMessage {
 }
 
 impl PrivateMessage {
-    fn decrypt_sender_data(
+    pub(crate) fn decrypt_sender_data(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -910,7 +902,7 @@ impl PrivateMessage {
         Ok(sender_data)
     }
 
-    fn decrypt_content(
+    pub(crate) fn decrypt_content(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -943,16 +935,16 @@ impl PrivateMessage {
         let mut content = PrivateMessageContent::default();
         content.read(&mut buf, self.content_type)?;
 
-        while buf.has_remaining() {
+        /*TODO(yngrtc):while buf.has_remaining() {
             if buf.get_u8() != 0 {
                 return Err(Error::PaddingContainsNonZeroBytes);
             }
-        }
+        }*/
 
         Ok(content)
     }
 
-    fn authenticated_content(
+    pub(crate) fn authenticated_content(
         &self,
         sender_data: &SenderData,
         content: &PrivateMessageContent,
@@ -1012,7 +1004,7 @@ impl Writer for PrivateContentAAD {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PrivateMessageContent {
-    content: Content,
+    pub(crate) content: Content,
     auth: FramedContentAuthData,
 }
 
@@ -1155,8 +1147,8 @@ fn encrypt_sender_data(
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub(crate) struct SenderData {
     leaf_index: LeafIndex,
-    generation: u32,
-    reuse_guard: [u8; 4],
+    pub(crate) generation: u32,
+    pub(crate) reuse_guard: [u8; 4],
 }
 
 impl SenderData {

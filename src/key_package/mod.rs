@@ -104,7 +104,10 @@ impl KeyPackage {
         Ok(())
     }
 
-    fn generate_ref(&self, crypto_provider: &impl CryptoProvider) -> Result<KeyPackageRef> {
+    pub(crate) fn generate_ref(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+    ) -> Result<KeyPackageRef> {
         let mut buf = BytesMut::new();
         self.write(&mut buf)?;
         let raw = buf.freeze();

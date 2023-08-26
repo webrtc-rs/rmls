@@ -1,14 +1,13 @@
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+
 use crate::codec::*;
+use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 use crate::key_schedule::{
     GroupContext, PreSharedKeyID, Psk, ResumptionPSKUsage, SECRET_LABEL_CONFIRM,
 };
 use crate::tree::tree_math::LeafIndex;
 use crate::tree::{read_extensions, write_extensions, Extension};
-
-use crate::crypto::provider::CryptoProvider;
-use crate::crypto::SignaturePublicKey;
-use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupInfo {
@@ -62,10 +61,10 @@ impl GroupInfo {
         Ok(())
     }
 
-    fn verify_signature(
+    pub(crate) fn verify_signature(
         &self,
         crypto_provider: &impl CryptoProvider,
-        signer_pub: &SignaturePublicKey,
+        signer_pub: &[u8],
     ) -> Result<()> {
         let cipher_suite = self.group_context.cipher_suite;
         let mut buf = BytesMut::new();
@@ -81,7 +80,7 @@ impl GroupInfo {
         )
     }
 
-    fn verify_confirmation_tag(
+    pub(crate) fn verify_confirmation_tag(
         &self,
         crypto_provider: &impl CryptoProvider,
         joiner_secret: &[u8],
@@ -109,7 +108,7 @@ impl GroupInfo {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupSecrets {
-    joiner_secret: Bytes,
+    pub(crate) joiner_secret: Bytes,
     path_secret: Option<Bytes>,
     psk_ids: Vec<PreSharedKeyID>,
 }

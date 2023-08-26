@@ -328,8 +328,8 @@ impl Default for WireFormatMessage {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct MlsMessage {
     version: ProtocolVersion,
-    wire_format: WireFormat,
-    message: WireFormatMessage,
+    pub(crate) wire_format: WireFormat,
+    pub(crate) message: WireFormatMessage,
 }
 
 impl Reader for MlsMessage {

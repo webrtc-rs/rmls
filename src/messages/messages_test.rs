@@ -1,9 +1,11 @@
-/*use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::cipher_suite::CipherSuite;
 use crate::codec::codec_test::load_test_vector;
-use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
+use crate::codec::Reader;
+use crate::crypto::provider::{ring::RingCryptoProvider, CryptoProvider};
 use crate::error::*;
+use crate::framing::{MlsMessage, WireFormat, WireFormatMessage};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {
@@ -18,44 +20,46 @@ struct WelcomeTest {
     welcome: Vec<u8>,
 }
 
-fn welcome_test( crypto_provider: &impl CryptoProvider,
-    cipher_suite: CipherSuite, tc:&WelcomeTest) -> Result<()> {
-    let mut welcomeMsg = mlsMessage
-    if err := welcomeMsg.unmarshal(tc.Welcome.ByteString()); err != nil {
-        t.Fatalf("unmarshal(welcome) = %v", err)
-    } else if welcomeMsg.wireFormat != wireFormatMLSWelcome {
-        t.Fatalf("wireFormat = %v, want %v", welcomeMsg.wireFormat, wireFormatMLSWelcome)
-    }
-    welcome := welcomeMsg.welcome
+fn welcome_test(
+    crypto_provider: &impl CryptoProvider,
+    _cipher_suite: CipherSuite,
+    tc: &WelcomeTest,
+) -> Result<()> {
+    let mut welcome_msg = MlsMessage::default();
+    let mut buf = tc.welcome.as_ref();
+    welcome_msg.read(&mut buf)?;
+    assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
+    let welcome = if let WireFormatMessage::Welcome(welcome) = welcome_msg.message {
+        welcome
+    } else {
+        return Err(Error::Other("unreachable".to_string()));
+    };
 
-    var keyPackageMsg mlsMessage
-    if err := keyPackageMsg.unmarshal(tc.KeyPackage.ByteString()); err != nil {
-        t.Fatalf("unmarshal(keyPackage) = %v", err)
-    } else if keyPackageMsg.wireFormat != wireFormatMLSKeyPackage {
-        t.Fatalf("wireFormat = %v, want %v", keyPackageMsg.wireFormat, wireFormatMLSKeyPackage)
-    }
-    keyPackage := keyPackageMsg.keyPackage
+    let mut key_package_msg = MlsMessage::default();
+    let mut buf = tc.key_package.as_ref();
+    key_package_msg.read(&mut buf)?;
+    assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
+    let key_package = if let WireFormatMessage::KeyPackage(key_package) = key_package_msg.message {
+        key_package
+    } else {
+        return Err(Error::Other("unreachable".to_string()));
+    };
 
-    keyPackageRef, err := keyPackage.generateRef()
-    if err != nil {
-        t.Fatalf("keyPackage.generateRef() = %v", err)
-    }
+    let key_package_ref = key_package.generate_ref(crypto_provider)?;
 
-    groupSecrets, err := welcome.decryptGroupSecrets(keyPackageRef, []byte(tc.InitPriv))
-    if err != nil {
-        t.Fatalf("welcome.decryptGroupSecrets() = %v", err)
-    }
+    let group_secrets =
+        welcome.decrypt_group_secrets(crypto_provider, &key_package_ref, &tc.init_priv)?;
 
-    groupInfo, err := welcome.decryptGroupInfo(groupSecrets.joinerSecret, nil)
-    if err != nil {
-        t.Fatalf("welcome.decryptGroupInfo() = %v", err)
-    }
-    if !groupInfo.verifySignature(signaturePublicKey(tc.SignerPub)) {
-        t.Errorf("groupInfo.verifySignature() failed")
-    }
-    if !groupInfo.verifyConfirmationTag(groupSecrets.joinerSecret, nil) {
-        t.Errorf("groupInfo.verifyConfirmationTag() failed")
-    }
+    let group_info =
+        welcome.decrypt_group_info(crypto_provider, &group_secrets.joiner_secret, &[])?;
+
+    assert!(group_info
+        .verify_signature(crypto_provider, &tc.signer_pub)
+        .is_ok());
+
+    assert!(group_info
+        .verify_confirmation_tag(crypto_provider, &group_secrets.joiner_secret, &[])
+        .is_ok());
 
     Ok(())
 }
@@ -66,10 +70,7 @@ fn test_welcome_with_crypto_provider(
 ) -> Result<()> {
     for tc in tests {
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!(
-            "test_welcome {}:{}",
-            cipher_suite, cipher_suite as u16
-        );
+        println!("test_welcome {}:{}", cipher_suite, cipher_suite as u16);
 
         if crypto_provider.supports(cipher_suite).is_ok() {
             welcome_test(crypto_provider, cipher_suite, tc)?;
@@ -81,14 +82,14 @@ fn test_welcome_with_crypto_provider(
 
 #[test]
 fn test_welcome() -> Result<()> {
-    let tests: Vec<WelcomeTest>= load_test_vector( "test-vectors/welcome.json")?;
+    let tests: Vec<WelcomeTest> = load_test_vector("test-vectors/welcome.json")?;
 
     test_welcome_with_crypto_provider(&tests, &RingCryptoProvider {})?;
-    //TODO:test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    //TODO(yngrtc): test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
 }
-
+/*
 type messageProtectionTest struct {
     CipherSuite cipherSuite `json:"cipher_suite"`
 

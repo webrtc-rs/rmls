@@ -98,19 +98,25 @@ impl GroupContext {
         joiner_secret: &[u8],
         psk_secret: &[u8],
     ) -> Result<Bytes> {
-        let cipher_suite = self.cipher_suite;
+        let kdf_extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size();
+        let zero = vec![0u8; kdf_extract_size];
 
         // TODO de-duplicate with extract_welcome_secret
 
-        let extracted = crypto_provider
-            .hpke(cipher_suite)
-            .kdf_extract(psk_secret, joiner_secret)?;
+        let extracted = crypto_provider.hpke(self.cipher_suite).kdf_extract(
+            if psk_secret.is_empty() {
+                &zero
+            } else {
+                psk_secret
+            },
+            joiner_secret,
+        )?;
 
         let raw_group_context = write(self)?;
-        let extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
-            cipher_suite,
+            self.cipher_suite,
             &extracted,
             b"epoch",
             &raw_group_context,
@@ -125,9 +131,16 @@ pub(crate) fn extract_welcome_secret(
     joiner_secret: &[u8],
     psk_secret: &[u8],
 ) -> Result<Bytes> {
-    let extracted = crypto_provider
-        .hpke(cipher_suite)
-        .kdf_extract(psk_secret, joiner_secret)?;
+    let kdf_extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+    let zero = vec![0u8; kdf_extract_size];
+    let extracted = crypto_provider.hpke(cipher_suite).kdf_extract(
+        if psk_secret.is_empty() {
+            &zero
+        } else {
+            psk_secret
+        },
+        joiner_secret,
+    )?;
 
     crypto_provider.derive_secret(cipher_suite, &extracted, b"welcome")
 }

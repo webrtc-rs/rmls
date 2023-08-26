@@ -335,7 +335,7 @@ impl RatchetTree {
         i: LeafIndex,
         node: Option<&LeafNode>,
     ) -> Result<()> {
-        buf.put_u8(1 /*NodeType::Leaf*/);
+        buf.put_u8(1); //NodeType::Leaf
         buf.put_u32(i.0);
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
@@ -350,7 +350,7 @@ impl RatchetTree {
         left_hash: &[u8],
         right_hash: &[u8],
     ) -> Result<()> {
-        buf.put_u8(2 /*NodeType::Parent*/);
+        buf.put_u8(2); //NodeType::Parent
         write_optional(node.is_some(), buf)?;
         if let Some(node) = node {
             node.write(buf)?;

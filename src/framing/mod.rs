@@ -1,4 +1,5 @@
 use bytes::{Buf, BufMut, Bytes};
+use rand::Rng;
 
 use crate::cipher_suite::CipherSuite;
 use crate::codec::*;
@@ -9,6 +10,7 @@ use crate::key_schedule::{ConfirmedTranscriptHashInput, GroupContext};
 use crate::messages::group_info::GroupInfo;
 use crate::messages::proposal::Proposal;
 use crate::messages::{Commit, Welcome};
+use crate::tree::secret_tree::RatchetSecret;
 use crate::tree::tree_math::LeafIndex;
 
 pub(crate) type ProtocolVersion = u16;
@@ -126,6 +128,16 @@ impl Writer for Content {
         }
 
         Ok(())
+    }
+}
+
+impl Content {
+    pub(crate) fn content_type(&self) -> ContentType {
+        match self {
+            Content::Application(_) => ContentType::Application,
+            Content::Proposal(_) => ContentType::Proposal,
+            Content::Commit(_) => ContentType::Commit,
+        }
     }
 }
 
@@ -319,60 +331,82 @@ pub struct MlsMessage {
     wire_format: WireFormat,
     message: WireFormatMessage,
 }
-/*
-func (msg *mlsMessage) unmarshal(s *cryptobyte.String) error {
-    *msg = mlsMessage{}
 
-    if !s.ReadUint16((*uint16)(&msg.version)) {
-        return io.ErrUnexpectedEOF
-    }
-    if msg.version != protocolVersionMLS10 {
-        return fmt.Errorf("mls: invalid protocol version %d", msg.version)
-    }
+impl Reader for MlsMessage {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 2 {
+            return Err(Error::BufferTooSmall);
+        }
+        self.version = buf.get_u16();
 
-    if err := msg.wire_format.unmarshal(s); err != nil {
-        return err
-    }
+        if self.version != PROTOCOL_VERSION_MLS10 {
+            return Err(Error::InvalidProtocolVersion(self.version));
+        }
 
-    switch msg.wire_format {
-    case wireFormatMLSPublicMessage:
-        msg.publicMessage = new(publicMessage)
-        return msg.publicMessage.unmarshal(s)
-    case wireFormatMLSPrivateMessage:
-        msg.privateMessage = new(privateMessage)
-        return msg.privateMessage.unmarshal(s)
-    case wireFormatMLSWelcome:
-        msg.welcome = new(welcome)
-        return msg.welcome.unmarshal(s)
-    case wireFormatMLSGroupInfo:
-        msg.groupInfo = new(groupInfo)
-        return msg.groupInfo.unmarshal(s)
-    case wireFormatMLSKeyPackage:
-        msg.keyPackage = new(keyPackage)
-        return msg.keyPackage.unmarshal(s)
-    default:
-        panic("unreachable")
+        self.wire_format.read(buf)?;
+
+        match self.wire_format {
+            WireFormat::PublicMessage => {
+                let mut message = PublicMessage::default();
+                message.read(buf)?;
+                self.message = WireFormatMessage::PublicMessage(message);
+            }
+            WireFormat::PrivateMessage => {
+                let mut message = PrivateMessage::default();
+                message.read(buf)?;
+                self.message = WireFormatMessage::PrivateMessage(message);
+            }
+            WireFormat::Welcome => {
+                let mut message = Welcome::default();
+                message.read(buf)?;
+                self.message = WireFormatMessage::Welcome(message);
+            }
+            WireFormat::GroupInfo => {
+                let mut message = GroupInfo::default();
+                message.read(buf)?;
+                self.message = WireFormatMessage::GroupInfo(message);
+            }
+            WireFormat::KeyPackage => {
+                let mut message = KeyPackage::default();
+                message.read(buf)?;
+                self.message = WireFormatMessage::KeyPackage(message);
+            }
+        }
+        Ok(())
     }
 }
-
-func (msg *mlsMessage) marshal(b *cryptobyte.Builder) {
-    b.AddUint16(uint16(msg.version))
-    msg.wire_format.marshal(b)
-    switch msg.wire_format {
-    case wireFormatMLSPublicMessage:
-        msg.publicMessage.marshal(b)
-    case wireFormatMLSPrivateMessage:
-        msg.privateMessage.marshal(b)
-    case wireFormatMLSWelcome:
-        msg.welcome.marshal(b)
-    case wireFormatMLSGroupInfo:
-        msg.groupInfo.marshal(b)
-    case wireFormatMLSKeyPackage:
-        msg.keyPackage.marshal(b)
-    default:
-        panic("unreachable")
+impl Writer for MlsMessage {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u16(self.version);
+        self.wire_format.write(buf)?;
+        match &self.message {
+            WireFormatMessage::PublicMessage(message) => {
+                message.write(buf)?;
+            }
+            WireFormatMessage::PrivateMessage(message) => {
+                message.write(buf)?;
+            }
+            WireFormatMessage::Welcome(message) => {
+                message.write(buf)?;
+            }
+            WireFormatMessage::GroupInfo(message) => {
+                message.write(buf)?;
+            }
+            WireFormatMessage::KeyPackage(message) => {
+                message.write(buf)?;
+            }
+        }
+        Ok(())
     }
-}*/
+}
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct AuthenticatedContent {
@@ -389,7 +423,7 @@ impl Reader for AuthenticatedContent {
     {
         self.wire_format.read(buf)?;
         self.content.read(buf)?;
-        self.auth.read(buf, &self.content.content)
+        self.auth.read(buf, self.content.content.content_type())
     }
 }
 
@@ -401,7 +435,7 @@ impl Writer for AuthenticatedContent {
     {
         self.wire_format.write(buf)?;
         self.content.write(buf)?;
-        self.auth.write(buf, &self.content.content)
+        self.auth.write(buf, self.content.content.content_type())
     }
 }
 
@@ -466,13 +500,13 @@ pub(crate) struct FramedContentAuthData {
 }
 
 impl FramedContentAuthData {
-    fn read<B>(&mut self, buf: &mut B, content: &Content) -> Result<()>
+    fn read<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
         self.signature = read_opaque_vec(buf)?;
-        if let Content::Commit(_) = content {
+        if ct == ContentType::Commit {
             self.confirmation_tag = Some(read_opaque_vec(buf)?);
         } else {
             self.confirmation_tag = None;
@@ -481,14 +515,14 @@ impl FramedContentAuthData {
         Ok(())
     }
 
-    fn write<B>(&self, buf: &mut B, content: &Content) -> Result<()>
+    fn write<B>(&self, buf: &mut B, ct: ContentType) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         write_opaque_vec(&self.signature, buf)?;
 
-        if let Content::Commit(_) = content {
+        if ct == ContentType::Commit {
             if let Some(confirmation_tag) = &self.confirmation_tag {
                 write_opaque_vec(confirmation_tag, buf)?;
             }
@@ -612,94 +646,147 @@ pub struct PublicMessage {
     membership_tag: Option<Bytes>, // for senderTypeMember
 }
 
-/*
-func signPublicMessage(cs cipherSuite, signKey []byte, content *framedContent, ctx *groupContext) (*publicMessage, error) {
-    authContent, err := sign_authenticated_content(cs, signKey, wireFormatMLSPublicMessage, content, ctx)
-    if err != nil {
-        return nil, err
-    }
-    return &publicMessage{
-        content: authContent.content,
-        auth:    authContent.auth,
-    }, nil
+fn sign_public_message(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sign_key: &[u8],
+    content: &FramedContent,
+    ctx: &GroupContext,
+) -> Result<PublicMessage> {
+    let auth_content = sign_authenticated_content(
+        crypto_provider,
+        cipher_suite,
+        sign_key,
+        WireFormat::PublicMessage,
+        content,
+        ctx,
+    )?;
+
+    Ok(PublicMessage {
+        content: auth_content.content,
+        auth: auth_content.auth,
+        membership_tag: None,
+    })
 }
 
-func (msg *publicMessage) unmarshal(s *cryptobyte.String) error {
-    *msg = publicMessage{}
+impl Reader for PublicMessage {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.content.read(buf)?;
+        self.auth.read(buf, self.content.content.content_type())?;
 
-    if err := msg.content.unmarshal(s); err != nil {
-        return err
-    }
-    if err := msg.auth.unmarshal(s, msg.content.content_type); err != nil {
-        return err
-    }
+        if let Sender::Member(_) = &self.content.sender {
+            self.membership_tag = Some(read_opaque_vec(buf)?);
+        }
 
-    if msg.content.sender.senderType == senderTypeMember {
-        if !readOpaqueVec(s, &msg.membership_tag) {
-            return io.ErrUnexpectedEOF
+        Ok(())
+    }
+}
+impl Writer for PublicMessage {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.content.write(buf)?;
+        self.auth.write(buf, self.content.content.content_type())?;
+
+        if let Sender::Member(_) = &self.content.sender {
+            if let Some(membership_tag) = &self.membership_tag {
+                write_opaque_vec(membership_tag, buf)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl PublicMessage {
+    fn authenticated_content(&self) -> AuthenticatedContent {
+        AuthenticatedContent {
+            wire_format: WireFormat::PublicMessage,
+            content: self.content.clone(),
+            auth: self.auth.clone(),
         }
     }
 
-    return nil
-}
+    fn authenticated_content_tbm(&self, ctx: &GroupContext) -> AuthenticatedContentTBM {
+        AuthenticatedContentTBM {
+            content_tbs: self.authenticated_content().framed_content_tbs(ctx),
+            auth: self.auth.clone(),
+        }
+    }
 
-func (msg *publicMessage) marshal(b *cryptobyte.Builder) {
-    msg.content.marshal(b)
-    msg.auth.marshal(b, msg.content.content_type)
+    fn sign_membership_tag(
+        &mut self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        membership_key: &[u8],
+        ctx: &GroupContext,
+    ) -> Result<()> {
+        match self.content.sender {
+            Sender::External(_) | Sender::NewMemberProposal | Sender::NewMemberCommit => {
+                return Ok(())
+            }
+            _ => {}
+        };
+        let raw_auth_content_tbm = write(&self.authenticated_content_tbm(ctx))?;
+        self.membership_tag =
+            Some(crypto_provider.sign_mac(cipher_suite, membership_key, &raw_auth_content_tbm));
+        Ok(())
+    }
 
-    if msg.content.sender.senderType == senderTypeMember {
-        writeOpaqueVec(b, msg.membership_tag)
+    fn verify_membership_tag(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        membership_key: &[u8],
+        ctx: &GroupContext,
+    ) -> bool {
+        match self.content.sender {
+            Sender::External(_) | Sender::NewMemberProposal | Sender::NewMemberCommit => {
+                return true;
+            }
+            _ => {}
+        };
+        if let Some(membership_tag) = &self.membership_tag {
+            let raw_auth_content_tbm = if let Ok(raw) = write(&self.authenticated_content_tbm(ctx))
+            {
+                raw
+            } else {
+                return false;
+            };
+            crypto_provider.verify_mac(
+                cipher_suite,
+                membership_key,
+                &raw_auth_content_tbm,
+                membership_tag,
+            )
+        } else {
+            true
+        }
     }
 }
-
-func (msg *publicMessage) authenticatedContent() *authenticatedContent {
-    return &authenticatedContent{
-        wire_format: wireFormatMLSPublicMessage,
-        content:    msg.content,
-        auth:       msg.auth,
-    }
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct AuthenticatedContentTBM {
+    content_tbs: FramedContentTBS,
+    auth: FramedContentAuthData,
 }
 
-func (msg *publicMessage) authenticatedContentTBM(ctx *groupContext) *authenticatedContentTBM {
-    return &authenticatedContentTBM{
-        contentTBS: *msg.authenticatedContent().framed_content_tbs(ctx),
-        auth:       msg.auth,
+impl Writer for AuthenticatedContentTBM {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.content_tbs.write(buf)?;
+        self.auth
+            .write(buf, self.content_tbs.content.content.content_type())
     }
 }
-
-func (msg *publicMessage) signMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) error {
-    if msg.content.sender.senderType != senderTypeMember {
-        return nil
-    }
-    rawAuthContentTBM, err := marshal(msg.authenticatedContentTBM(ctx))
-    if err != nil {
-        return err
-    }
-    msg.membership_tag = cs.signMAC(membershipKey, rawAuthContentTBM)
-    return nil
-}
-
-func (msg *publicMessage) verifyMembershipTag(cs cipherSuite, membershipKey []byte, ctx *groupContext) bool {
-    if msg.content.sender.senderType != senderTypeMember {
-        return true // there is no membership tag
-    }
-    rawAuthContentTBM, err := marshal(msg.authenticatedContentTBM(ctx))
-    if err != nil {
-        return false
-    }
-    return cs.verifyMAC(membershipKey, rawAuthContentTBM, msg.membership_tag)
-}
-
-type authenticatedContentTBM struct {
-    contentTBS framed_content_tbs
-    auth       framedContentAuthData
-}
-
-func (tbm *authenticatedContentTBM) marshal(b *cryptobyte.Builder) {
-    tbm.contentTBS.marshal(b)
-    tbm.auth.marshal(b, tbm.contentTBS.content.content_type)
-}
-*/
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PrivateMessage {
@@ -711,355 +798,407 @@ pub struct PrivateMessage {
     ciphertext: Bytes,
 }
 
-/*
-func encryptPrivateMessage(cs cipherSuite, signPriv []byte, secret ratchetSecret, senderDataSecret []byte, content *framedContent, senderData *senderData, ctx *groupContext) (*privateMessage, error) {
-    ciphertext, err := encryptPrivateMessageContent(cs, signPriv, secret, content, ctx, senderData.reuseGuard)
-    if err != nil {
-        return nil, err
-    }
-    encrypted_sender_data, err := encryptSenderData(cs, senderDataSecret, senderData, content, ciphertext)
-    if err != nil {
-        return nil, err
-    }
-    return &privateMessage{
-        group_id:             content.group_id,
-        epoch:               content.epoch,
-        content_type:         content.content_type,
-        authenticated_data:   content.authenticated_data,
-        encrypted_sender_data: encrypted_sender_data,
-        ciphertext:          ciphertext,
-    }, nil
+#[allow(clippy::too_many_arguments)]
+fn encrypt_private_message(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sign_priv: &[u8],
+    secret: &RatchetSecret,
+    sender_data_secret: &[u8],
+    content: &FramedContent,
+    sender_data: &SenderData,
+    ctx: &GroupContext,
+) -> Result<PrivateMessage> {
+    let ciphertext = encrypt_private_message_content(
+        crypto_provider,
+        cipher_suite,
+        sign_priv,
+        secret,
+        content,
+        ctx,
+        &sender_data.reuse_guard,
+    )?;
+    let encrypted_sender_data = encrypt_sender_data(
+        crypto_provider,
+        cipher_suite,
+        sender_data_secret,
+        sender_data,
+        content,
+        &ciphertext,
+    )?;
+
+    Ok(PrivateMessage {
+        group_id: content.group_id.clone(),
+        epoch: content.epoch,
+        content_type: content.content.content_type(),
+        authenticated_data: content.authenticated_data.clone(),
+        encrypted_sender_data,
+        ciphertext,
+    })
 }
 
-func (msg *privateMessage) unmarshal(s *cryptobyte.String) error {
-    *msg = privateMessage{}
-    ok := readOpaqueVec(s, (*[]byte)(&msg.group_id)) &&
-        s.ReadUint64(&msg.epoch)
-    if !ok {
-        return io.ErrUnexpectedEOF
-    }
-    if err := msg.content_type.unmarshal(s); err != nil {
-        return err
-    }
-    ok = readOpaqueVec(s, &msg.authenticated_data) &&
-        readOpaqueVec(s, &msg.encrypted_sender_data) &&
-        readOpaqueVec(s, &msg.ciphertext)
-    if !ok {
-        return io.ErrUnexpectedEOF
-    }
-    return nil
-}
-
-func (msg *privateMessage) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(msg.group_id))
-    b.AddUint64(msg.epoch)
-    msg.content_type.marshal(b)
-    writeOpaqueVec(b, msg.authenticated_data)
-    writeOpaqueVec(b, msg.encrypted_sender_data)
-    writeOpaqueVec(b, msg.ciphertext)
-}
-
-func (msg *privateMessage) decryptSenderData(cs cipherSuite, senderDataSecret []byte) (*senderData, error) {
-    key, err := expandSenderDataKey(cs, senderDataSecret, msg.ciphertext)
-    if err != nil {
-        return nil, err
-    }
-    nonce, err := expandSenderDataNonce(cs, senderDataSecret, msg.ciphertext)
-    if err != nil {
-        return nil, err
-    }
-
-    aad := senderDataAAD{
-        group_id:     msg.group_id,
-        epoch:       msg.epoch,
-        content_type: msg.content_type,
-    }
-    rawAAD, err := marshal(&aad)
-    if err != nil {
-        return nil, err
-    }
-
-    _, _, aead := cs.hpke().Params()
-    cipher, err := aead.New(key)
-    if err != nil {
-        return nil, err
-    }
-
-    rawSenderData, err := cipher.Open(nil, nonce, msg.encrypted_sender_data, rawAAD)
-    if err != nil {
-        return nil, err
-    }
-
-    var senderData senderData
-    if err := unmarshal(rawSenderData, &senderData); err != nil {
-        return nil, err
-    }
-
-    return &senderData, nil
-}
-
-func (msg *privateMessage) decryptContent(cs cipherSuite, secret ratchetSecret, reuseGuard [4]byte) (*privateMessageContent, error) {
-    key, nonce, err := derivePrivateMessageKeyAndNonce(cs, secret, reuseGuard)
-    if err != nil {
-        return nil, err
-    }
-
-    aad := privateContentAAD{
-        group_id:           msg.group_id,
-        epoch:             msg.epoch,
-        content_type:       msg.content_type,
-        authenticated_data: msg.authenticated_data,
-    }
-    rawAAD, err := marshal(&aad)
-    if err != nil {
-        return nil, err
-    }
-
-    _, _, aead := cs.hpke().Params()
-    cipher, err := aead.New(key)
-    if err != nil {
-        return nil, err
-    }
-
-    rawContent, err := cipher.Open(nil, nonce, msg.ciphertext, rawAAD)
-    if err != nil {
-        return nil, err
-    }
-
-    s := cryptobyte.String(rawContent)
-    var content privateMessageContent
-    if err := content.unmarshal(&s, msg.content_type); err != nil {
-        return nil, err
-    }
-
-    for _, v := range s {
-        if v != 0 {
-            return nil, fmt.Errorf("mls: padding contains non-zero bytes")
+impl Reader for PrivateMessage {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        self.group_id = read_opaque_vec(buf)?;
+        if buf.remaining() < 8 {
+            return Err(Error::BufferTooSmall);
         }
+        self.epoch = buf.get_u64();
+        self.content_type.read(buf)?;
+        self.authenticated_data = read_opaque_vec(buf)?;
+        self.encrypted_sender_data = read_opaque_vec(buf)?;
+        self.ciphertext = read_opaque_vec(buf)?;
+        Ok(())
     }
-
-    return &content, nil
 }
 
-func derivePrivateMessageKeyAndNonce(cs cipherSuite, secret ratchetSecret, reuseGuard [4]byte) (key, nonce []byte, err error) {
-    key, err = secret.deriveKey(cs)
-    if err != nil {
-        return nil, nil, err
+impl Writer for PrivateMessage {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        write_opaque_vec(&self.group_id, buf)?;
+        buf.put_u64(self.epoch);
+        self.content_type.write(buf)?;
+        write_opaque_vec(&self.authenticated_data, buf)?;
+        write_opaque_vec(&self.encrypted_sender_data, buf)?;
+        write_opaque_vec(&self.ciphertext, buf)
     }
-    nonce, err = secret.deriveNonce(cs)
-    if err != nil {
-        return nil, nil, err
-    }
-
-    for i := range reuseGuard {
-        nonce[i] = nonce[i] ^ reuseGuard[i]
-    }
-
-    return key, nonce, nil
 }
 
-func (msg *privateMessage) authenticatedContent(senderData *senderData, content *privateMessageContent) *authenticatedContent {
-    return &authenticatedContent{
-        wire_format: wireFormatMLSPrivateMessage,
-        content: framedContent{
-            group_id: msg.group_id,
-            epoch:   msg.epoch,
-            sender: sender{
-                senderType: senderTypeMember,
-                leafIndex:  senderData.leafIndex,
+impl PrivateMessage {
+    fn decrypt_sender_data(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        sender_data_secret: &[u8],
+    ) -> Result<SenderData> {
+        let key = expand_sender_data_key(
+            crypto_provider,
+            cipher_suite,
+            sender_data_secret,
+            &self.ciphertext,
+        )?;
+        let nonce = expand_sender_data_nonce(
+            crypto_provider,
+            cipher_suite,
+            sender_data_secret,
+            &self.ciphertext,
+        )?;
+
+        let aad = SenderDataAAD {
+            group_id: self.group_id.clone(),
+            epoch: self.epoch,
+            content_type: self.content_type,
+        };
+        let raw_aad = write(&aad)?;
+
+        let raw_sender_data = crypto_provider.hpke(cipher_suite).aead_open(
+            &key,
+            &nonce,
+            &self.encrypted_sender_data,
+            &raw_aad,
+        )?;
+        let mut sender_data = SenderData::default();
+        let mut buf = raw_sender_data.as_ref();
+        sender_data.read(&mut buf)?;
+        Ok(sender_data)
+    }
+
+    fn decrypt_content(
+        &self,
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        secret: &RatchetSecret,
+        reuse_guard: &[u8],
+    ) -> Result<PrivateMessageContent> {
+        let (key, nonce) = derive_private_message_key_and_nonce(
+            crypto_provider,
+            cipher_suite,
+            secret,
+            reuse_guard,
+        )?;
+
+        let aad = PrivateContentAAD {
+            group_id: self.group_id.clone(),
+            epoch: self.epoch,
+            content_type: self.content_type,
+            authenticated_data: self.authenticated_data.clone(),
+        };
+
+        let raw_aad = write(&aad)?;
+        let raw_content = crypto_provider.hpke(cipher_suite).aead_open(
+            &key,
+            &nonce,
+            &self.ciphertext,
+            &raw_aad,
+        )?;
+
+        let mut buf = raw_content.as_ref();
+        let mut content = PrivateMessageContent::default();
+        content.read(&mut buf, self.content_type)?;
+
+        while buf.has_remaining() {
+            if buf.get_u8() != 0 {
+                return Err(Error::PaddingContainsNonZeroBytes);
+            }
+        }
+
+        Ok(content)
+    }
+
+    fn authenticated_content(
+        &self,
+        sender_data: &SenderData,
+        content: &PrivateMessageContent,
+    ) -> AuthenticatedContent {
+        AuthenticatedContent {
+            wire_format: WireFormat::PrivateMessage,
+            content: FramedContent {
+                group_id: self.group_id.clone(),
+                epoch: self.epoch,
+                sender: Sender::Member(sender_data.leaf_index),
+                authenticated_data: self.authenticated_data.clone(),
+                content: content.content.clone(),
             },
-            authenticated_data: msg.authenticated_data,
-            content_type:       msg.content_type,
-            applicationData:   content.applicationData,
-            proposal:          content.proposal,
-            commit:            content.commit,
-        },
-        auth: content.auth,
-    }
-}
-
-type senderDataAAD struct {
-    group_id     GroupID
-    epoch       uint64
-    content_type content_type
-}
-
-func (aad *senderDataAAD) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(aad.group_id))
-    b.AddUint64(aad.epoch)
-    aad.content_type.marshal(b)
-}
-
-type privateContentAAD struct {
-    group_id           GroupID
-    epoch             uint64
-    content_type       content_type
-    authenticated_data []byte
-}
-
-func (aad *privateContentAAD) marshal(b *cryptobyte.Builder) {
-    writeOpaqueVec(b, []byte(aad.group_id))
-    b.AddUint64(aad.epoch)
-    aad.content_type.marshal(b)
-    writeOpaqueVec(b, aad.authenticated_data)
-}
-
-type privateMessageContent struct {
-    applicationData []byte    // for contentTypeApplication
-    proposal        *proposal // for contentTypeProposal
-    commit          *commit   // for contentTypeCommit
-
-    auth framedContentAuthData
-}
-
-func (content *privateMessageContent) unmarshal(s *cryptobyte.String, ct content_type) error {
-    *content = privateMessageContent{}
-
-    var err error
-    switch ct {
-    case contentTypeApplication:
-        if !readOpaqueVec(s, &content.applicationData) {
-            err = io.ErrUnexpectedEOF
+            auth: content.auth.clone(),
         }
-    case contentTypeProposal:
-        content.proposal = new(proposal)
-        err = content.proposal.unmarshal(s)
-    case contentTypeCommit:
-        content.commit = new(commit)
-        err = content.commit.unmarshal(s)
-    default:
-        panic("unreachable")
     }
-    if err != nil {
-        return err
-    }
-
-    return content.auth.unmarshal(s, ct)
+}
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct SenderDataAAD {
+    group_id: GroupID,
+    epoch: u64,
+    content_type: ContentType,
 }
 
-func (content *privateMessageContent) marshal(b *cryptobyte.Builder, ct content_type) {
-    switch ct {
-    case contentTypeApplication:
-        writeOpaqueVec(b, content.applicationData)
-    case contentTypeProposal:
-        content.proposal.marshal(b)
-    case contentTypeCommit:
-        content.commit.marshal(b)
-    default:
-        panic("unreachable")
+impl Writer for SenderDataAAD {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        write_opaque_vec(&self.group_id, buf)?;
+        buf.put_u64(self.epoch);
+        self.content_type.write(buf)
     }
-    content.auth.marshal(b, ct)
 }
 
-func encryptPrivateMessageContent(cs cipherSuite, signKey []byte, secret ratchetSecret, content *framedContent, ctx *groupContext, reuseGuard [4]byte) ([]byte, error) {
-    authContent, err := sign_authenticated_content(cs, signKey, wireFormatMLSPrivateMessage, content, ctx)
-    if err != nil {
-        return nil, err
-    }
-
-    privContent := privateMessageContent{
-        applicationData: content.applicationData,
-        proposal:        content.proposal,
-        commit:          content.commit,
-        auth:            authContent.auth,
-    }
-    var b cryptobyte.Builder
-    privContent.marshal(&b, content.content_type)
-    plaintext, err := b.Bytes()
-    if err != nil {
-        return nil, err
-    }
-
-    key, nonce, err := derivePrivateMessageKeyAndNonce(cs, secret, reuseGuard)
-    if err != nil {
-        return nil, err
-    }
-
-    aad := privateContentAAD{
-        group_id:           content.group_id,
-        epoch:             content.epoch,
-        content_type:       content.content_type,
-        authenticated_data: content.authenticated_data,
-    }
-    rawAAD, err := marshal(&aad)
-    if err != nil {
-        return nil, err
-    }
-
-    _, _, aead := cs.hpke().Params()
-    cipher, err := aead.New(key)
-    if err != nil {
-        return nil, err
-    }
-
-    return cipher.Seal(nil, nonce, plaintext, rawAAD), nil
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+struct PrivateContentAAD {
+    group_id: GroupID,
+    epoch: u64,
+    content_type: ContentType,
+    authenticated_data: Bytes,
 }
 
-func encryptSenderData(cs cipherSuite, senderDataSecret []byte, senderData *senderData, content *framedContent, ciphertext []byte) ([]byte, error) {
-    key, err := expandSenderDataKey(cs, senderDataSecret, ciphertext)
-    if err != nil {
-        return nil, err
+impl Writer for PrivateContentAAD {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        write_opaque_vec(&self.group_id, buf)?;
+        buf.put_u64(self.epoch);
+        self.content_type.write(buf)?;
+        write_opaque_vec(&self.authenticated_data, buf)
     }
-    nonce, err := expandSenderDataNonce(cs, senderDataSecret, ciphertext)
-    if err != nil {
-        return nil, err
-    }
-
-    aad := senderDataAAD{
-        group_id:     content.group_id,
-        epoch:       content.epoch,
-        content_type: content.content_type,
-    }
-    rawAAD, err := marshal(&aad)
-    if err != nil {
-        return nil, err
-    }
-
-    _, _, aead := cs.hpke().Params()
-    cipher, err := aead.New(key)
-    if err != nil {
-        return nil, err
-    }
-
-    rawSenderData, err := marshal(senderData)
-    if err != nil {
-        return nil, err
-    }
-
-    return cipher.Seal(nil, nonce, rawSenderData, rawAAD), nil
 }
 
-type senderData struct {
-    leafIndex  leafIndex
-    generation uint32
-    reuseGuard [4]byte
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct PrivateMessageContent {
+    content: Content,
+    auth: FramedContentAuthData,
 }
 
-func newSenderData(leafIndex leafIndex, generation uint32) (*senderData, error) {
-    data := senderData{
-        leafIndex:  leafIndex,
-        generation: generation,
+impl PrivateMessageContent {
+    fn read<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        match ct {
+            ContentType::Application => {
+                self.content = Content::Application(read_opaque_vec(buf)?);
+            }
+            ContentType::Proposal => {
+                let mut proposal = Proposal::default();
+                proposal.read(buf)?;
+                self.content = Content::Proposal(proposal);
+            }
+            ContentType::Commit => {
+                let mut commit = Commit::default();
+                commit.read(buf)?;
+                self.content = Content::Commit(commit);
+            }
+        };
+
+        self.auth.read(buf, ct)
     }
-    if _, err := rand.Read(data.reuseGuard[:]); err != nil {
-        return nil, err
+}
+
+impl Writer for PrivateMessageContent {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        match &self.content {
+            Content::Application(application) => write_opaque_vec(application, buf)?,
+            Content::Proposal(proposal) => proposal.write(buf)?,
+            Content::Commit(commit) => commit.write(buf)?,
+        }
+
+        self.auth.write(buf, self.content.content_type())
     }
-    return &data, nil
 }
 
-func (data *senderData) unmarshal(s *cryptobyte.String) error {
-    if !s.ReadUint32((*uint32)(&data.leafIndex)) || !s.ReadUint32(&data.generation) || !s.CopyBytes(data.reuseGuard[:]) {
-        return io.ErrUnexpectedEOF
+fn derive_private_message_key_and_nonce(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    secret: &RatchetSecret,
+    reuse_guard: &[u8],
+) -> Result<(Bytes, Bytes)> {
+    let key = secret.derive_key(crypto_provider, cipher_suite)?;
+    let mut nonce = secret.derive_nonce(crypto_provider, cipher_suite)?.to_vec();
+    if nonce.len() < reuse_guard.len() {
+        return Err(Error::NonceAndReuseGuardLenNotMatch);
     }
-    return nil
+
+    for i in 0..reuse_guard.len() {
+        nonce[i] ^= reuse_guard[i];
+    }
+
+    Ok((key, nonce.into()))
 }
 
-func (data *senderData) marshal(b *cryptobyte.Builder) {
-    b.AddUint32(uint32(data.leafIndex))
-    b.AddUint32(data.generation)
-    b.AddBytes(data.reuseGuard[:])
+pub(crate) fn encrypt_private_message_content(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sign_key: &[u8],
+    secret: &RatchetSecret,
+    content: &FramedContent,
+    ctx: &GroupContext,
+    reuse_guard: &[u8],
+) -> Result<Bytes> {
+    let auth_content = sign_authenticated_content(
+        crypto_provider,
+        cipher_suite,
+        sign_key,
+        WireFormat::PrivateMessage,
+        content,
+        ctx,
+    )?;
+
+    let priv_content = PrivateMessageContent {
+        content: content.content.clone(),
+        auth: auth_content.auth,
+    };
+
+    let plainttext = write(&priv_content)?;
+
+    let (key, nonce) =
+        derive_private_message_key_and_nonce(crypto_provider, cipher_suite, secret, reuse_guard)?;
+
+    let aad = PrivateContentAAD {
+        group_id: content.group_id.clone(),
+        epoch: content.epoch,
+        content_type: content.content.content_type(),
+        authenticated_data: content.authenticated_data.clone(),
+    };
+    let raw_aad = write(&aad)?;
+
+    crypto_provider
+        .hpke(cipher_suite)
+        .aead_seal(&key, &nonce, &plainttext, &raw_aad)
 }
 
-*/
+fn encrypt_sender_data(
+    crypto_provider: &impl CryptoProvider,
+    cipher_suite: CipherSuite,
+    sender_data_secret: &[u8],
+    sender_data: &SenderData,
+    content: &FramedContent,
+    ciphertext: &[u8],
+) -> Result<Bytes> {
+    let key = expand_sender_data_key(
+        crypto_provider,
+        cipher_suite,
+        sender_data_secret,
+        ciphertext,
+    )?;
+    let nonce = expand_sender_data_nonce(
+        crypto_provider,
+        cipher_suite,
+        sender_data_secret,
+        ciphertext,
+    )?;
+
+    let aad = SenderDataAAD {
+        group_id: content.group_id.clone(),
+        epoch: content.epoch,
+        content_type: content.content.content_type(),
+    };
+    let raw_aad = write(&aad)?;
+    let raw_sender_data = write(sender_data)?;
+
+    crypto_provider
+        .hpke(cipher_suite)
+        .aead_seal(&key, &nonce, &raw_sender_data, &raw_aad)
+}
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub(crate) struct SenderData {
+    leaf_index: LeafIndex,
+    generation: u32,
+    reuse_guard: [u8; 4],
+}
+
+impl SenderData {
+    pub(crate) fn new(leaf_index: LeafIndex, generation: u32) -> Self {
+        let mut reuse_guard: [u8; 4] = [0u8; 4];
+        rand::thread_rng().fill(&mut reuse_guard[..]);
+        Self {
+            leaf_index,
+            generation,
+            reuse_guard,
+        }
+    }
+}
+
+impl Reader for SenderData {
+    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 12 {
+            return Err(Error::BufferTooSmall);
+        }
+        self.leaf_index = LeafIndex(buf.get_u32());
+        self.generation = buf.get_u32();
+        buf.copy_to_slice(&mut self.reuse_guard);
+        Ok(())
+    }
+}
+
+impl Writer for SenderData {
+    fn write<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u32(self.leaf_index.0);
+        buf.put_u32(self.generation);
+        buf.put_slice(&self.reuse_guard);
+        Ok(())
+    }
+}
 
 pub(crate) fn expand_sender_data_key(
     crypto_provider: &impl CryptoProvider,

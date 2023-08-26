@@ -136,6 +136,12 @@ pub enum Error {
     ConfirmedTranscriptHashInputContainContentCommitOnly,
     #[error("senderTypeMember and senderTypeNewMemberCommit should have GroupContext")]
     SenderMemberAndNewMemberCommitNoGroupContext,
+    #[error("nonce and reuse_guard len not match")]
+    NonceAndReuseGuardLenNotMatch,
+    #[error("padding contains non-zero bytes")]
+    PaddingContainsNonZeroBytes,
+    #[error("invalid protocol version {0}")]
+    InvalidProtocolVersion(u16),
 
     #[error("parse int: {0}")]
     ParseInt(#[from] ParseIntError),

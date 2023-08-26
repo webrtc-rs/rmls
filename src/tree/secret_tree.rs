@@ -135,7 +135,7 @@ pub(crate) struct RatchetSecret {
 }
 
 impl RatchetSecret {
-    fn derive_nonce(
+    pub(crate) fn derive_nonce(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -151,7 +151,7 @@ impl RatchetSecret {
         )
     }
 
-    fn derive_key(
+    pub(crate) fn derive_key(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,

@@ -3,7 +3,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::error::*;
 use crate::key::schedule::*;
-use crate::messages::framing::*;
+use crate::message::framing::*;
 use crate::serde::*;
 use crate::tree::*;
 

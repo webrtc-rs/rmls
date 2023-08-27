@@ -7,10 +7,13 @@ use crate::crypto::{
 };
 use crate::error::*;
 use crate::key::schedule::GroupContext;
-use crate::messages::framing::{
-    encrypt_private_message, sign_public_message, Content, FramedContent, MlsMessage,
-    PrivateMessage, PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,
-    WireFormatMessage, PROTOCOL_VERSION_MLS10,
+use crate::message::{
+    framing::{
+        encrypt_private_message, sign_public_message, Content, FramedContent, PrivateMessage,
+        PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,
+        PROTOCOL_VERSION_MLS10,
+    },
+    Message, WireFormatMessage,
 };
 use crate::serde::serde_test::load_test_vector;
 use crate::serde::*;
@@ -37,7 +40,7 @@ fn welcome_test(
     _cipher_suite: CipherSuite,
     tc: &WelcomeTest,
 ) -> Result<()> {
-    let mut welcome_msg = MlsMessage::default();
+    let mut welcome_msg = Message::default();
     let mut buf = tc.welcome.as_ref();
     welcome_msg.deserialize(&mut buf)?;
     assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
@@ -47,7 +50,7 @@ fn welcome_test(
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let mut key_package_msg = MlsMessage::default();
+    let mut key_package_msg = Message::default();
     let mut buf = tc.key_package.as_ref();
     key_package_msg.deserialize(&mut buf)?;
     assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
@@ -154,7 +157,7 @@ fn test_message_protection_pub(
     want_raw: &[u8],
     raw_pub: &[u8],
 ) -> Result<()> {
-    let mut msg = MlsMessage::default();
+    let mut msg = Message::default();
     let mut buf = raw_pub;
     msg.deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PublicMessage);
@@ -211,7 +214,7 @@ fn test_message_protection_priv(
     want_raw: &[u8],
     raw_priv: &[u8],
 ) -> Result<()> {
-    let mut msg = MlsMessage::default();
+    let mut msg = Message::default();
     let mut buf = raw_priv;
     msg.deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PrivateMessage);

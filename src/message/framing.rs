@@ -3,13 +3,8 @@ use rand::Rng;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
-use crate::key::{
-    package::KeyPackage,
-    schedule::{ConfirmedTranscriptHashInput, GroupContext},
-};
-use crate::messages::group_info::GroupInfo;
-use crate::messages::proposal::Proposal;
-use crate::messages::{Commit, Welcome};
+use crate::key::schedule::{ConfirmedTranscriptHashInput, GroupContext};
+use crate::message::{proposal::Proposal, Commit};
 use crate::serde::*;
 use crate::tree::secret_tree::RatchetSecret;
 use crate::tree::tree_math::LeafIndex;
@@ -308,104 +303,6 @@ impl Serializer for FramedContent {
         self.sender.serialize(buf)?;
         serialize_opaque_vec(&self.authenticated_data, buf)?;
         self.content.serialize(buf)
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum WireFormatMessage {
-    PublicMessage(PublicMessage),
-    PrivateMessage(PrivateMessage),
-    Welcome(Welcome),
-    GroupInfo(GroupInfo),
-    KeyPackage(KeyPackage),
-}
-
-impl Default for WireFormatMessage {
-    fn default() -> Self {
-        WireFormatMessage::Welcome(Welcome::default())
-    }
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct MlsMessage {
-    version: ProtocolVersion,
-    pub(crate) wire_format: WireFormat,
-    pub(crate) message: WireFormatMessage,
-}
-
-impl Deserializer for MlsMessage {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        if buf.remaining() < 2 {
-            return Err(Error::BufferTooSmall);
-        }
-        self.version = buf.get_u16();
-
-        if self.version != PROTOCOL_VERSION_MLS10 {
-            return Err(Error::InvalidProtocolVersion(self.version));
-        }
-
-        self.wire_format.deserialize(buf)?;
-
-        match self.wire_format {
-            WireFormat::PublicMessage => {
-                let mut message = PublicMessage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::PublicMessage(message);
-            }
-            WireFormat::PrivateMessage => {
-                let mut message = PrivateMessage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::PrivateMessage(message);
-            }
-            WireFormat::Welcome => {
-                let mut message = Welcome::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::Welcome(message);
-            }
-            WireFormat::GroupInfo => {
-                let mut message = GroupInfo::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::GroupInfo(message);
-            }
-            WireFormat::KeyPackage => {
-                let mut message = KeyPackage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::KeyPackage(message);
-            }
-        }
-        Ok(())
-    }
-}
-impl Serializer for MlsMessage {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        buf.put_u16(self.version);
-        self.wire_format.serialize(buf)?;
-        match &self.message {
-            WireFormatMessage::PublicMessage(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::PrivateMessage(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::Welcome(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::GroupInfo(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::KeyPackage(message) => {
-                message.serialize(buf)?;
-            }
-        }
-        Ok(())
     }
 }
 

@@ -12,7 +12,7 @@ use crate::key::schedule::{
     SECRET_LABEL_EXTERNAL, SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION,
     SECRET_LABEL_SENDER_DATA,
 };
-use crate::messages::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
+use crate::message::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
 use crate::serde::{serde_test::load_test_vector, serialize, Deserializer};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

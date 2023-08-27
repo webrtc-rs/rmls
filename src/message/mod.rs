@@ -1,24 +1,29 @@
 #[cfg(test)]
 mod messages_test;
 
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::collections::HashSet;
+use std::iter::zip;
+
 pub mod external;
 pub mod framing;
 pub mod group_info;
 pub mod proposal;
 
-use crate::error::*;
-use crate::serde::*;
-use crate::tree::*;
-use proposal::*;
-use std::collections::HashSet;
-use std::iter::zip;
-
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HpkeCiphertext};
-use crate::key::{package::KeyPackageRef, schedule::extract_welcome_secret};
-use crate::messages::group_info::*;
+use crate::error::*;
+use crate::key::{
+    package::{KeyPackage, KeyPackageRef},
+    schedule::extract_welcome_secret,
+};
+use crate::message::{
+    framing::{PrivateMessage, ProtocolVersion, PublicMessage, WireFormat, PROTOCOL_VERSION_MLS10},
+    group_info::*,
+    proposal::*,
+};
+use crate::serde::*;
 use crate::tree::tree_math::LeafIndex;
-
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use crate::tree::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Commit {
@@ -322,5 +327,103 @@ impl Serializer for EncryptedGroupSecrets {
     {
         serialize_opaque_vec(&self.new_member, buf)?;
         self.encrypted_group_secrets.serialize(buf)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum WireFormatMessage {
+    PublicMessage(PublicMessage),
+    PrivateMessage(PrivateMessage),
+    Welcome(Welcome),
+    GroupInfo(GroupInfo),
+    KeyPackage(KeyPackage),
+}
+
+impl Default for WireFormatMessage {
+    fn default() -> Self {
+        WireFormatMessage::Welcome(Welcome::default())
+    }
+}
+
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct Message {
+    version: ProtocolVersion,
+    pub(crate) wire_format: WireFormat,
+    pub(crate) message: WireFormatMessage,
+}
+
+impl Deserializer for Message {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 2 {
+            return Err(Error::BufferTooSmall);
+        }
+        self.version = buf.get_u16();
+
+        if self.version != PROTOCOL_VERSION_MLS10 {
+            return Err(Error::InvalidProtocolVersion(self.version));
+        }
+
+        self.wire_format.deserialize(buf)?;
+
+        match self.wire_format {
+            WireFormat::PublicMessage => {
+                let mut message = PublicMessage::default();
+                message.deserialize(buf)?;
+                self.message = WireFormatMessage::PublicMessage(message);
+            }
+            WireFormat::PrivateMessage => {
+                let mut message = PrivateMessage::default();
+                message.deserialize(buf)?;
+                self.message = WireFormatMessage::PrivateMessage(message);
+            }
+            WireFormat::Welcome => {
+                let mut message = Welcome::default();
+                message.deserialize(buf)?;
+                self.message = WireFormatMessage::Welcome(message);
+            }
+            WireFormat::GroupInfo => {
+                let mut message = GroupInfo::default();
+                message.deserialize(buf)?;
+                self.message = WireFormatMessage::GroupInfo(message);
+            }
+            WireFormat::KeyPackage => {
+                let mut message = KeyPackage::default();
+                message.deserialize(buf)?;
+                self.message = WireFormatMessage::KeyPackage(message);
+            }
+        }
+        Ok(())
+    }
+}
+impl Serializer for Message {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u16(self.version);
+        self.wire_format.serialize(buf)?;
+        match &self.message {
+            WireFormatMessage::PublicMessage(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormatMessage::PrivateMessage(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormatMessage::Welcome(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormatMessage::GroupInfo(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormatMessage::KeyPackage(message) => {
+                message.serialize(buf)?;
+            }
+        }
+        Ok(())
     }
 }

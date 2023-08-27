@@ -1,13 +1,10 @@
-#[cfg(test)]
-mod secret_tree_test;
-
 use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::{Display, Formatter};
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider};
 use crate::error::*;
 use crate::message::framing::*;
-use crate::tree::tree_math::*;
+use crate::tree::math::*;
 
 const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";
 const RATCHET_LABEL_APPLICATION_STR: &str = "application";

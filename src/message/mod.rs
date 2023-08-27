@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod messages_test;
+mod message_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
@@ -22,7 +22,7 @@ use crate::message::{
     proposal::*,
 };
 use crate::serde::*;
-use crate::tree::tree_math::LeafIndex;
+use crate::tree::math::LeafIndex;
 use crate::tree::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

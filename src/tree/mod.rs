@@ -1,9 +1,13 @@
 #[cfg(test)]
+mod secret_tree_test;
+#[cfg(test)]
+mod tree_math_test;
+#[cfg(test)]
 mod tree_test;
 
-pub(crate) mod ratchet_tree;
-pub(crate) mod secret_tree;
-pub(crate) mod tree_math;
+pub(crate) mod math;
+pub(crate) mod ratchet;
+pub(crate) mod secret;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
@@ -14,7 +18,7 @@ use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::error::*;
 use crate::message::{framing::*, proposal::*};
 use crate::serde::*;
-use tree_math::*;
+use crate::tree::math::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ParentNode {

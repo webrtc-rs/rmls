@@ -6,7 +6,7 @@ use crate::key::schedule::{
     GroupContext, PreSharedKeyID, Psk, ResumptionPSKUsage, SECRET_LABEL_CONFIRM,
 };
 use crate::serde::*;
-use crate::tree::tree_math::LeafIndex;
+use crate::tree::math::LeafIndex;
 use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

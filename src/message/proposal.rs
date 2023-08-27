@@ -3,7 +3,7 @@ use crate::error::*;
 use crate::key::{package::KeyPackage, schedule::PreSharedKeyID};
 use crate::message::framing::{GroupID, ProtocolVersion};
 use crate::serde::{deserialize_opaque_vec, serialize_opaque_vec, Deserializer, Serializer};
-use crate::tree::tree_math::LeafIndex;
+use crate::tree::math::LeafIndex;
 use crate::tree::{deserialize_extensions, serialize_extensions, Extension, LeafNode};
 
 use bytes::{Buf, BufMut, Bytes};

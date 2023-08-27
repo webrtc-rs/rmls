@@ -4,7 +4,7 @@ use crate::crypto::{
 };
 use crate::error::*;
 use crate::serde::serde_test::*;
-use crate::tree::secret_tree::derive_tree_secret;
+use crate::tree::secret::derive_tree_secret;
 
 use serde::{Deserialize, Serialize};
 

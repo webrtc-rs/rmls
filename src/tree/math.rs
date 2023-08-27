@@ -18,9 +18,6 @@
 //
 //    Leaf: 0     1     2     3     4     5     6     7
 
-#[cfg(test)]
-mod tree_math_test;
-
 use crate::error::{Error, Result};
 use serde::{Deserialize, Serialize};
 

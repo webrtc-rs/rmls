@@ -17,10 +17,8 @@ use crate::message::{
 };
 use crate::serde::serde_test::load_test_vector;
 use crate::serde::*;
-use crate::tree::secret_tree::{
-    derive_secret_tree, ratchet_label_from_content_type, RatchetSecret,
-};
-use crate::tree::tree_math::{LeafIndex, NumLeaves};
+use crate::tree::math::{LeafIndex, NumLeaves};
+use crate::tree::secret::{derive_secret_tree, ratchet_label_from_content_type, RatchetSecret};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {

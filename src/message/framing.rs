@@ -6,8 +6,8 @@ use crate::error::*;
 use crate::key::schedule::{ConfirmedTranscriptHashInput, GroupContext};
 use crate::message::{proposal::Proposal, Commit};
 use crate::serde::*;
-use crate::tree::secret_tree::RatchetSecret;
-use crate::tree::tree_math::LeafIndex;
+use crate::tree::math::LeafIndex;
+use crate::tree::secret::RatchetSecret;
 
 pub(crate) type ProtocolVersion = u16;
 

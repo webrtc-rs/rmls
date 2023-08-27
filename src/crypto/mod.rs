@@ -17,7 +17,7 @@ pub(crate) type SignaturePublicKey = Bytes;
 #[repr(u16)]
 pub enum CredentialType {
     #[default]
-    Basic = 0x0001, //TODO(yngrtc): use enum for Credential
+    Basic = 0x0001,
     X509 = 0x0002,
     Unknown(u16),
 }
@@ -42,11 +42,16 @@ impl From<CredentialType> for u16 {
     }
 }
 
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Credential {
-    pub(crate) credential_type: CredentialType,
-    identity: Bytes,          // for credentialTypeBasic
-    certificates: Vec<Bytes>, // for credentialTypeX509
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum Credential {
+    Basic(Bytes),
+    X509(Vec<Bytes>),
+}
+
+impl Default for Credential {
+    fn default() -> Self {
+        Self::Basic(Bytes::new())
+    }
 }
 
 impl Deserializer for Credential {
@@ -59,18 +64,10 @@ impl Deserializer for Credential {
             return Err(Error::BufferTooSmall);
         }
         let credential_type = buf.get_u16().into();
-        let mut identity = Bytes::new();
         let mut certificates = vec![];
 
         match credential_type {
-            CredentialType::Basic => {
-                identity = deserialize_opaque_vec(buf)?;
-                Ok(Self {
-                    credential_type,
-                    identity,
-                    certificates,
-                })
-            }
+            CredentialType::Basic => Ok(Self::Basic(deserialize_opaque_vec(buf)?)),
             CredentialType::X509 => {
                 deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
                     let cert = deserialize_opaque_vec(b)?;
@@ -78,11 +75,7 @@ impl Deserializer for Credential {
                     Ok(())
                 })?;
 
-                Ok(Self {
-                    credential_type,
-                    identity,
-                    certificates,
-                })
+                Ok(Self::X509(certificates))
             }
             _ => Err(Error::InvalidCredentialTypeValue),
         }
@@ -95,17 +88,25 @@ impl Serializer for Credential {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.credential_type.into());
-        match self.credential_type {
-            CredentialType::Basic => serialize_opaque_vec(&self.identity, buf),
-            CredentialType::X509 => serialize_vector(
-                self.certificates.len(),
+        buf.put_u16(self.credential_type().into());
+        match self {
+            Credential::Basic(identity) => serialize_opaque_vec(identity, buf),
+            Credential::X509(certificates) => serialize_vector(
+                certificates.len(),
                 buf,
                 |i: usize, b: &mut BytesMut| -> Result<()> {
-                    serialize_opaque_vec(&self.certificates[i], b)
+                    serialize_opaque_vec(&certificates[i], b)
                 },
             ),
-            _ => Err(Error::InvalidCredentialTypeValue),
+        }
+    }
+}
+
+impl Credential {
+    pub fn credential_type(&self) -> CredentialType {
+        match self {
+            Credential::Basic(_) => CredentialType::Basic,
+            Credential::X509(_) => CredentialType::X509,
         }
     }
 }

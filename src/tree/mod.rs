@@ -574,10 +574,10 @@ impl LeafNode {
 
         if !options
             .supported_creds
-            .contains(&self.credential.credential_type)
+            .contains(&self.credential.credential_type())
         {
             return Err(Error::CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(
-                self.credential.credential_type.into(),
+                self.credential.credential_type().into(),
             ));
         }
 

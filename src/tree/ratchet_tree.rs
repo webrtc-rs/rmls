@@ -1,4 +1,4 @@
-use crate::key_schedule::GroupContext;
+use crate::key::schedule::GroupContext;
 use crate::serde::*;
 use crate::tree::*;
 

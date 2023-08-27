@@ -6,7 +6,7 @@ use crate::crypto::{
     provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
 };
 use crate::error::*;
-use crate::key_schedule::{
+use crate::key::schedule::{
     extract_psk_secret, extract_welcome_secret, next_interim_transcript_hash, GroupContext,
     PreSharedKeyID, Psk, SECRET_LABEL_CONFIRM, SECRET_LABEL_ENCRYPTION, SECRET_LABEL_EXPORTER,
     SECRET_LABEL_EXTERNAL, SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION,

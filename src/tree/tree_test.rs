@@ -1,7 +1,7 @@
 use super::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
-use crate::key_schedule::GroupContext;
+use crate::key::schedule::GroupContext;
 use crate::serde::serde_test::load_test_vector;
 use crate::tree::ratchet_tree::RatchetTree;
 

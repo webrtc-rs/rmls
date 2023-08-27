@@ -6,7 +6,7 @@ use crate::crypto::{
     provider::{ring::RingCryptoProvider, CryptoProvider},
 };
 use crate::error::*;
-use crate::key_schedule::GroupContext;
+use crate::key::schedule::GroupContext;
 use crate::messages::framing::{
     encrypt_private_message, sign_public_message, Content, FramedContent, MlsMessage,
     PrivateMessage, PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,

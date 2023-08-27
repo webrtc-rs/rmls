@@ -3,8 +3,10 @@ use rand::Rng;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
-use crate::key_package::KeyPackage;
-use crate::key_schedule::{ConfirmedTranscriptHashInput, GroupContext};
+use crate::key::{
+    package::KeyPackage,
+    schedule::{ConfirmedTranscriptHashInput, GroupContext},
+};
 use crate::messages::group_info::GroupInfo;
 use crate::messages::proposal::Proposal;
 use crate::messages::{Commit, Welcome};

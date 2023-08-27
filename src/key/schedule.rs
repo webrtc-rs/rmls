@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod key_schedule_test;
-
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::messages::framing::{
@@ -68,7 +65,7 @@ impl Serializer for GroupContext {
 }
 
 impl GroupContext {
-    fn extract_joiner_secret(
+    pub(crate) fn extract_joiner_secret(
         &self,
         crypto_provider: &impl CryptoProvider,
         prev_init_secret: &[u8],
@@ -200,7 +197,7 @@ impl Serializer for ConfirmedTranscriptHashInput {
 }
 
 impl ConfirmedTranscriptHashInput {
-    fn hash(
+    pub(crate) fn hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -301,7 +298,7 @@ impl Default for Psk {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct PreSharedKeyID {
     pub(crate) psk: Psk,
-    psk_nonce: Bytes,
+    pub(crate) psk_nonce: Bytes,
 }
 
 impl Deserializer for PreSharedKeyID {
@@ -360,7 +357,7 @@ impl Serializer for PreSharedKeyID {
     }
 }
 
-fn extract_psk_secret(
+pub(crate) fn extract_psk_secret(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     psk_ids: &[PreSharedKeyID],

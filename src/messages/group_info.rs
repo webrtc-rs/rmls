@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
-use crate::key_schedule::{
+use crate::key::schedule::{
     GroupContext, PreSharedKeyID, Psk, ResumptionPSKUsage, SECRET_LABEL_CONFIRM,
 };
 use crate::serde::*;

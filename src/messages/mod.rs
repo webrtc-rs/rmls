@@ -14,8 +14,7 @@ use std::collections::HashSet;
 use std::iter::zip;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HpkeCiphertext};
-use crate::key_package::KeyPackageRef;
-use crate::key_schedule::extract_welcome_secret;
+use crate::key::{package::KeyPackageRef, schedule::extract_welcome_secret};
 use crate::messages::group_info::*;
 use crate::tree::tree_math::LeafIndex;
 

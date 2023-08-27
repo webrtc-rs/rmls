@@ -1,7 +1,6 @@
 use crate::crypto::cipher_suite::CipherSuite;
 use crate::error::*;
-use crate::key_package::KeyPackage;
-use crate::key_schedule::PreSharedKeyID;
+use crate::key::{package::KeyPackage, schedule::PreSharedKeyID};
 use crate::messages::framing::{GroupID, ProtocolVersion};
 use crate::serde::{deserialize_opaque_vec, serialize_opaque_vec, Deserializer, Serializer};
 use crate::tree::tree_math::LeafIndex;

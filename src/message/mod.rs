@@ -107,7 +107,6 @@ pub fn verify_proposal_list(
                     return Err(Error::MultipleAddProposalsHaveTheSameSignatureKey);
                 }
                 add_proposals.insert(proposal.key_package.leaf_node.signature_key.clone());
-                //TODO:(yngrtc) optimize it
             }
 
             Proposal::Update(_) => {

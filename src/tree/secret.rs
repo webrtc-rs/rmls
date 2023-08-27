@@ -86,7 +86,6 @@ impl SecretTree {
         Ok(())
     }
 
-    //TODO(yngrtc): really Option<&Option<Bytes>>?
     fn get(&self, ni: NodeIndex) -> Option<&Option<Bytes>> {
         self.0.get(ni.0 as usize)
     }

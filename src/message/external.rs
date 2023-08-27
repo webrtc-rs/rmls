@@ -1,1 +1,1 @@
-//TODO(yngrtc): add external proposals
+//TODO: add external proposals

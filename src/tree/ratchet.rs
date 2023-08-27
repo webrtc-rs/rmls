@@ -680,7 +680,7 @@ impl RatchetTree {
         // Apply all update proposals
         for (i, prop) in proposals.iter().enumerate() {
             if let Proposal::Update(update) = prop {
-                self.update(senders[i], update.leaf_node.clone()); //TODO(yngrtc): optimize it
+                self.update(senders[i], update.leaf_node.clone());
             }
         }
 
@@ -694,7 +694,7 @@ impl RatchetTree {
         // Apply all add proposals
         for prop in proposals {
             if let Proposal::Add(add) = prop {
-                self.add(add.key_package.leaf_node.clone()); //TODO(yngrtc): optimize it
+                self.add(add.key_package.leaf_node.clone());
             }
         }
     }

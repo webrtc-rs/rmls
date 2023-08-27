@@ -1,7 +1,7 @@
 pub mod ring;
 pub mod rust;
 
-use crate::cipher_suite::CipherSuite;
+use crate::crypto::cipher_suite::CipherSuite;
 use crate::error::*;
 use crate::serde::*;
 

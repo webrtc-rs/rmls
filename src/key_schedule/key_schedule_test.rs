@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::cipher_suite::CipherSuite;
-use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
+use crate::crypto::{
+    cipher_suite::CipherSuite,
+    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
+};
 use crate::error::*;
 use crate::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
 use crate::key_schedule::{

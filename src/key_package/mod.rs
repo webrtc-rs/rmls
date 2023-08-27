@@ -1,8 +1,6 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::cipher_suite::*;
-use crate::crypto::provider::CryptoProvider;
-use crate::crypto::*;
+use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::error::*;
 use crate::framing::*;
 use crate::key_schedule::*;

@@ -4,8 +4,7 @@ mod secret_tree_test;
 use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::{Display, Formatter};
 
-use crate::cipher_suite::*;
-use crate::crypto::provider::CryptoProvider;
+use crate::crypto::{cipher_suite::*, provider::CryptoProvider};
 use crate::error::*;
 use crate::framing::*;
 use crate::tree::tree_math::*;

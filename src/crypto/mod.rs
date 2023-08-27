@@ -1,8 +1,12 @@
+#[cfg(test)]
+mod crypto_test;
+
 use crate::error::*;
 use crate::serde::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+pub mod cipher_suite;
 pub mod provider;
 
 pub(crate) type HpkePublicKey = Bytes;

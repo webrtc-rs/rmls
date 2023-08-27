@@ -1,7 +1,6 @@
 #![warn(rust_2018_idioms)]
 #![allow(dead_code)]
 
-pub mod cipher_suite;
 pub mod crypto;
 pub mod error;
 pub(crate) mod framing;

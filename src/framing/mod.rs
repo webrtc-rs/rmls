@@ -1,8 +1,7 @@
 use bytes::{Buf, BufMut, Bytes};
 use rand::Rng;
 
-use crate::cipher_suite::CipherSuite;
-use crate::crypto::provider::CryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::key_package::KeyPackage;
 use crate::key_schedule::{ConfirmedTranscriptHashInput, GroupContext};

@@ -1,5 +1,7 @@
-use super::*;
-use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
+use crate::crypto::{
+    cipher_suite::CipherSuite,
+    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
+};
 use crate::error::*;
 use crate::serde::serde_test::*;
 use crate::tree::secret_tree::derive_tree_secret;

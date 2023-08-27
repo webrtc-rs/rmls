@@ -1,4 +1,4 @@
-use crate::cipher_suite::CipherSuite;
+use crate::crypto::cipher_suite::CipherSuite;
 use crate::error::*;
 use crate::framing::{GroupID, ProtocolVersion};
 use crate::key_package::KeyPackage;

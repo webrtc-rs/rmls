@@ -1,8 +1,7 @@
 #[cfg(test)]
 mod key_schedule_test;
 
-use crate::cipher_suite::CipherSuite;
-use crate::crypto::provider::CryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::framing::{
     Content, FramedContent, GroupID, ProtocolVersion, WireFormat, PROTOCOL_VERSION_MLS10,

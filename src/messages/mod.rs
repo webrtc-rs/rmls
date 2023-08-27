@@ -12,9 +12,7 @@ use proposal::*;
 use std::collections::HashSet;
 use std::iter::zip;
 
-use crate::cipher_suite::CipherSuite;
-use crate::crypto::provider::CryptoProvider;
-use crate::crypto::HpkeCiphertext;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HpkeCiphertext};
 use crate::key_package::KeyPackageRef;
 use crate::key_schedule::extract_welcome_secret;
 use crate::messages::group_info::*;

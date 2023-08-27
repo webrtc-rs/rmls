@@ -1,8 +1,10 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::cipher_suite::CipherSuite;
-use crate::crypto::provider::{ring::RingCryptoProvider, CryptoProvider};
+use crate::crypto::{
+    cipher_suite::CipherSuite,
+    provider::{ring::RingCryptoProvider, CryptoProvider},
+};
 use crate::error::*;
 use crate::framing::{
     encrypt_private_message, sign_public_message, Content, FramedContent, MlsMessage,

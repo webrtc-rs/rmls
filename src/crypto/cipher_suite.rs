@@ -1,6 +1,3 @@
-#[cfg(test)]
-mod cipher_suite_test;
-
 use crate::error::*;
 
 use std::fmt::{Display, Formatter};

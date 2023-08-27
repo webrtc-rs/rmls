@@ -10,9 +10,7 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::cipher_suite::*;
-use crate::crypto::provider::CryptoProvider;
-use crate::crypto::*;
+use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::error::*;
 use crate::framing::*;
 use crate::messages::proposal::*;

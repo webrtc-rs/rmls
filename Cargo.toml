@@ -7,7 +7,7 @@ description = "MLS in Rust"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/rmls"
 homepage = "https://rmls.io"
-repository = "https://github.com/ngr-tc/rmls"
+repository = "https://github.com/webrtc-rs/rmls"
 
 [features]
 default = ["RustCryptoProvider"] #["RingCryptoProvider"]#,

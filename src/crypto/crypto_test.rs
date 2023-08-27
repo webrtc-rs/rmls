@@ -82,7 +82,7 @@ fn test_derive_secret(
     tc: &DeriveSecretTest,
 ) -> Result<()> {
     let out = crypto_provider.derive_secret(cipher_suite, &tc.secret, tc.label.as_bytes())?;
-    assert_eq!(out.as_ref(), &tc.out,);
+    assert_eq!(out.as_ref(), &tc.out);
     Ok(())
 }
 
@@ -110,7 +110,7 @@ fn test_derive_tree_secret(
         tc.generation,
         tc.length,
     )?;
-    assert_eq!(out.as_ref(), &tc.out,);
+    assert_eq!(out.as_ref(), &tc.out);
     Ok(())
 }
 

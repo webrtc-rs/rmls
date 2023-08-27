@@ -157,7 +157,7 @@ impl RatchetTree {
     //
     //   - It doesn't check that credentials are valid.
     //   - It doesn't check the lifetime field.
-    fn verify_integrity(
+    pub(crate) fn verify_integrity(
         &self,
         crypto_provider: &impl CryptoProvider,
         ctx: &GroupContext,
@@ -281,7 +281,7 @@ impl RatchetTree {
                     }
                 }
             }
-            RatchetTree::marshal_leaf_node_hash_input(&mut buf, li, l)?;
+            RatchetTree::serialize_leaf_node_hash_input(&mut buf, li, l)?;
         } else {
             let (left, right, ok) = x.children();
             if !ok {
@@ -317,7 +317,7 @@ impl RatchetTree {
                 None
             };
 
-            RatchetTree::marshal_parent_node_hash_input(
+            RatchetTree::serialize_parent_node_hash_input(
                 &mut buf,
                 p,
                 left_hash.as_ref(),
@@ -330,7 +330,7 @@ impl RatchetTree {
         Ok(h.digest(&input))
     }
 
-    fn marshal_leaf_node_hash_input<B: BufMut>(
+    fn serialize_leaf_node_hash_input<B: BufMut>(
         buf: &mut B,
         i: LeafIndex,
         node: Option<&LeafNode>,
@@ -344,7 +344,7 @@ impl RatchetTree {
         Ok(())
     }
 
-    fn marshal_parent_node_hash_input<B: BufMut>(
+    fn serialize_parent_node_hash_input<B: BufMut>(
         buf: &mut B,
         node: Option<&ParentNode>,
         left_hash: &[u8],
@@ -446,7 +446,7 @@ impl RatchetTree {
         NumLeaves::new(self.0.len() as u32)
     }
 
-    fn find_leaf(&self, node: &LeafNode) -> (LeafIndex, bool) {
+    pub(crate) fn find_leaf(&self, node: &LeafNode) -> (LeafIndex, bool) {
         for li in 0..self.num_leaves().0 {
             if let Some(n) = self.get_leaf(LeafIndex(li)) {
                 // Encryption keys are unique
@@ -588,7 +588,7 @@ impl RatchetTree {
         crypto_provide: &impl CryptoProvider,
         cipher_suite: CipherSuite,
         sender_leaf_index: LeafIndex,
-        path: UpdatePath,
+        path: &UpdatePath,
     ) -> Result<()> {
         let sender_node_index = sender_leaf_index.node_index();
         let num_leaves = self.num_leaves();
@@ -671,12 +671,12 @@ impl RatchetTree {
             return Err(Error::ParentHashMismatchForUpdatePathLeafNode);
         }
 
-        self.set(sender_node_index, Some(Node::Leaf(path.leaf_node)));
+        self.set(sender_node_index, Some(Node::Leaf(path.leaf_node.clone())));
 
         Ok(())
     }
 
-    fn apply(&mut self, proposals: &[Proposal], senders: &[LeafIndex]) {
+    pub(crate) fn apply(&mut self, proposals: &[Proposal], senders: &[LeafIndex]) {
         // Apply all update proposals
         for (i, prop) in proposals.iter().enumerate() {
             if let Proposal::Update(update) = prop {

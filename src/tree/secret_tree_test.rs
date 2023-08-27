@@ -55,7 +55,7 @@ fn secret_tree_test(
         &tc.sender_data.sender_data_secret,
         &tc.sender_data.ciphertext,
     )?;
-    assert_eq!(&key, &tc.sender_data.key,);
+    assert_eq!(&key, &tc.sender_data.key);
 
     let nonce = expand_sender_data_nonce(
         crypto_provider,
@@ -63,7 +63,7 @@ fn secret_tree_test(
         &tc.sender_data.sender_data_secret,
         &tc.sender_data.ciphertext,
     )?;
-    assert_eq!(&nonce, &tc.sender_data.nonce,);
+    assert_eq!(&nonce, &tc.sender_data.nonce);
 
     let tree = derive_secret_tree(
         crypto_provider,
@@ -120,10 +120,10 @@ fn test_ratchet_secret(
         };
 
         let key = secret.derive_key(crypto_provider, cipher_suite)?;
-        assert_eq!(&key, &want_key,);
+        assert_eq!(&key, &want_key);
 
         let nonce = secret.derive_nonce(crypto_provider, cipher_suite)?;
-        assert_eq!(&nonce, &want_nonce,);
+        assert_eq!(&nonce, &want_nonce);
     }
 
     Ok(())

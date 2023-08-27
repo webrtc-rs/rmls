@@ -11,10 +11,10 @@ use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupInfo {
-    group_context: GroupContext,
-    extensions: Vec<Extension>,
+    pub(crate) group_context: GroupContext,
+    pub(crate) extensions: Vec<Extension>,
     confirmation_tag: Bytes,
-    signer: LeafIndex,
+    pub(crate) signer: LeafIndex,
     signature: Bytes,
 }
 
@@ -115,8 +115,8 @@ impl GroupInfo {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupSecrets {
     pub(crate) joiner_secret: Bytes,
-    path_secret: Option<Bytes>,
-    psk_ids: Vec<PreSharedKeyID>,
+    pub(crate) path_secret: Option<Bytes>,
+    pub(crate) psk_ids: Vec<PreSharedKeyID>,
 }
 
 impl Deserializer for GroupSecrets {
@@ -172,7 +172,7 @@ impl Serializer for GroupSecrets {
 impl GroupSecrets {
     // verifySingleReInitOrBranchPSK verifies that at most one key has type
     // resumption with usage reinit or branch.
-    fn verify_single_reinit_or_branch_psk(&self) -> bool {
+    pub(crate) fn verify_single_reinit_or_branch_psk(&self) -> bool {
         let mut n = 0;
         for psk in &self.psk_ids {
             if let Psk::Resumption(resumption) = &psk.psk {

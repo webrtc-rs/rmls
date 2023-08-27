@@ -18,10 +18,10 @@ struct TreeMathTest {
 fn tree_math_test(tc: TreeMathTest) {
     let n = tc.n_leaves;
     let w = n.width();
-    assert_eq!(w, tc.n_nodes, "width({:?}) = {}, want {}", n, w, tc.n_nodes);
+    assert_eq!(w, tc.n_nodes);
 
     let r = n.root();
-    assert_eq!(r, tc.root, "root({:?}) = {:?}, want {:?}", n, r, tc.root);
+    assert_eq!(r, tc.root);
 
     for (i, want) in tc.left.iter().enumerate() {
         let x = NodeIndex(i as u32);

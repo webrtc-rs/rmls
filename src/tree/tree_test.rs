@@ -36,18 +36,14 @@ fn tree_validation_test(
     for (i, want) in tc.resolutions.iter().enumerate() {
         let x = NodeIndex(i as u32);
         let res = tree.resolve(x);
-        assert_eq!(&res, want, "resolve({:?}) = {:?}, want {:?}", x, res, want);
+        assert_eq!(&res, want);
     }
 
     let exclude = HashSet::new();
     for (i, want) in tc.tree_hashes.iter().enumerate() {
         let x = NodeIndex(i as u32);
         let h = tree.compute_tree_hash(crypto_provider, cipher_suite, x, &exclude)?;
-        assert_eq!(
-            &h, &want.0,
-            "computeTreeHash({:?}) = {:?}, want {:?}",
-            x, h, want
-        );
+        assert_eq!(&h, &want.0);
     }
 
     assert!(
@@ -167,15 +163,11 @@ fn tree_kem_test(
             crypto_provider,
             cipher_suite,
             LeafIndex(update_path_test.sender),
-            up,
+            &up,
         )?;
 
         let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
-        assert_eq!(
-            &tree_hash, &update_path_test.tree_hash_after,
-            "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
-            tree_hash, update_path_test.tree_hash_after
-        );
+        assert_eq!(&tree_hash, &update_path_test.tree_hash_after);
 
         // TODO: create and verify new update path
     }
@@ -236,11 +228,7 @@ fn tree_operations_test(
     let mut tree = RatchetTree::deserialize_exact(&tc.tree_before)?;
 
     let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
-    assert_eq!(
-        &tree_hash, &tc.tree_hash_before,
-        "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
-        tree_hash, tc.tree_hash_before
-    );
+    assert_eq!(&tree_hash, &tc.tree_hash_before);
 
     let prop = Proposal::deserialize_exact(&tc.proposal)?;
 
@@ -282,18 +270,10 @@ fn tree_operations_test(
     }
 
     let raw_tree = tree.serialize_detached()?;
-    assert_eq!(
-        &raw_tree, &tc.tree_after,
-        "marshal(tree) = {:?}, want {:?}",
-        raw_tree, tc.tree_after
-    );
+    assert_eq!(&raw_tree, &tc.tree_after);
 
     let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
-    assert_eq!(
-        &tree_hash, &tc.tree_hash_after,
-        "ratchetTree.computeRootTreeHash() = {:?}, want {:?}",
-        tree_hash, tc.tree_hash_after
-    );
+    assert_eq!(&tree_hash, &tc.tree_hash_after);
 
     Ok(())
 }

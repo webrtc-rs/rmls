@@ -27,8 +27,8 @@ use crate::tree::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Commit {
-    proposals: Vec<ProposalOrRef>,
-    path: Option<UpdatePath>,
+    pub(crate) proposals: Vec<ProposalOrRef>,
+    pub(crate) path: Option<UpdatePath>,
 }
 
 impl Deserializer for Commit {
@@ -154,7 +154,7 @@ pub fn verify_proposal_list(
     Ok(())
 }
 
-fn proposal_list_needs_path(proposals: &[Proposal]) -> bool {
+pub(crate) fn proposal_list_needs_path(proposals: &[Proposal]) -> bool {
     if proposals.is_empty() {
         return true;
     }
@@ -234,7 +234,7 @@ impl Welcome {
         None
     }
 
-    fn decrypt_group_secrets(
+    pub(crate) fn decrypt_group_secrets(
         &self,
         crypto_provider: &impl CryptoProvider,
         r: &KeyPackageRef,
@@ -256,7 +256,7 @@ impl Welcome {
         }
     }
 
-    fn decrypt_group_info(
+    pub(crate) fn decrypt_group_info(
         &self,
         crypto_provider: &impl CryptoProvider,
         joiner_secret: &[u8],

@@ -80,7 +80,7 @@ impl ParentNode {
         cipher_suite: CipherSuite,
         original_sibling_tree_hash: &[u8],
     ) -> Result<Bytes> {
-        let input = ParentNode::marshal_parent_hash_input(
+        let input = ParentNode::serialize_parent_hash_input(
             &self.encryption_key,
             &self.parent_hash,
             original_sibling_tree_hash,
@@ -89,7 +89,7 @@ impl ParentNode {
         Ok(h.digest(&input))
     }
 
-    pub(crate) fn marshal_parent_hash_input(
+    pub(crate) fn serialize_parent_hash_input(
         encryption_key: &HpkePublicKey,
         parent_hash: &[u8],
         original_sibling_tree_hash: &[u8],
@@ -422,7 +422,7 @@ pub(crate) fn serialize_extensions<B: BufMut>(exts: &[Extension], buf: &mut B) -
     )
 }
 
-fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
+pub(crate) fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
     for ext in exts {
         if ext.extension_type == t {
             return Some(ext.extension_data.clone());
@@ -559,7 +559,7 @@ impl LeafNode {
     //
     // It does not perform all checks: it does not check that the credential is
     // valid.
-    fn verify(
+    pub(crate) fn verify(
         &self,
         crypto_provider: &impl CryptoProvider,
         options: LeafNodeVerifyOptions<'_>,
@@ -614,18 +614,18 @@ impl LeafNode {
 }
 
 pub(crate) struct LeafNodeVerifyOptions<'a> {
-    cipher_suite: CipherSuite,
-    group_id: &'a GroupID,
-    leaf_index: LeafIndex,
-    supported_creds: &'a HashSet<CredentialType>,
-    signature_keys: &'a HashSet<Bytes>,
-    encryption_keys: &'a HashSet<Bytes>,
-    now: &'a dyn Fn() -> SystemTime,
+    pub(crate) cipher_suite: CipherSuite,
+    pub(crate) group_id: &'a GroupID,
+    pub(crate) leaf_index: LeafIndex,
+    pub(crate) supported_creds: &'a HashSet<CredentialType>,
+    pub(crate) signature_keys: &'a HashSet<Bytes>,
+    pub(crate) encryption_keys: &'a HashSet<Bytes>,
+    pub(crate) now: &'a dyn Fn() -> SystemTime,
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct UpdatePathNode {
-    encryption_key: HpkePublicKey,
+    pub(crate) encryption_key: HpkePublicKey,
     encrypted_path_secret: Vec<HpkeCiphertext>,
 }
 
@@ -669,8 +669,8 @@ impl Serializer for UpdatePathNode {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct UpdatePath {
-    leaf_node: LeafNode,
-    nodes: Vec<UpdatePathNode>,
+    pub(crate) leaf_node: LeafNode,
+    pub(crate) nodes: Vec<UpdatePathNode>,
 }
 
 impl Deserializer for UpdatePath {

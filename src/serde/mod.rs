@@ -125,6 +125,14 @@ pub(crate) trait Deserializer {
     where
         Self: Sized,
         B: Buf;
+
+    fn deserialize_exact(buf: impl AsRef<[u8]>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        let mut buf = buf.as_ref();
+        Self::deserialize(&mut buf)
+    }
 }
 
 pub(crate) trait Serializer {

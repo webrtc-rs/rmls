@@ -241,7 +241,7 @@ impl Welcome {
         init_key_priv: &[u8],
     ) -> Result<GroupSecrets> {
         if let Some(sec) = self.find_secret(r) {
-            let mut raw_group_secrets = crypto_provider.decrypt_with_label(
+            let raw_group_secrets = crypto_provider.decrypt_with_label(
                 self.cipher_suite,
                 init_key_priv,
                 b"Welcome",
@@ -250,7 +250,7 @@ impl Welcome {
                 &sec.encrypted_group_secrets.ciphertext,
             )?;
 
-            Ok(GroupSecrets::deserialize(&mut raw_group_secrets)?)
+            Ok(GroupSecrets::deserialize_exact(&raw_group_secrets)?)
         } else {
             Err(Error::EncryptedGroupSecretsNotFoundForProvidedKeyPackageRef)
         }
@@ -287,14 +287,14 @@ impl Welcome {
             aead_key_size,
         )?;
 
-        let mut raw_group_info = crypto_provider.hpke(self.cipher_suite).aead_open(
+        let raw_group_info = crypto_provider.hpke(self.cipher_suite).aead_open(
             &welcome_key,
             &welcome_nonce,
             &self.encrypted_group_info,
             &[],
         )?;
 
-        GroupInfo::deserialize(&mut raw_group_info)
+        GroupInfo::deserialize_exact(&raw_group_info)
     }
 }
 

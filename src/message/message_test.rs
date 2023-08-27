@@ -19,8 +19,7 @@ use crate::message::{
     Commit, Message, WireFormatMessage,
 };
 use crate::serde::{serde_test::load_test_vector, *};
-use crate::tree::ratchet::RatchetTree;
-use crate::tree::{math::*, secret::*};
+use crate::tree::{math::*, ratchet::RatchetTree, secret::*};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {
@@ -40,8 +39,7 @@ fn welcome_test(
     _cipher_suite: CipherSuite,
     tc: &WelcomeTest,
 ) -> Result<()> {
-    let mut buf = tc.welcome.as_ref();
-    let welcome_msg = Message::deserialize(&mut buf)?;
+    let welcome_msg = Message::deserialize_exact(&tc.welcome)?;
     assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
     let welcome = if let WireFormatMessage::Welcome(welcome) = welcome_msg.message {
         welcome
@@ -49,8 +47,7 @@ fn welcome_test(
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let mut buf = tc.key_package.as_ref();
-    let key_package_msg = Message::deserialize(&mut buf)?;
+    let key_package_msg = Message::deserialize_exact(&tc.key_package)?;
     assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
     let key_package = if let WireFormatMessage::KeyPackage(key_package) = key_package_msg.message {
         key_package
@@ -157,8 +154,7 @@ fn test_message_protection_pub(
     want_raw: &[u8],
     raw_pub: &[u8],
 ) -> Result<()> {
-    let mut buf = raw_pub;
-    let msg = Message::deserialize(&mut buf)?;
+    let msg = Message::deserialize_exact(raw_pub)?;
     assert_eq!(msg.wire_format, WireFormat::PublicMessage);
     let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
         pub_msg
@@ -213,8 +209,7 @@ fn test_message_protection_priv(
     want_raw: &[u8],
     raw_priv: &[u8],
 ) -> Result<()> {
-    let mut buf = raw_priv;
-    let msg = Message::deserialize(&mut buf)?;
+    let msg = Message::deserialize_exact(raw_priv)?;
     assert_eq!(msg.wire_format, WireFormat::PrivateMessage);
     let priv_msg = if let WireFormatMessage::PrivateMessage(priv_msg) = msg.message {
         priv_msg
@@ -439,54 +434,46 @@ pub struct MessagesTest {
 
 fn messages_test(tc: MessagesTest) -> Result<()> {
     // Welcome
-    let mut tv_mls_welcome = tc.mls_welcome.as_slice();
-    let my_mls_welcome = Message::deserialize(&mut tv_mls_welcome)?.serialize_detached()?;
+    let my_mls_welcome = Message::deserialize_exact(&tc.mls_welcome)?.serialize_detached()?;
     assert_eq!(&tc.mls_welcome, my_mls_welcome.as_ref());
 
     // (Verifiable)GroupInfo
-    let mut tv_mls_group_info = tc.mls_group_info.as_slice();
-    let my_mls_group_info = Message::deserialize(&mut tv_mls_group_info)?.serialize_detached()?;
+    let my_mls_group_info = Message::deserialize_exact(&tc.mls_group_info)?.serialize_detached()?;
     assert_eq!(&tc.mls_group_info, my_mls_group_info.as_ref());
 
     // KeyPackage
-    let mut tv_mls_key_package = tc.mls_key_package.as_slice();
-    let my_key_package = Message::deserialize(&mut tv_mls_key_package)?.serialize_detached()?;
+    let my_key_package = Message::deserialize_exact(&tc.mls_key_package)?.serialize_detached()?;
     assert_eq!(&tc.mls_key_package, my_key_package.as_ref());
 
     // RatchetTree
-    let mut tv_ratchet_tree = tc.ratchet_tree.as_slice();
-    let my_ratchet_tree = RatchetTree::deserialize(&mut tv_ratchet_tree)?.serialize_detached()?;
+    let my_ratchet_tree = RatchetTree::deserialize_exact(&tc.ratchet_tree)?.serialize_detached()?;
     assert_eq!(&tc.ratchet_tree, my_ratchet_tree.as_ref());
 
     // GroupSecrets
-    let mut tv_group_secrets = tc.group_secrets.as_slice();
     let my_group_secrets =
-        GroupSecrets::deserialize(&mut tv_group_secrets)?.serialize_detached()?;
+        GroupSecrets::deserialize_exact(&tc.group_secrets)?.serialize_detached()?;
     assert_eq!(&tc.group_secrets, my_group_secrets.as_ref());
 
     // AddProposal
-    let mut tv_add_proposal = tc.add_proposal.as_slice();
-    let my_add_proposal = AddProposal::deserialize(&mut tv_add_proposal)?.serialize_detached()?;
+    let my_add_proposal = AddProposal::deserialize_exact(&tc.add_proposal)?.serialize_detached()?;
     assert_eq!(&tc.add_proposal, my_add_proposal.as_ref());
 
     //update_proposal: String,         /* serialized Update */
     // UpdateProposal
-    let mut tv_update_proposal = tc.update_proposal.as_slice();
     let my_update_proposal =
-        UpdateProposal::deserialize(&mut tv_update_proposal)?.serialize_detached()?;
+        UpdateProposal::deserialize_exact(&tc.update_proposal)?.serialize_detached()?;
     assert_eq!(&tc.update_proposal, my_update_proposal.as_ref());
 
     //remove_proposal: String,         /* serialized Remove */
     // RemoveProposal
-    let mut tv_remove_proposal = tc.remove_proposal.as_slice();
     let my_remove_proposal =
-        RemoveProposal::deserialize(&mut tv_remove_proposal)?.serialize_detached()?;
+        RemoveProposal::deserialize_exact(&tc.remove_proposal)?.serialize_detached()?;
     assert_eq!(&tc.remove_proposal, my_remove_proposal.as_ref());
 
     // PreSharedKeyProposal
-    let mut tv_pre_shared_key_proposal = tc.pre_shared_key_proposal.as_slice();
     let my_pre_shared_key_proposal =
-        PreSharedKeyProposal::deserialize(&mut tv_pre_shared_key_proposal)?.serialize_detached()?;
+        PreSharedKeyProposal::deserialize_exact(&tc.pre_shared_key_proposal)?
+            .serialize_detached()?;
     assert_eq!(
         &tc.pre_shared_key_proposal,
         my_pre_shared_key_proposal.as_ref()
@@ -495,37 +482,33 @@ fn messages_test(tc: MessagesTest) -> Result<()> {
     // Re-Init, External Init and App-Ack Proposals go here...
 
     // Commit
-    let mut tv_commit = tc.commit.as_slice();
-    let my_commit = Commit::deserialize(&mut tv_commit)?.serialize_detached()?;
+    let my_commit = Commit::deserialize_exact(&tc.commit)?.serialize_detached()?;
     assert_eq!(&tc.commit, my_commit.as_ref());
 
     // MlsPlaintextApplication
-    let mut tv_public_message_application = tc.public_message_application.as_slice();
     let my_public_message_application =
-        Message::deserialize(&mut tv_public_message_application)?.serialize_detached()?;
+        Message::deserialize_exact(&tc.public_message_application)?.serialize_detached()?;
     assert_eq!(
         &tc.public_message_application,
         my_public_message_application.as_ref()
     );
 
     // PublicMessage(Proposal)
-    let mut tv_public_message_proposal = tc.public_message_proposal.as_slice();
     let my_public_message_proposal =
-        Message::deserialize(&mut tv_public_message_proposal)?.serialize_detached()?;
+        Message::deserialize_exact(&tc.public_message_proposal)?.serialize_detached()?;
     assert_eq!(
         &tc.public_message_proposal,
         my_public_message_proposal.as_ref()
     );
 
     // PublicMessage(Commit)
-    let mut tv_public_message_commit = tc.public_message_commit.as_slice();
     let my_public_message_commit =
-        Message::deserialize(&mut tv_public_message_commit)?.serialize_detached()?;
+        Message::deserialize_exact(&tc.public_message_commit)?.serialize_detached()?;
     assert_eq!(&tc.public_message_commit, my_public_message_commit.as_ref());
 
     // PrivateMessage
-    let mut tv_private_message = tc.private_message.as_slice();
-    let my_private_message = Message::deserialize(&mut tv_private_message)?.serialize_detached()?;
+    let my_private_message =
+        Message::deserialize_exact(&tc.private_message)?.serialize_detached()?;
     assert_eq!(&tc.private_message, my_private_message.as_ref());
 
     Ok(())

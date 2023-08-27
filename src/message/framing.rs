@@ -808,8 +808,7 @@ impl PrivateMessage {
             &raw_aad,
         )?;
 
-        let mut buf = raw_sender_data.as_ref();
-        SenderData::deserialize(&mut buf)
+        SenderData::deserialize_exact(&raw_sender_data)
     }
 
     pub(crate) fn decrypt_content(

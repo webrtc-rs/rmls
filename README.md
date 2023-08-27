@@ -49,7 +49,7 @@
 
 *RMLS* is a Rust implementation of the Messaging Layer Security (MLS) protocol, as specified in [RFC 9420](https://datatracker.ietf.org/doc/html/rfc9420).
 Messaging Layer Security (MLS) is a key establishment protocol that provides efficient asynchronous group key establishment with forward secrecy (FS) and 
-post-compromise security (PCS) for groups in size ranging from two to thousands.. 
+post-compromise security (PCS) for groups in size ranging from two to thousands.
 
 ## Supported CipherSuites
 
@@ -59,14 +59,14 @@ post-compromise security (PCS) for groups in size ranging from two to thousands.
 
 ## Cryptography Dependencies
 
-RMLS does not implement its own cryptographic primitives. Instead, it relies
-on existing implementations of the cryptographic primitives, i.e., ring or RustCrypto. There
-are two different cryptography providers implemented right now:
+*RMLS* does not implement its own cryptographic primitives. Instead, it relies
+on existing implementations of the cryptographic primitives, i.e., [ring](https://github.com/briansmith/ring) or [RustCrypto](https://github.com/RustCrypto). There
+are two cryptography providers implemented right now:
 
 - [ring](https://github.com/briansmith/ring) based crypto provider
 - [RustCrypto](https://github.com/RustCrypto) based crypto provider 
 
-But consumers can bring their own implementation. See [CryptoProvider Trait](https://github.com/webrtc-rs/rmls/blob/bca90809d1f7b1db2b8dbab2b6df3125df8f3cfc/src/crypto/provider/mod.rs#L51) for more
+Other cryptography providers, like [openssl](https://github.com/sfackler/rust-openssl) or [boring](https://github.com/cloudflare/boring), are also possible, see [CryptoProvider Trait](https://github.com/webrtc-rs/rmls/blob/bca90809d1f7b1db2b8dbab2b6df3125df8f3cfc/src/crypto/provider/mod.rs#L51) for more
 details.
 
 ## Open Source License

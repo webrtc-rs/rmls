@@ -1,7 +1,8 @@
-use crate::crypto::{
-    cipher_suite::CipherSuite,
-    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
-};
+#[cfg(feature = "RingCryptoProvider")]
+use crate::crypto::provider::ring::RingCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::message::framing::*;
 use crate::serde::serde_test::load_test_vector;
@@ -146,8 +147,9 @@ fn test_secret_tree_with_crypto_provider(
 fn test_secret_tree() -> Result<()> {
     let tests: Vec<SecretTreeTest> = load_test_vector("test-vectors/secret-tree.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_secret_tree_with_crypto_provider(&tests, &RingCryptoProvider {})?;
-
+    #[cfg(feature = "RustCryptoProvider")]
     test_secret_tree_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())

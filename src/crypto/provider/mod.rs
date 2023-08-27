@@ -1,4 +1,6 @@
+#[cfg(feature = "RingCryptoProvider")]
 pub mod ring;
+#[cfg(feature = "RustCryptoProvider")]
 pub mod rust;
 
 use crate::crypto::cipher_suite::CipherSuite;

@@ -1,7 +1,8 @@
-use crate::crypto::{
-    cipher_suite::CipherSuite,
-    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
-};
+#[cfg(feature = "RingCryptoProvider")]
+use crate::crypto::provider::ring::RingCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::serde::serde_test::*;
 use crate::tree::secret::derive_tree_secret;
@@ -267,8 +268,9 @@ fn test_crypto_basics_with_crypto_provider(
 fn test_crypto_basics() -> Result<()> {
     let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_crypto_basics_with_crypto_provider(&tests, &RingCryptoProvider {})?;
-
+    #[cfg(feature = "RustCryptoProvider")]
     test_crypto_basics_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())

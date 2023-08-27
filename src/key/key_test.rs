@@ -1,10 +1,11 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{
-    cipher_suite::CipherSuite,
-    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
-};
+#[cfg(feature = "RingCryptoProvider")]
+use crate::crypto::provider::ring::RingCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::key::schedule::{
     extract_psk_secret, extract_welcome_secret, next_interim_transcript_hash, GroupContext,
@@ -76,7 +77,9 @@ fn test_psk_secret_with_crypto_provider(
 fn test_psk_secret() -> Result<()> {
     let tests: Vec<PskSecretTest> = load_test_vector("test-vectors/psk_secret.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_psk_secret_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_psk_secret_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
@@ -228,7 +231,9 @@ fn test_key_schedule_with_crypto_provider(
 fn test_key_schedule() -> Result<()> {
     let tests: Vec<KeyScheduleTest> = load_test_vector("test-vectors/key-schedule.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_key_schedule_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_key_schedule_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
@@ -322,7 +327,9 @@ fn test_transcript_hashes_with_crypto_provider(
 fn test_transcript_hashes() -> Result<()> {
     let tests: Vec<TranscriptHashesTest> = load_test_vector("test-vectors/transcript-hashes.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_transcript_hashes_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_transcript_hashes_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())

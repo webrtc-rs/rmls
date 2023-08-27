@@ -1,5 +1,9 @@
 use super::*;
-use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
+#[cfg(feature = "RingCryptoProvider")]
+use crate::crypto::provider::ring::RingCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::key::schedule::GroupContext;
 use crate::serde::serde_test::load_test_vector;
@@ -92,7 +96,9 @@ fn test_tree_validation_with_crypto_provider(
 fn test_tree_validation() -> Result<()> {
     let tests: Vec<TreeValidationTest> = load_test_vector("test-vectors/tree-validation.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_tree_validation_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_tree_validation_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
@@ -203,7 +209,9 @@ fn test_tree_kem_with_crypto_provider(
 fn test_tree_kem() -> Result<()> {
     let tests: Vec<TreeKEMTest> = load_test_vector("test-vectors/treekem.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_tree_kem_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_tree_kem_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
@@ -318,7 +326,9 @@ fn test_tree_operations_with_crypto_provider(
 fn test_tree_operations() -> Result<()> {
     let tests: Vec<TreeOperationsTest> = load_test_vector("test-vectors/tree-operations.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_tree_operations_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_tree_operations_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())

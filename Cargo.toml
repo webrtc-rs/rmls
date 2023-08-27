@@ -9,6 +9,11 @@ documentation = "https://docs.rs/rmls"
 homepage = "https://rmls.io"
 repository = "https://github.com/ngr-tc/rmls"
 
+[features]
+default = ["RustCryptoProvider"] #["RingCryptoProvider"]#,
+RingCryptoProvider = ["ring"]
+RustCryptoProvider = ["sha2", "hmac", "hkdf", "ed25519-dalek", "ecdsa", "sec1", "signature", "aead", "aes-gcm", "chacha20poly1305", "p256", "p384", "p521"]
+
 [dependencies]
 thiserror = "1"
 bytes = "1"
@@ -20,23 +25,23 @@ rand = "0.8.5"
 # Common
 hpke = "0.10.0"
 
-# RingCryptoProvider: TODO(yngrtc): use ring feature
-ring = "0.16.20"
+# RingCryptoProvider feature
+ring = { version = "0.16.20", optional = true }
 
-# RustCryptoProvider: TODO(yngrtc): use rust feature
-sha2 = "0.10.7"
-hmac = "0.12.1"
-hkdf = "0.12.3"
-ed25519-dalek = "2.0.0"
-ecdsa = "0.16.8"
-sec1 = "0.7.3"
-signature = "2.1.0"
-aead = "0.5.2"
-aes-gcm = "0.10.2"
-chacha20poly1305 = "0.10.1"
-p256 = "0.13.2"
-p384 = "0.13.0"
-p521 = "0.13.0"
+# RustCryptoProvider feature
+sha2 = { version = "0.10.7", optional = true }
+hmac = { version = "0.12.1", optional = true }
+hkdf = { version = "0.12.3", optional = true }
+ed25519-dalek = { version = "2.0.0", optional = true }
+ecdsa = { version = "0.16.8", optional = true }
+sec1 = { version = "0.7.3", optional = true }
+signature = { version = "2.1.0", optional = true }
+aead = { version = "0.5.2", optional = true }
+aes-gcm = { version = "0.10.2", optional = true }
+chacha20poly1305 = { version = "0.10.1", optional = true }
+p256 = { version = "0.13.2", optional = true }
+p384 = { version = "0.13.0", optional = true }
+p521 = { version = "0.13.0", optional = true }
 
 [dev-dependencies]
 hex = { version = "0.4", features = ["serde"] }

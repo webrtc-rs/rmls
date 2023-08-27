@@ -1,10 +1,11 @@
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{
-    cipher_suite::CipherSuite,
-    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
-};
+#[cfg(feature = "RingCryptoProvider")]
+use crate::crypto::provider::ring::RingCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::key::schedule::GroupContext;
 use crate::message::{
@@ -97,7 +98,9 @@ fn test_welcome_with_crypto_provider(
 fn test_welcome() -> Result<()> {
     let tests: Vec<WelcomeTest> = load_test_vector("test-vectors/welcome.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_welcome_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
@@ -385,7 +388,9 @@ fn test_message_protection() -> Result<()> {
     let tests: Vec<MessageProtectionTest> =
         load_test_vector("test-vectors/message-protection.json")?;
 
+    #[cfg(feature = "RingCryptoProvider")]
     test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    #[cfg(feature = "RustCryptoProvider")]
     test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())

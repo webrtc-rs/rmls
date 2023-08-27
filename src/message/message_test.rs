@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::crypto::{
     cipher_suite::CipherSuite,
-    provider::{ring::RingCryptoProvider, CryptoProvider},
+    provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider},
 };
 use crate::error::*;
 use crate::key::schedule::GroupContext;
@@ -98,7 +98,7 @@ fn test_welcome() -> Result<()> {
     let tests: Vec<WelcomeTest> = load_test_vector("test-vectors/welcome.json")?;
 
     test_welcome_with_crypto_provider(&tests, &RingCryptoProvider {})?;
-    //TODO(yngrtc): test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
 }
@@ -386,7 +386,7 @@ fn test_message_protection() -> Result<()> {
         load_test_vector("test-vectors/message-protection.json")?;
 
     test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider {})?;
-    //TODO(yngrtc): test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
 
     Ok(())
 }

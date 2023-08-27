@@ -1,6 +1,8 @@
 use bytes::Bytes;
-use ring::signature::{Ed25519KeyPair, VerificationAlgorithm, ED25519};
-use signature::{Signer, Verifier}; //TODO(yngrtc): use ring library only in RingCryptoProvider
+use ring::signature::{
+    Ed25519KeyPair, VerificationAlgorithm, ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519,
+};
+use signature::Signer;
 
 use crate::error::*;
 
@@ -49,19 +51,15 @@ impl crate::crypto::provider::Signature for SignatureScheme {
                 Ok(())
             }
             SignatureScheme::ECDSA_P256_SHA256 => {
-                let encoded_point = p256::EncodedPoint::from_bytes(public_key)?;
-                let verifying_key: ecdsa::VerifyingKey<p256::NistP256> =
-                    ecdsa::VerifyingKey::from_encoded_point(&encoded_point)?;
-                let signature = ecdsa::Signature::from_der(signature)?;
-                verifying_key.verify(message, &signature)?;
+                ECDSA_P256_SHA256_ASN1
+                    .verify(public_key.into(), message.into(), signature.into())
+                    .map_err(|err| Error::RingCryptoError(err.to_string()))?;
                 Ok(())
             }
             SignatureScheme::ECDSA_P384_SHA384 => {
-                let encoded_point = p384::EncodedPoint::from_bytes(public_key)?;
-                let verifying_key: ecdsa::VerifyingKey<p384::NistP384> =
-                    ecdsa::VerifyingKey::from_encoded_point(&encoded_point)?;
-                let signature = ecdsa::Signature::from_der(signature)?;
-                verifying_key.verify(message, &signature)?;
+                ECDSA_P384_SHA384_ASN1
+                    .verify(public_key.into(), message.into(), signature.into())
+                    .map_err(|err| Error::RingCryptoError(err.to_string()))?;
                 Ok(())
             }
             SignatureScheme::ECDSA_P521_SHA512 => Err(Error::UnsupportedEcdsa),

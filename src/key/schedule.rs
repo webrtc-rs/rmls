@@ -84,7 +84,7 @@ impl GroupContext {
             .hpke(cipher_suite)
             .kdf_extract(commit_secret, prev_init_secret)?;
 
-        let raw_group_context = serialize(self)?;
+        let raw_group_context = self.serialize_detached()?;
         let extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
@@ -116,7 +116,7 @@ impl GroupContext {
             joiner_secret,
         )?;
 
-        let raw_group_context = serialize(self)?;
+        let raw_group_context = self.serialize_detached()?;
         let extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
@@ -217,7 +217,7 @@ impl ConfirmedTranscriptHashInput {
         interim_transcript_hash_before: &[u8],
     ) -> Result<Bytes> {
         let mut buf = BytesMut::new();
-        let raw_input = serialize(self)?;
+        let raw_input = self.serialize_detached()?;
 
         buf.extend_from_slice(interim_transcript_hash_before);
         buf.put(raw_input);
@@ -395,7 +395,7 @@ pub(crate) fn extract_psk_secret(
             index: i as u16,
             count: psk_ids.len() as u16,
         };
-        let raw_psklabel = serialize(&psk_label)?;
+        let raw_psklabel = psk_label.serialize_detached()?;
 
         let psk_input = crypto_provider.expand_with_label(
             cipher_suite,

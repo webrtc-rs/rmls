@@ -449,7 +449,7 @@ impl FramedContentAuthData {
         verif_key: &[u8],
         content: &FramedContentTBS,
     ) -> Result<()> {
-        let raw_content = serialize(content)?;
+        let raw_content = content.serialize_detached()?;
         crypto_provider.verify_with_label(
             cipher_suite,
             verif_key,
@@ -465,7 +465,7 @@ fn sign_framed_content(
     sign_key: &[u8],
     content: &FramedContentTBS,
 ) -> Result<Bytes> {
-    let raw_content = serialize(content)?;
+    let raw_content = content.serialize_detached()?;
     crypto_provider.sign_with_label(cipher_suite, sign_key, b"FramedContentTBS", &raw_content)
 }
 
@@ -628,7 +628,7 @@ impl PublicMessage {
             }
             _ => {}
         };
-        let raw_auth_content_tbm = serialize(&self.authenticated_content_tbm(ctx))?;
+        let raw_auth_content_tbm = self.authenticated_content_tbm(ctx).serialize_detached()?;
         self.membership_tag =
             Some(crypto_provider.sign_mac(cipher_suite, membership_key, &raw_auth_content_tbm));
         Ok(())
@@ -649,7 +649,7 @@ impl PublicMessage {
         };
         if let Some(membership_tag) = &self.membership_tag {
             let raw_auth_content_tbm =
-                if let Ok(raw) = serialize(&self.authenticated_content_tbm(ctx)) {
+                if let Ok(raw) = self.authenticated_content_tbm(ctx).serialize_detached() {
                     raw
                 } else {
                     return false;
@@ -799,7 +799,7 @@ impl PrivateMessage {
             epoch: self.epoch,
             content_type: self.content_type,
         };
-        let raw_aad = serialize(&aad)?;
+        let raw_aad = aad.serialize_detached()?;
 
         let raw_sender_data = crypto_provider.hpke(cipher_suite).aead_open(
             &key,
@@ -833,7 +833,7 @@ impl PrivateMessage {
             authenticated_data: self.authenticated_data.clone(),
         };
 
-        let raw_aad = serialize(&aad)?;
+        let raw_aad = aad.serialize_detached()?;
         let raw_content = crypto_provider.hpke(cipher_suite).aead_open(
             &key,
             &nonce,
@@ -985,7 +985,7 @@ pub(crate) fn encrypt_private_message_content(
         auth: auth_content.auth,
     };
 
-    let plainttext = serialize(&priv_content)?;
+    let plainttext = priv_content.serialize_detached()?;
 
     let (key, nonce) =
         derive_private_message_key_and_nonce(crypto_provider, cipher_suite, secret, reuse_guard)?;
@@ -996,7 +996,7 @@ pub(crate) fn encrypt_private_message_content(
         content_type: content.content.content_type(),
         authenticated_data: content.authenticated_data.clone(),
     };
-    let raw_aad = serialize(&aad)?;
+    let raw_aad = aad.serialize_detached()?;
 
     crypto_provider
         .hpke(cipher_suite)
@@ -1029,8 +1029,8 @@ fn encrypt_sender_data(
         epoch: content.epoch,
         content_type: content.content.content_type(),
     };
-    let raw_aad = serialize(&aad)?;
-    let raw_sender_data = serialize(sender_data)?;
+    let raw_aad = aad.serialize_detached()?;
+    let raw_sender_data = sender_data.serialize_detached()?;
 
     crypto_provider
         .hpke(cipher_suite)

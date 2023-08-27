@@ -455,7 +455,7 @@ impl RatchetTree {
                 }
 
                 // Make sure both nodes are identical
-                if let (Ok(raw1), Ok(raw2)) = (serialize(node), serialize(n)) {
+                if let (Ok(raw1), Ok(raw2)) = (node.serialize_detached(), n.serialize_detached()) {
                     return (LeafIndex(li), raw1 == raw2);
                 } else {
                     return (LeafIndex(li), false);

@@ -132,10 +132,13 @@ pub(crate) trait Serializer {
     where
         Self: Sized,
         B: BufMut;
-}
 
-pub(crate) fn serialize<V: Serializer>(v: &V) -> Result<Bytes> {
-    let mut b = BytesMut::new();
-    v.serialize(&mut b)?;
-    Ok(b.freeze())
+    fn serialize_detached(&self) -> Result<Bytes>
+    where
+        Self: Sized,
+    {
+        let mut buf = BytesMut::new();
+        self.serialize(&mut buf)?;
+        Ok(buf.freeze())
+    }
 }

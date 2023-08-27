@@ -286,7 +286,7 @@ fn tree_operations_test(
         _ => assert!(false),
     }
 
-    let raw_tree = serialize(&tree)?;
+    let raw_tree = tree.serialize_detached()?;
     assert_eq!(
         &raw_tree, &tc.tree_after,
         "marshal(tree) = {:?}, want {:?}",

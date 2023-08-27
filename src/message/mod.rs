@@ -129,7 +129,7 @@ pub fn verify_proposal_list(
                 update_or_remove_proposals.insert(proposal.removed);
             }
             Proposal::PreSharedKey(proposal) => {
-                let psk = serialize(&proposal.psk)?;
+                let psk = proposal.psk.serialize_detached()?;
                 if psk_proposals.contains(&psk) {
                     return Err(Error::MultiplePSKProposalsReferenceTheSamePSKId);
                 }

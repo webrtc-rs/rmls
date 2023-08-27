@@ -534,11 +534,12 @@ impl LeafNode {
         group_id: &GroupID,
         leaf_index: LeafIndex,
     ) -> bool {
-        let leaf_node_tbs = if let Ok(leaf_node_tbs) = serialize(&LeafNodeTBS {
+        let tbs = LeafNodeTBS {
             leaf_node: self,
             group_id,
             leaf_index,
-        }) {
+        };
+        let leaf_node_tbs = if let Ok(leaf_node_tbs) = tbs.serialize_detached() {
             leaf_node_tbs
         } else {
             return false;

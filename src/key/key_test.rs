@@ -14,7 +14,7 @@ use crate::key::schedule::{
     SECRET_LABEL_SENDER_DATA,
 };
 use crate::message::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
-use crate::serde::{serde_test::load_test_vector, serialize, Deserializer};
+use crate::serde::{serde_test::load_test_vector, Deserializer, Serializer};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct PSK {
@@ -168,7 +168,7 @@ fn key_schedule_test(
             extensions: vec![],
         };
 
-        let raw_ctx = serialize(&ctx)?;
+        let raw_ctx = ctx.serialize_detached()?;
         assert_eq!(raw_ctx.as_ref(), &epoch.group_context);
 
         let joiner_secret =

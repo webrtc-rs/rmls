@@ -1,11 +1,11 @@
 use crate::cipher_suite::CipherSuite;
-use crate::codec::{read_opaque_vec, write_opaque_vec, Reader, Writer};
 use crate::error::*;
 use crate::framing::{GroupID, ProtocolVersion};
 use crate::key_package::KeyPackage;
 use crate::key_schedule::PreSharedKeyID;
+use crate::serde::{deserialize_opaque_vec, serialize_opaque_vec, Deserializer, Serializer};
 use crate::tree::tree_math::LeafIndex;
-use crate::tree::{read_extensions, write_extensions, Extension, LeafNode};
+use crate::tree::{deserialize_extensions, serialize_extensions, Extension, LeafNode};
 
 use bytes::{Buf, BufMut, Bytes};
 
@@ -54,8 +54,8 @@ impl From<ProposalTypeCapability> for u16 {
     }
 }
 
-impl Reader for ProposalTypeCapability {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ProposalTypeCapability {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -68,8 +68,8 @@ impl Reader for ProposalTypeCapability {
     }
 }
 
-impl Writer for ProposalTypeCapability {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ProposalTypeCapability {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -96,8 +96,8 @@ impl Default for Proposal {
     }
 }
 
-impl Reader for Proposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Proposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -110,37 +110,37 @@ impl Reader for Proposal {
         match proposal {
             ProposalTypeCapability::Add => {
                 let mut proposal = AddProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::Add(proposal);
             }
             ProposalTypeCapability::Update => {
                 let mut proposal = UpdateProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::Update(proposal);
             }
             ProposalTypeCapability::Remove => {
                 let mut proposal = RemoveProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::Remove(proposal);
             }
             ProposalTypeCapability::PreSharedKey => {
                 let mut proposal = PreSharedKeyProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::PreSharedKey(proposal);
             }
             ProposalTypeCapability::ReInit => {
                 let mut proposal = ReInitProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::ReInit(proposal);
             }
             ProposalTypeCapability::ExternalInit => {
                 let mut proposal = ExternalInitProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::ExternalInit(proposal);
             }
             ProposalTypeCapability::GroupContextExtensions => {
                 let mut proposal = GroupContextExtensionsProposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Proposal::GroupContextExtensions(proposal);
             }
             ProposalTypeCapability::Unknown(v) => return Err(Error::InvalidProposalTypeValue(v)),
@@ -150,8 +150,8 @@ impl Reader for Proposal {
     }
 }
 
-impl Writer for Proposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Proposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -159,31 +159,31 @@ impl Writer for Proposal {
         match self {
             Proposal::Add(proposal) => {
                 buf.put_u16(ProposalTypeCapability::Add.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::Update(proposal) => {
                 buf.put_u16(ProposalTypeCapability::Update.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::Remove(proposal) => {
                 buf.put_u16(ProposalTypeCapability::Remove.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::PreSharedKey(proposal) => {
                 buf.put_u16(ProposalTypeCapability::PreSharedKey.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::ReInit(proposal) => {
                 buf.put_u16(ProposalTypeCapability::ReInit.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::ExternalInit(proposal) => {
                 buf.put_u16(ProposalTypeCapability::ExternalInit.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             Proposal::GroupContextExtensions(proposal) => {
                 buf.put_u16(ProposalTypeCapability::GroupContextExtensions.into());
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
         }
     }
@@ -194,23 +194,23 @@ pub struct AddProposal {
     pub(crate) key_package: KeyPackage,
 }
 
-impl Reader for AddProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for AddProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.key_package.read(buf)
+        self.key_package.deserialize(buf)
     }
 }
 
-impl Writer for AddProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for AddProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.key_package.write(buf)
+        self.key_package.serialize(buf)
     }
 }
 
@@ -219,23 +219,23 @@ pub struct UpdateProposal {
     pub(crate) leaf_node: LeafNode,
 }
 
-impl Reader for UpdateProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for UpdateProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.leaf_node.read(buf)
+        self.leaf_node.deserialize(buf)
     }
 }
 
-impl Writer for UpdateProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for UpdateProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.leaf_node.write(buf)
+        self.leaf_node.serialize(buf)
     }
 }
 
@@ -244,8 +244,8 @@ pub struct RemoveProposal {
     pub(crate) removed: LeafIndex,
 }
 
-impl Reader for RemoveProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for RemoveProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -258,8 +258,8 @@ impl Reader for RemoveProposal {
     }
 }
 
-impl Writer for RemoveProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for RemoveProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -275,22 +275,22 @@ pub struct PreSharedKeyProposal {
     pub(crate) psk: PreSharedKeyID,
 }
 
-impl Reader for PreSharedKeyProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for PreSharedKeyProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.psk.read(buf)
+        self.psk.deserialize(buf)
     }
 }
-impl Writer for PreSharedKeyProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PreSharedKeyProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.psk.write(buf)
+        self.psk.serialize(buf)
     }
 }
 
@@ -302,13 +302,13 @@ pub struct ReInitProposal {
     extensions: Vec<Extension>,
 }
 
-impl Reader for ReInitProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ReInitProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = read_opaque_vec(buf)?;
+        self.group_id = deserialize_opaque_vec(buf)?;
 
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
@@ -316,21 +316,21 @@ impl Reader for ReInitProposal {
         self.version = buf.get_u16();
         self.cipher_suite = buf.get_u16().try_into()?;
 
-        self.extensions = read_extensions(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
 
         Ok(())
     }
 }
-impl Writer for ReInitProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ReInitProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u16(self.version);
         buf.put_u16(self.cipher_suite as u16);
-        write_extensions(&self.extensions, buf)
+        serialize_extensions(&self.extensions, buf)
     }
 }
 
@@ -339,24 +339,24 @@ pub struct ExternalInitProposal {
     kem_output: Bytes,
 }
 
-impl Reader for ExternalInitProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ExternalInitProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.kem_output = read_opaque_vec(buf)?;
+        self.kem_output = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
-impl Writer for ExternalInitProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ExternalInitProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.kem_output, buf)
+        serialize_opaque_vec(&self.kem_output, buf)
     }
 }
 
@@ -365,24 +365,24 @@ pub struct GroupContextExtensionsProposal {
     extensions: Vec<Extension>,
 }
 
-impl Reader for GroupContextExtensionsProposal {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for GroupContextExtensionsProposal {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.extensions = read_extensions(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
 
         Ok(())
     }
 }
-impl Writer for GroupContextExtensionsProposal {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for GroupContextExtensionsProposal {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_extensions(&self.extensions, buf)
+        serialize_extensions(&self.extensions, buf)
     }
 }
 
@@ -400,8 +400,8 @@ impl Default for ProposalOrRef {
     }
 }
 
-impl Reader for ProposalOrRef {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ProposalOrRef {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -413,11 +413,11 @@ impl Reader for ProposalOrRef {
         match v {
             1 => {
                 let mut proposal = Proposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = ProposalOrRef::Proposal(proposal);
             }
             2 => {
-                let proposal_ref = read_opaque_vec(buf)?;
+                let proposal_ref = deserialize_opaque_vec(buf)?;
                 *self = ProposalOrRef::Reference(proposal_ref);
             }
             _ => return Err(Error::InvalidProposalOrRefValue(v)),
@@ -426,8 +426,8 @@ impl Reader for ProposalOrRef {
         Ok(())
     }
 }
-impl Writer for ProposalOrRef {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ProposalOrRef {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -435,11 +435,11 @@ impl Writer for ProposalOrRef {
         match self {
             ProposalOrRef::Proposal(proposal) => {
                 buf.put_u8(1);
-                proposal.write(buf)
+                proposal.serialize(buf)
             }
             ProposalOrRef::Reference(proposal_ref) => {
                 buf.put_u8(2);
-                write_opaque_vec(proposal_ref, buf)
+                serialize_opaque_vec(proposal_ref, buf)
             }
         }
     }

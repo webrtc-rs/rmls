@@ -1,5 +1,5 @@
-use crate::codec::*;
 use crate::error::*;
+use crate::serde::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -45,8 +45,8 @@ pub(crate) struct Credential {
     certificates: Vec<Bytes>, // for credentialTypeX509
 }
 
-impl Reader for Credential {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Credential {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -60,11 +60,11 @@ impl Reader for Credential {
 
         match self.credential_type {
             CredentialType::Basic => {
-                self.identity = read_opaque_vec(buf)?;
+                self.identity = deserialize_opaque_vec(buf)?;
                 Ok(())
             }
-            CredentialType::X509 => read_vector(buf, |b: &mut Bytes| -> Result<()> {
-                let cert = read_opaque_vec(b)?;
+            CredentialType::X509 => deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
+                let cert = deserialize_opaque_vec(b)?;
                 self.certificates.push(cert);
                 Ok(())
             }),
@@ -73,20 +73,20 @@ impl Reader for Credential {
     }
 }
 
-impl Writer for Credential {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Credential {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.credential_type.into());
         match self.credential_type {
-            CredentialType::Basic => write_opaque_vec(&self.identity, buf),
-            CredentialType::X509 => write_vector(
+            CredentialType::Basic => serialize_opaque_vec(&self.identity, buf),
+            CredentialType::X509 => serialize_vector(
                 self.certificates.len(),
                 buf,
                 |i: usize, b: &mut BytesMut| -> Result<()> {
-                    write_opaque_vec(&self.certificates[i], b)
+                    serialize_opaque_vec(&self.certificates[i], b)
                 },
             ),
             _ => Err(Error::InvalidCredentialTypeValue),
@@ -100,27 +100,27 @@ pub(crate) struct HpkeCiphertext {
     pub(crate) ciphertext: Bytes,
 }
 
-impl Reader for HpkeCiphertext {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for HpkeCiphertext {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.kem_output = read_opaque_vec(buf)?;
-        self.ciphertext = read_opaque_vec(buf)?;
+        self.kem_output = deserialize_opaque_vec(buf)?;
+        self.ciphertext = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
 
-impl Writer for HpkeCiphertext {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for HpkeCiphertext {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.kem_output, buf)?;
-        write_opaque_vec(&self.ciphertext, buf)?;
+        serialize_opaque_vec(&self.kem_output, buf)?;
+        serialize_opaque_vec(&self.ciphertext, buf)?;
         Ok(())
     }
 }

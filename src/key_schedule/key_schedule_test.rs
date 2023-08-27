@@ -2,8 +2,6 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher_suite::CipherSuite;
-use crate::codec::codec_test::load_test_vector;
-use crate::codec::{write, Reader};
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
 use crate::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
@@ -13,6 +11,7 @@ use crate::key_schedule::{
     SECRET_LABEL_EXTERNAL, SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION,
     SECRET_LABEL_SENDER_DATA,
 };
+use crate::serde::{serde_test::load_test_vector, serialize, Deserializer};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct PSK {
@@ -164,7 +163,7 @@ fn key_schedule_test(
             extensions: vec![],
         };
 
-        let raw_ctx = write(&ctx)?;
+        let raw_ctx = serialize(&ctx)?;
         assert_eq!(raw_ctx.as_ref(), &epoch.group_context);
 
         let joiner_secret =
@@ -257,7 +256,7 @@ fn transcript_hashes_test(
 ) -> Result<()> {
     let mut auth_content = AuthenticatedContent::default();
     let mut buf = tc.authenticated_content.as_ref();
-    auth_content.read(&mut buf)?;
+    auth_content.deserialize(&mut buf)?;
     match auth_content.content.content {
         Content::Commit(_) => {}
         _ => assert!(

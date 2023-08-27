@@ -2,13 +2,13 @@
 mod key_schedule_test;
 
 use crate::cipher_suite::CipherSuite;
-use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 use crate::framing::{
     Content, FramedContent, GroupID, ProtocolVersion, WireFormat, PROTOCOL_VERSION_MLS10,
 };
-use crate::tree::{read_extensions, write_extensions, Extension};
+use crate::serde::*;
+use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -23,8 +23,8 @@ pub(crate) struct GroupContext {
     pub(crate) extensions: Vec<Extension>,
 }
 
-impl Reader for GroupContext {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for GroupContext {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -35,36 +35,36 @@ impl Reader for GroupContext {
 
         self.version = buf.get_u16();
         self.cipher_suite = buf.get_u16().try_into()?;
-        self.group_id = read_opaque_vec(buf)?;
+        self.group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
         self.epoch = buf.get_u64();
-        self.tree_hash = read_opaque_vec(buf)?;
-        self.confirmed_transcript_hash = read_opaque_vec(buf)?;
+        self.tree_hash = deserialize_opaque_vec(buf)?;
+        self.confirmed_transcript_hash = deserialize_opaque_vec(buf)?;
 
         if self.version != PROTOCOL_VERSION_MLS10 {
             return Err(Error::InvalidProposalTypeValue(self.version));
         }
 
-        self.extensions = read_extensions(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
 
         Ok(())
     }
 }
-impl Writer for GroupContext {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for GroupContext {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.version);
         buf.put_u16(self.cipher_suite as u16);
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
-        write_opaque_vec(&self.tree_hash, buf)?;
-        write_opaque_vec(&self.confirmed_transcript_hash, buf)?;
-        write_extensions(&self.extensions, buf)
+        serialize_opaque_vec(&self.tree_hash, buf)?;
+        serialize_opaque_vec(&self.confirmed_transcript_hash, buf)?;
+        serialize_extensions(&self.extensions, buf)
     }
 }
 
@@ -80,7 +80,7 @@ impl GroupContext {
             .hpke(cipher_suite)
             .kdf_extract(commit_secret, prev_init_secret)?;
 
-        let raw_group_context = write(self)?;
+        let raw_group_context = serialize(self)?;
         let extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
@@ -112,7 +112,7 @@ impl GroupContext {
             joiner_secret,
         )?;
 
-        let raw_group_context = write(self)?;
+        let raw_group_context = serialize(self)?;
         let extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
@@ -162,27 +162,27 @@ pub(crate) struct ConfirmedTranscriptHashInput {
     pub(crate) signature: Bytes,
 }
 
-impl Reader for ConfirmedTranscriptHashInput {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ConfirmedTranscriptHashInput {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.wire_format.read(buf)?;
-        self.content.read(buf)?;
+        self.wire_format.deserialize(buf)?;
+        self.content.deserialize(buf)?;
         match self.content.content {
             Content::Application(_) | Content::Proposal(_) => {
                 return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
             }
             Content::Commit(_) => {}
         };
-        self.signature = read_opaque_vec(buf)?;
+        self.signature = deserialize_opaque_vec(buf)?;
         Ok(())
     }
 }
 
-impl Writer for ConfirmedTranscriptHashInput {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ConfirmedTranscriptHashInput {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -194,9 +194,9 @@ impl Writer for ConfirmedTranscriptHashInput {
             Content::Commit(_) => {}
         };
 
-        self.wire_format.write(buf)?;
-        self.content.write(buf)?;
-        write_opaque_vec(&self.signature, buf)
+        self.wire_format.serialize(buf)?;
+        self.content.serialize(buf)?;
+        serialize_opaque_vec(&self.signature, buf)
     }
 }
 
@@ -208,7 +208,7 @@ impl ConfirmedTranscriptHashInput {
         interim_transcript_hash_before: &[u8],
     ) -> Result<Bytes> {
         let mut buf = BytesMut::new();
-        let raw_input = write(self)?;
+        let raw_input = serialize(self)?;
 
         buf.extend_from_slice(interim_transcript_hash_before);
         buf.put(raw_input);
@@ -224,7 +224,7 @@ pub(crate) fn next_interim_transcript_hash(
     confirmation_tag: &[u8],
 ) -> Result<Bytes> {
     let mut buf = BytesMut::new();
-    write_opaque_vec(confirmation_tag, &mut buf)?;
+    serialize_opaque_vec(confirmation_tag, &mut buf)?;
     let raw_input = buf.freeze();
 
     let mut buf = BytesMut::new();
@@ -256,8 +256,8 @@ impl TryFrom<u8> for ResumptionPSKUsage {
     }
 }
 
-impl Reader for ResumptionPSKUsage {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ResumptionPSKUsage {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -269,8 +269,8 @@ impl Reader for ResumptionPSKUsage {
         Ok(())
     }
 }
-impl Writer for ResumptionPSKUsage {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ResumptionPSKUsage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -305,8 +305,8 @@ pub(crate) struct PreSharedKeyID {
     psk_nonce: Bytes,
 }
 
-impl Reader for PreSharedKeyID {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for PreSharedKeyID {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -317,12 +317,12 @@ impl Reader for PreSharedKeyID {
         let v = buf.get_u8();
         match v {
             1 => {
-                self.psk = Psk::External(read_opaque_vec(buf)?);
+                self.psk = Psk::External(deserialize_opaque_vec(buf)?);
             }
             2 => {
                 let mut resumption = Resumption::default();
-                resumption.usage.read(buf)?;
-                resumption.psk_group_id = read_opaque_vec(buf)?;
+                resumption.usage.deserialize(buf)?;
+                resumption.psk_group_id = deserialize_opaque_vec(buf)?;
                 if buf.remaining() < 8 {
                     return Err(Error::BufferTooSmall);
                 }
@@ -332,13 +332,13 @@ impl Reader for PreSharedKeyID {
             _ => return Err(Error::InvalidPskTypeValue(v)),
         }
 
-        self.psk_nonce = read_opaque_vec(buf)?;
+        self.psk_nonce = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
-impl Writer for PreSharedKeyID {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PreSharedKeyID {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -346,18 +346,18 @@ impl Writer for PreSharedKeyID {
         match &self.psk {
             Psk::External(psk_id) => {
                 buf.put_u8(1);
-                write_opaque_vec(psk_id, buf)?;
+                serialize_opaque_vec(psk_id, buf)?;
             }
             Psk::Resumption(resumption) => {
                 buf.put_u8(2);
 
-                resumption.usage.write(buf)?;
-                write_opaque_vec(&resumption.psk_group_id, buf)?;
+                resumption.usage.serialize(buf)?;
+                serialize_opaque_vec(&resumption.psk_group_id, buf)?;
                 buf.put_u64(resumption.psk_epoch);
             }
         }
 
-        write_opaque_vec(&self.psk_nonce, buf)
+        serialize_opaque_vec(&self.psk_nonce, buf)
     }
 }
 
@@ -385,7 +385,7 @@ fn extract_psk_secret(
             index: i as u16,
             count: psk_ids.len() as u16,
         };
-        let raw_psklabel = write(&psk_label)?;
+        let raw_psklabel = serialize(&psk_label)?;
 
         let psk_input = crypto_provider.expand_with_label(
             cipher_suite,
@@ -410,13 +410,13 @@ struct PskLabel {
     count: u16,
 }
 
-impl Reader for PskLabel {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for PskLabel {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.id.read(buf)?;
+        self.id.deserialize(buf)?;
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
@@ -427,13 +427,13 @@ impl Reader for PskLabel {
     }
 }
 
-impl Writer for PskLabel {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PskLabel {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.id.write(buf)?;
+        self.id.serialize(buf)?;
         buf.put_u16(self.index);
         buf.put_u16(self.count);
         Ok(())

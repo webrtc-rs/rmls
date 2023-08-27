@@ -1,7 +1,7 @@
 use super::*;
-use crate::codec::codec_test::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
+use crate::serde::serde_test::*;
 use crate::tree::secret_tree::derive_tree_secret;
 
 use serde::{Deserialize, Serialize};

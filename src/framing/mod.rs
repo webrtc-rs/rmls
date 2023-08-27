@@ -2,7 +2,6 @@ use bytes::{Buf, BufMut, Bytes};
 use rand::Rng;
 
 use crate::cipher_suite::CipherSuite;
-use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 use crate::key_package::KeyPackage;
@@ -10,6 +9,7 @@ use crate::key_schedule::{ConfirmedTranscriptHashInput, GroupContext};
 use crate::messages::group_info::GroupInfo;
 use crate::messages::proposal::Proposal;
 use crate::messages::{Commit, Welcome};
+use crate::serde::*;
 use crate::tree::secret_tree::RatchetSecret;
 use crate::tree::tree_math::LeafIndex;
 
@@ -39,8 +39,8 @@ impl TryFrom<u8> for ContentType {
     }
 }
 
-impl Reader for ContentType {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ContentType {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -52,8 +52,8 @@ impl Reader for ContentType {
         Ok(())
     }
 }
-impl Writer for ContentType {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ContentType {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -76,8 +76,8 @@ impl Default for Content {
     }
 }
 
-impl Reader for Content {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Content {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -88,16 +88,16 @@ impl Reader for Content {
         let v = buf.get_u8();
         match v {
             0x01 => {
-                *self = Content::Application(read_opaque_vec(buf)?);
+                *self = Content::Application(deserialize_opaque_vec(buf)?);
             }
             0x02 => {
                 let mut proposal = Proposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 *self = Content::Proposal(proposal);
             }
             0x03 => {
                 let mut commit = Commit::default();
-                commit.read(buf)?;
+                commit.deserialize(buf)?;
                 *self = Content::Commit(commit);
             }
             _ => return Err(Error::InvalidContentTypeValue(v)),
@@ -106,8 +106,8 @@ impl Reader for Content {
         Ok(())
     }
 }
-impl Writer for Content {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Content {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -115,15 +115,15 @@ impl Writer for Content {
         match self {
             Content::Application(application) => {
                 buf.put_u8(1);
-                write_opaque_vec(application, buf)?;
+                serialize_opaque_vec(application, buf)?;
             }
             Content::Proposal(proposal) => {
                 buf.put_u8(2);
-                proposal.write(buf)?;
+                proposal.serialize(buf)?;
             }
             Content::Commit(commit) => {
                 buf.put_u8(3);
-                commit.write(buf)?
+                commit.serialize(buf)?
             }
         }
 
@@ -150,8 +150,8 @@ pub(crate) enum Sender {
     NewMemberCommit,
 }
 
-impl Reader for Sender {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Sender {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -186,8 +186,8 @@ impl Reader for Sender {
     }
 }
 
-impl Writer for Sender {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Sender {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -239,8 +239,8 @@ impl TryFrom<u16> for WireFormat {
     }
 }
 
-impl Reader for WireFormat {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for WireFormat {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -255,8 +255,8 @@ impl Reader for WireFormat {
     }
 }
 
-impl Writer for WireFormat {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for WireFormat {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -279,34 +279,34 @@ pub(crate) struct FramedContent {
     pub(crate) content: Content,
 }
 
-impl Reader for FramedContent {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for FramedContent {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = read_opaque_vec(buf)?;
+        self.group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
         self.epoch = buf.get_u64();
-        self.sender.read(buf)?;
-        self.authenticated_data = read_opaque_vec(buf)?;
-        self.content.read(buf)
+        self.sender.deserialize(buf)?;
+        self.authenticated_data = deserialize_opaque_vec(buf)?;
+        self.content.deserialize(buf)
     }
 }
 
-impl Writer for FramedContent {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for FramedContent {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
-        self.sender.write(buf)?;
-        write_opaque_vec(&self.authenticated_data, buf)?;
-        self.content.write(buf)
+        self.sender.serialize(buf)?;
+        serialize_opaque_vec(&self.authenticated_data, buf)?;
+        self.content.serialize(buf)
     }
 }
 
@@ -332,8 +332,8 @@ pub struct MlsMessage {
     pub(crate) message: WireFormatMessage,
 }
 
-impl Reader for MlsMessage {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for MlsMessage {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -347,61 +347,61 @@ impl Reader for MlsMessage {
             return Err(Error::InvalidProtocolVersion(self.version));
         }
 
-        self.wire_format.read(buf)?;
+        self.wire_format.deserialize(buf)?;
 
         match self.wire_format {
             WireFormat::PublicMessage => {
                 let mut message = PublicMessage::default();
-                message.read(buf)?;
+                message.deserialize(buf)?;
                 self.message = WireFormatMessage::PublicMessage(message);
             }
             WireFormat::PrivateMessage => {
                 let mut message = PrivateMessage::default();
-                message.read(buf)?;
+                message.deserialize(buf)?;
                 self.message = WireFormatMessage::PrivateMessage(message);
             }
             WireFormat::Welcome => {
                 let mut message = Welcome::default();
-                message.read(buf)?;
+                message.deserialize(buf)?;
                 self.message = WireFormatMessage::Welcome(message);
             }
             WireFormat::GroupInfo => {
                 let mut message = GroupInfo::default();
-                message.read(buf)?;
+                message.deserialize(buf)?;
                 self.message = WireFormatMessage::GroupInfo(message);
             }
             WireFormat::KeyPackage => {
                 let mut message = KeyPackage::default();
-                message.read(buf)?;
+                message.deserialize(buf)?;
                 self.message = WireFormatMessage::KeyPackage(message);
             }
         }
         Ok(())
     }
 }
-impl Writer for MlsMessage {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for MlsMessage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.version);
-        self.wire_format.write(buf)?;
+        self.wire_format.serialize(buf)?;
         match &self.message {
             WireFormatMessage::PublicMessage(message) => {
-                message.write(buf)?;
+                message.serialize(buf)?;
             }
             WireFormatMessage::PrivateMessage(message) => {
-                message.write(buf)?;
+                message.serialize(buf)?;
             }
             WireFormatMessage::Welcome(message) => {
-                message.write(buf)?;
+                message.serialize(buf)?;
             }
             WireFormatMessage::GroupInfo(message) => {
-                message.write(buf)?;
+                message.serialize(buf)?;
             }
             WireFormatMessage::KeyPackage(message) => {
-                message.write(buf)?;
+                message.serialize(buf)?;
             }
         }
         Ok(())
@@ -415,27 +415,29 @@ pub(crate) struct AuthenticatedContent {
     pub(crate) auth: FramedContentAuthData,
 }
 
-impl Reader for AuthenticatedContent {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for AuthenticatedContent {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.wire_format.read(buf)?;
-        self.content.read(buf)?;
-        self.auth.read(buf, self.content.content.content_type())
+        self.wire_format.deserialize(buf)?;
+        self.content.deserialize(buf)?;
+        self.auth
+            .deserialize(buf, self.content.content.content_type())
     }
 }
 
-impl Writer for AuthenticatedContent {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for AuthenticatedContent {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.wire_format.write(buf)?;
-        self.content.write(buf)?;
-        self.auth.write(buf, self.content.content.content_type())
+        self.wire_format.serialize(buf)?;
+        self.content.serialize(buf)?;
+        self.auth
+            .serialize(buf, self.content.content.content_type())
     }
 }
 
@@ -500,28 +502,28 @@ pub(crate) struct FramedContentAuthData {
 }
 
 impl FramedContentAuthData {
-    fn read<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
+    fn deserialize<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.signature = read_opaque_vec(buf)?;
+        self.signature = deserialize_opaque_vec(buf)?;
         if ct == ContentType::Commit {
-            self.confirmation_tag = read_opaque_vec(buf)?;
+            self.confirmation_tag = deserialize_opaque_vec(buf)?;
         }
 
         Ok(())
     }
 
-    fn write<B>(&self, buf: &mut B, ct: ContentType) -> Result<()>
+    fn serialize<B>(&self, buf: &mut B, ct: ContentType) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.signature, buf)?;
+        serialize_opaque_vec(&self.signature, buf)?;
 
         if ct == ContentType::Commit {
-            write_opaque_vec(&self.confirmation_tag, buf)?;
+            serialize_opaque_vec(&self.confirmation_tag, buf)?;
         }
         Ok(())
     }
@@ -552,7 +554,7 @@ impl FramedContentAuthData {
         verif_key: &[u8],
         content: &FramedContentTBS,
     ) -> Result<()> {
-        let raw_content = write(content)?;
+        let raw_content = serialize(content)?;
         crypto_provider.verify_with_label(
             cipher_suite,
             verif_key,
@@ -568,7 +570,7 @@ fn sign_framed_content(
     sign_key: &[u8],
     content: &FramedContentTBS,
 ) -> Result<Bytes> {
-    let raw_content = write(content)?;
+    let raw_content = serialize(content)?;
     crypto_provider.sign_with_label(cipher_suite, sign_key, b"FramedContentTBS", &raw_content)
 }
 
@@ -580,8 +582,8 @@ pub(crate) struct FramedContentTBS {
     context: Option<GroupContext>, // for senderTypeMember and senderTypeNewMemberCommit
 }
 
-impl Reader for FramedContentTBS {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for FramedContentTBS {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -590,14 +592,14 @@ impl Reader for FramedContentTBS {
             return Err(Error::BufferTooSmall);
         }
         self.version = buf.get_u16();
-        self.wire_format.read(buf)?;
-        self.content.read(buf)?;
+        self.wire_format.deserialize(buf)?;
+        self.content.deserialize(buf)?;
 
         let sender = self.content.sender;
         match sender {
             Sender::Member(_) | Sender::NewMemberCommit => {
                 let mut group_context = GroupContext::default();
-                group_context.read(buf)?;
+                group_context.deserialize(buf)?;
                 self.context = Some(group_context);
             }
             _ => self.context = None,
@@ -607,19 +609,19 @@ impl Reader for FramedContentTBS {
     }
 }
 
-impl Writer for FramedContentTBS {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for FramedContentTBS {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.version);
-        self.wire_format.write(buf)?;
-        self.content.write(buf)?;
+        self.wire_format.serialize(buf)?;
+        self.content.serialize(buf)?;
         match &self.content.sender {
             Sender::Member(_) | Sender::NewMemberCommit => {
                 if let Some(group_context) = &self.context {
-                    group_context.write(buf)?;
+                    group_context.serialize(buf)?;
                 } else {
                     return Err(Error::SenderMemberAndNewMemberCommitNoGroupContext);
                 }
@@ -661,34 +663,36 @@ pub(crate) fn sign_public_message(
     })
 }
 
-impl Reader for PublicMessage {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for PublicMessage {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.content.read(buf)?;
-        self.auth.read(buf, self.content.content.content_type())?;
+        self.content.deserialize(buf)?;
+        self.auth
+            .deserialize(buf, self.content.content.content_type())?;
 
         if let Sender::Member(_) = &self.content.sender {
-            self.membership_tag = Some(read_opaque_vec(buf)?);
+            self.membership_tag = Some(deserialize_opaque_vec(buf)?);
         }
 
         Ok(())
     }
 }
-impl Writer for PublicMessage {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PublicMessage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.content.write(buf)?;
-        self.auth.write(buf, self.content.content.content_type())?;
+        self.content.serialize(buf)?;
+        self.auth
+            .serialize(buf, self.content.content.content_type())?;
 
         if let Sender::Member(_) = &self.content.sender {
             if let Some(membership_tag) = &self.membership_tag {
-                write_opaque_vec(membership_tag, buf)?;
+                serialize_opaque_vec(membership_tag, buf)?;
             }
         }
 
@@ -725,7 +729,7 @@ impl PublicMessage {
             }
             _ => {}
         };
-        let raw_auth_content_tbm = write(&self.authenticated_content_tbm(ctx))?;
+        let raw_auth_content_tbm = serialize(&self.authenticated_content_tbm(ctx))?;
         self.membership_tag =
             Some(crypto_provider.sign_mac(cipher_suite, membership_key, &raw_auth_content_tbm));
         Ok(())
@@ -745,12 +749,12 @@ impl PublicMessage {
             _ => {}
         };
         if let Some(membership_tag) = &self.membership_tag {
-            let raw_auth_content_tbm = if let Ok(raw) = write(&self.authenticated_content_tbm(ctx))
-            {
-                raw
-            } else {
-                return false;
-            };
+            let raw_auth_content_tbm =
+                if let Ok(raw) = serialize(&self.authenticated_content_tbm(ctx)) {
+                    raw
+                } else {
+                    return false;
+                };
             crypto_provider.verify_mac(
                 cipher_suite,
                 membership_key,
@@ -768,15 +772,15 @@ struct AuthenticatedContentTBM {
     auth: FramedContentAuthData,
 }
 
-impl Writer for AuthenticatedContentTBM {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for AuthenticatedContentTBM {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.content_tbs.write(buf)?;
+        self.content_tbs.serialize(buf)?;
         self.auth
-            .write(buf, self.content_tbs.content.content.content_type())
+            .serialize(buf, self.content_tbs.content.content.content_type())
     }
 }
 
@@ -829,37 +833,37 @@ pub(crate) fn encrypt_private_message(
     })
 }
 
-impl Reader for PrivateMessage {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for PrivateMessage {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = read_opaque_vec(buf)?;
+        self.group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
         self.epoch = buf.get_u64();
-        self.content_type.read(buf)?;
-        self.authenticated_data = read_opaque_vec(buf)?;
-        self.encrypted_sender_data = read_opaque_vec(buf)?;
-        self.ciphertext = read_opaque_vec(buf)?;
+        self.content_type.deserialize(buf)?;
+        self.authenticated_data = deserialize_opaque_vec(buf)?;
+        self.encrypted_sender_data = deserialize_opaque_vec(buf)?;
+        self.ciphertext = deserialize_opaque_vec(buf)?;
         Ok(())
     }
 }
 
-impl Writer for PrivateMessage {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PrivateMessage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
-        self.content_type.write(buf)?;
-        write_opaque_vec(&self.authenticated_data, buf)?;
-        write_opaque_vec(&self.encrypted_sender_data, buf)?;
-        write_opaque_vec(&self.ciphertext, buf)
+        self.content_type.serialize(buf)?;
+        serialize_opaque_vec(&self.authenticated_data, buf)?;
+        serialize_opaque_vec(&self.encrypted_sender_data, buf)?;
+        serialize_opaque_vec(&self.ciphertext, buf)
     }
 }
 
@@ -888,7 +892,7 @@ impl PrivateMessage {
             epoch: self.epoch,
             content_type: self.content_type,
         };
-        let raw_aad = write(&aad)?;
+        let raw_aad = serialize(&aad)?;
 
         let raw_sender_data = crypto_provider.hpke(cipher_suite).aead_open(
             &key,
@@ -898,7 +902,7 @@ impl PrivateMessage {
         )?;
         let mut sender_data = SenderData::default();
         let mut buf = raw_sender_data.as_ref();
-        sender_data.read(&mut buf)?;
+        sender_data.deserialize(&mut buf)?;
         Ok(sender_data)
     }
 
@@ -923,7 +927,7 @@ impl PrivateMessage {
             authenticated_data: self.authenticated_data.clone(),
         };
 
-        let raw_aad = write(&aad)?;
+        let raw_aad = serialize(&aad)?;
         let raw_content = crypto_provider.hpke(cipher_suite).aead_open(
             &key,
             &nonce,
@@ -933,7 +937,7 @@ impl PrivateMessage {
 
         let mut buf = raw_content.as_ref();
         let mut content = PrivateMessageContent::default();
-        content.read(&mut buf, self.content_type)?;
+        content.deserialize(&mut buf, self.content_type)?;
 
         /*TODO(yngrtc):while buf.has_remaining() {
             if buf.get_u8() != 0 {
@@ -969,15 +973,15 @@ struct SenderDataAAD {
     content_type: ContentType,
 }
 
-impl Writer for SenderDataAAD {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for SenderDataAAD {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
-        self.content_type.write(buf)
+        self.content_type.serialize(buf)
     }
 }
 
@@ -989,16 +993,16 @@ struct PrivateContentAAD {
     authenticated_data: Bytes,
 }
 
-impl Writer for PrivateContentAAD {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PrivateContentAAD {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.group_id, buf)?;
+        serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
-        self.content_type.write(buf)?;
-        write_opaque_vec(&self.authenticated_data, buf)
+        self.content_type.serialize(buf)?;
+        serialize_opaque_vec(&self.authenticated_data, buf)
     }
 }
 
@@ -1009,44 +1013,44 @@ pub(crate) struct PrivateMessageContent {
 }
 
 impl PrivateMessageContent {
-    fn read<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
+    fn deserialize<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
         match ct {
             ContentType::Application => {
-                self.content = Content::Application(read_opaque_vec(buf)?);
+                self.content = Content::Application(deserialize_opaque_vec(buf)?);
             }
             ContentType::Proposal => {
                 let mut proposal = Proposal::default();
-                proposal.read(buf)?;
+                proposal.deserialize(buf)?;
                 self.content = Content::Proposal(proposal);
             }
             ContentType::Commit => {
                 let mut commit = Commit::default();
-                commit.read(buf)?;
+                commit.deserialize(buf)?;
                 self.content = Content::Commit(commit);
             }
         };
 
-        self.auth.read(buf, ct)
+        self.auth.deserialize(buf, ct)
     }
 }
 
-impl Writer for PrivateMessageContent {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for PrivateMessageContent {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         match &self.content {
-            Content::Application(application) => write_opaque_vec(application, buf)?,
-            Content::Proposal(proposal) => proposal.write(buf)?,
-            Content::Commit(commit) => commit.write(buf)?,
+            Content::Application(application) => serialize_opaque_vec(application, buf)?,
+            Content::Proposal(proposal) => proposal.serialize(buf)?,
+            Content::Commit(commit) => commit.serialize(buf)?,
         }
 
-        self.auth.write(buf, self.content.content_type())
+        self.auth.serialize(buf, self.content.content_type())
     }
 }
 
@@ -1092,7 +1096,7 @@ pub(crate) fn encrypt_private_message_content(
         auth: auth_content.auth,
     };
 
-    let plainttext = write(&priv_content)?;
+    let plainttext = serialize(&priv_content)?;
 
     let (key, nonce) =
         derive_private_message_key_and_nonce(crypto_provider, cipher_suite, secret, reuse_guard)?;
@@ -1103,7 +1107,7 @@ pub(crate) fn encrypt_private_message_content(
         content_type: content.content.content_type(),
         authenticated_data: content.authenticated_data.clone(),
     };
-    let raw_aad = write(&aad)?;
+    let raw_aad = serialize(&aad)?;
 
     crypto_provider
         .hpke(cipher_suite)
@@ -1136,8 +1140,8 @@ fn encrypt_sender_data(
         epoch: content.epoch,
         content_type: content.content.content_type(),
     };
-    let raw_aad = write(&aad)?;
-    let raw_sender_data = write(sender_data)?;
+    let raw_aad = serialize(&aad)?;
+    let raw_sender_data = serialize(sender_data)?;
 
     crypto_provider
         .hpke(cipher_suite)
@@ -1163,8 +1167,8 @@ impl SenderData {
     }
 }
 
-impl Reader for SenderData {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for SenderData {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -1179,8 +1183,8 @@ impl Reader for SenderData {
     }
 }
 
-impl Writer for SenderData {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for SenderData {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,

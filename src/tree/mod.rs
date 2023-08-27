@@ -11,12 +11,12 @@ use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::cipher_suite::*;
-use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
 use crate::messages::proposal::*;
+use crate::serde::*;
 use tree_math::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -26,18 +26,18 @@ pub(crate) struct ParentNode {
     unmerged_leaves: Vec<LeafIndex>,
 }
 
-impl Reader for ParentNode {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for ParentNode {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
         *self = ParentNode::default();
 
-        self.encryption_key = read_opaque_vec(buf)?;
-        self.parent_hash = read_opaque_vec(buf)?;
+        self.encryption_key = deserialize_opaque_vec(buf)?;
+        self.parent_hash = deserialize_opaque_vec(buf)?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if !b.has_remaining() {
                 return Err(Error::BufferTooSmall);
             }
@@ -48,15 +48,15 @@ impl Reader for ParentNode {
     }
 }
 
-impl Writer for ParentNode {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for ParentNode {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.encryption_key, buf)?;
-        write_opaque_vec(&self.parent_hash, buf)?;
-        write_vector(
+        serialize_opaque_vec(&self.encryption_key, buf)?;
+        serialize_opaque_vec(&self.parent_hash, buf)?;
+        serialize_vector(
             self.unmerged_leaves.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -89,9 +89,9 @@ impl ParentNode {
         original_sibling_tree_hash: &[u8],
     ) -> Result<Bytes> {
         let mut buf = BytesMut::new();
-        write_opaque_vec(encryption_key, &mut buf)?;
-        write_opaque_vec(parent_hash, &mut buf)?;
-        write_opaque_vec(original_sibling_tree_hash, &mut buf)?;
+        serialize_opaque_vec(encryption_key, &mut buf)?;
+        serialize_opaque_vec(parent_hash, &mut buf)?;
+        serialize_opaque_vec(original_sibling_tree_hash, &mut buf)?;
         Ok(buf.freeze())
     }
 }
@@ -104,8 +104,8 @@ pub(crate) enum LeafNodeSource {
     Commit(Bytes),        // = 3,
 }
 
-impl Reader for LeafNodeSource {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for LeafNodeSource {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -117,11 +117,11 @@ impl Reader for LeafNodeSource {
         match v {
             1 => {
                 let mut lifetime = Lifetime::default();
-                lifetime.read(buf)?;
+                lifetime.deserialize(buf)?;
                 *self = LeafNodeSource::KeyPackage(lifetime);
             }
             2 => *self = LeafNodeSource::Update,
-            3 => *self = LeafNodeSource::Commit(read_opaque_vec(buf)?),
+            3 => *self = LeafNodeSource::Commit(deserialize_opaque_vec(buf)?),
             _ => return Err(Error::InvalidLeafNodeSourceValue(v)),
         };
 
@@ -129,8 +129,8 @@ impl Reader for LeafNodeSource {
     }
 }
 
-impl Writer for LeafNodeSource {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for LeafNodeSource {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -138,12 +138,12 @@ impl Writer for LeafNodeSource {
         match self {
             LeafNodeSource::KeyPackage(lifetime) => {
                 buf.put_u8(1);
-                lifetime.write(buf)?;
+                lifetime.serialize(buf)?;
             }
             LeafNodeSource::Update => buf.put_u8(2),
             LeafNodeSource::Commit(parent_hash) => {
                 buf.put_u8(3);
-                write_opaque_vec(parent_hash, buf)?
+                serialize_opaque_vec(parent_hash, buf)?
             }
         };
 
@@ -160,8 +160,8 @@ pub(crate) struct Capabilities {
     credentials: Vec<CredentialType>,
 }
 
-impl Reader for Capabilities {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Capabilities {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -170,7 +170,7 @@ impl Reader for Capabilities {
 
         // Note: all unknown values here must be ignored
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
@@ -179,7 +179,7 @@ impl Reader for Capabilities {
             Ok(())
         })?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
@@ -187,7 +187,7 @@ impl Reader for Capabilities {
             Ok(())
         })?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
@@ -196,7 +196,7 @@ impl Reader for Capabilities {
             Ok(())
         })?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
@@ -205,7 +205,7 @@ impl Reader for Capabilities {
             Ok(())
         })?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
@@ -218,13 +218,13 @@ impl Reader for Capabilities {
     }
 }
 
-impl Writer for Capabilities {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Capabilities {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_vector(
+        serialize_vector(
             self.versions.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -233,7 +233,7 @@ impl Writer for Capabilities {
             },
         )?;
 
-        write_vector(
+        serialize_vector(
             self.cipher_suites.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -242,7 +242,7 @@ impl Writer for Capabilities {
             },
         )?;
 
-        write_vector(
+        serialize_vector(
             self.extensions.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -251,7 +251,7 @@ impl Writer for Capabilities {
             },
         )?;
 
-        write_vector(
+        serialize_vector(
             self.proposals.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -260,7 +260,7 @@ impl Writer for Capabilities {
             },
         )?;
 
-        write_vector(
+        serialize_vector(
             self.credentials.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
@@ -282,8 +282,8 @@ pub(crate) struct Lifetime {
     not_after: u64,
 }
 
-impl Reader for Lifetime {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Lifetime {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -300,8 +300,8 @@ impl Reader for Lifetime {
     }
 }
 
-impl Writer for Lifetime {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Lifetime {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -384,14 +384,14 @@ pub(crate) struct Extension {
     extension_data: Bytes,
 }
 
-pub(crate) fn read_extensions<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
+pub(crate) fn deserialize_extensions<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
     let mut exts = vec![];
-    read_vector(buf, |b: &mut Bytes| -> Result<()> {
+    deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
         if b.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
         let extension_type: ExtensionType = b.get_u16().into();
-        let extension_data = read_opaque_vec(b)?;
+        let extension_data = deserialize_opaque_vec(b)?;
         exts.push(Extension {
             extension_type,
             extension_data,
@@ -401,13 +401,13 @@ pub(crate) fn read_extensions<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
     Ok(exts)
 }
 
-pub(crate) fn write_extensions<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<()> {
-    write_vector(
+pub(crate) fn serialize_extensions<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<()> {
+    serialize_vector(
         exts.len(),
         buf,
         |i: usize, b: &mut BytesMut| -> Result<()> {
             b.put_u16(exts[i].extension_type.into());
-            write_opaque_vec(&exts[i].extension_data, b)
+            serialize_opaque_vec(&exts[i].extension_data, b)
         },
     )
 }
@@ -434,47 +434,47 @@ pub(crate) struct LeafNode {
 }
 
 impl LeafNode {
-    fn write_base<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        write_opaque_vec(&self.encryption_key, buf)?;
-        write_opaque_vec(&self.signature_key, buf)?;
-        self.credential.write(buf)?;
-        self.capabilities.write(buf)?;
-        self.leaf_node_source.write(buf)?;
+    fn serialize_base<B: BufMut>(&self, buf: &mut B) -> Result<()> {
+        serialize_opaque_vec(&self.encryption_key, buf)?;
+        serialize_opaque_vec(&self.signature_key, buf)?;
+        self.credential.serialize(buf)?;
+        self.capabilities.serialize(buf)?;
+        self.leaf_node_source.serialize(buf)?;
 
-        write_extensions(&self.extensions, buf)
+        serialize_extensions(&self.extensions, buf)
     }
 }
 
-impl Reader for LeafNode {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for LeafNode {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
         *self = LeafNode::default();
 
-        self.encryption_key = read_opaque_vec(buf)?;
-        self.signature_key = read_opaque_vec(buf)?;
+        self.encryption_key = deserialize_opaque_vec(buf)?;
+        self.signature_key = deserialize_opaque_vec(buf)?;
 
-        self.credential.read(buf)?;
-        self.capabilities.read(buf)?;
-        self.leaf_node_source.read(buf)?;
+        self.credential.deserialize(buf)?;
+        self.capabilities.deserialize(buf)?;
+        self.leaf_node_source.deserialize(buf)?;
 
-        self.extensions = read_extensions(buf)?;
-        self.signature = read_opaque_vec(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
+        self.signature = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
 
-impl Writer for LeafNode {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for LeafNode {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.write_base(buf)?;
-        write_opaque_vec(&self.signature, buf)
+        self.serialize_base(buf)?;
+        serialize_opaque_vec(&self.signature, buf)
     }
 }
 
@@ -487,17 +487,17 @@ pub(crate) struct LeafNodeTBS<'a> {
     leaf_index: LeafIndex,
 }
 
-impl<'a> Writer for LeafNodeTBS<'a> {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl<'a> Serializer for LeafNodeTBS<'a> {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.leaf_node.write_base(buf)?;
+        self.leaf_node.serialize_base(buf)?;
 
         match &self.leaf_node.leaf_node_source {
             LeafNodeSource::Update | LeafNodeSource::Commit(_) => {
-                write_opaque_vec(self.group_id, buf)?;
+                serialize_opaque_vec(self.group_id, buf)?;
                 buf.put_u32(self.leaf_index.0);
             }
             _ => {}
@@ -518,7 +518,7 @@ impl LeafNode {
         group_id: &GroupID,
         leaf_index: LeafIndex,
     ) -> bool {
-        let leaf_node_tbs = if let Ok(leaf_node_tbs) = write(&LeafNodeTBS {
+        let leaf_node_tbs = if let Ok(leaf_node_tbs) = serialize(&LeafNodeTBS {
             leaf_node: self,
             group_id,
             leaf_index,
@@ -612,34 +612,36 @@ pub(crate) struct UpdatePathNode {
     encrypted_path_secret: Vec<HpkeCiphertext>,
 }
 
-impl Reader for UpdatePathNode {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for UpdatePathNode {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.encryption_key = read_opaque_vec(buf)?;
+        self.encryption_key = deserialize_opaque_vec(buf)?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             let mut ciphertext = HpkeCiphertext::default();
-            ciphertext.read(b)?;
+            ciphertext.deserialize(b)?;
             self.encrypted_path_secret.push(ciphertext);
             Ok(())
         })
     }
 }
 
-impl Writer for UpdatePathNode {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for UpdatePathNode {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.encryption_key, buf)?;
-        write_vector(
+        serialize_opaque_vec(&self.encryption_key, buf)?;
+        serialize_vector(
             self.encrypted_path_secret.len(),
             buf,
-            |i: usize, b: &mut BytesMut| -> Result<()> { self.encrypted_path_secret[i].write(b) },
+            |i: usize, b: &mut BytesMut| -> Result<()> {
+                self.encrypted_path_secret[i].serialize(b)
+            },
         )
     }
 }
@@ -650,34 +652,34 @@ pub(crate) struct UpdatePath {
     nodes: Vec<UpdatePathNode>,
 }
 
-impl Reader for UpdatePath {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for UpdatePath {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.leaf_node.read(buf)?;
+        self.leaf_node.deserialize(buf)?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             let mut node = UpdatePathNode::default();
-            node.read(b)?;
+            node.deserialize(b)?;
             self.nodes.push(node);
             Ok(())
         })
     }
 }
 
-impl Writer for UpdatePath {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for UpdatePath {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.leaf_node.write(buf)?;
-        write_vector(
+        self.leaf_node.serialize(buf)?;
+        serialize_vector(
             self.nodes.len(),
             buf,
-            |i: usize, b: &mut BytesMut| -> Result<()> { self.nodes[i].write(b) },
+            |i: usize, b: &mut BytesMut| -> Result<()> { self.nodes[i].serialize(b) },
         )
     }
 }
@@ -694,8 +696,8 @@ impl Default for Node {
     }
 }
 
-impl Reader for Node {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Node {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -708,13 +710,13 @@ impl Reader for Node {
         match v {
             1 => {
                 let mut leaf_node = LeafNode::default();
-                leaf_node.read(buf)?;
+                leaf_node.deserialize(buf)?;
                 *self = Node::Leaf(leaf_node);
                 Ok(())
             }
             2 => {
                 let mut parent_node = ParentNode::default();
-                parent_node.read(buf)?;
+                parent_node.deserialize(buf)?;
                 *self = Node::Parent(parent_node);
                 Ok(())
             }
@@ -723,8 +725,8 @@ impl Reader for Node {
     }
 }
 
-impl Writer for Node {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Node {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -732,11 +734,11 @@ impl Writer for Node {
         match self {
             Node::Leaf(leaf_node) => {
                 buf.put_u8(1);
-                leaf_node.write(buf)
+                leaf_node.serialize(buf)
             }
             Node::Parent(parent_node) => {
                 buf.put_u8(2);
-                parent_node.write(buf)
+                parent_node.serialize(buf)
             }
         }
     }

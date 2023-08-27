@@ -1,7 +1,7 @@
 use super::*;
-use crate::codec::codec_test::load_test_vector;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
+use crate::serde::serde_test::load_test_vector;
 
 use serde::{Deserialize, Serialize};
 

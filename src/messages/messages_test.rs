@@ -2,8 +2,6 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use crate::cipher_suite::CipherSuite;
-use crate::codec::codec_test::load_test_vector;
-use crate::codec::*;
 use crate::crypto::provider::{ring::RingCryptoProvider, CryptoProvider};
 use crate::error::*;
 use crate::framing::{
@@ -12,6 +10,8 @@ use crate::framing::{
     WireFormatMessage, PROTOCOL_VERSION_MLS10,
 };
 use crate::key_schedule::GroupContext;
+use crate::serde::serde_test::load_test_vector;
+use crate::serde::*;
 use crate::tree::secret_tree::{
     derive_secret_tree, ratchet_label_from_content_type, RatchetSecret,
 };
@@ -37,7 +37,7 @@ fn welcome_test(
 ) -> Result<()> {
     let mut welcome_msg = MlsMessage::default();
     let mut buf = tc.welcome.as_ref();
-    welcome_msg.read(&mut buf)?;
+    welcome_msg.deserialize(&mut buf)?;
     assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
     let welcome = if let WireFormatMessage::Welcome(welcome) = welcome_msg.message {
         welcome
@@ -47,7 +47,7 @@ fn welcome_test(
 
     let mut key_package_msg = MlsMessage::default();
     let mut buf = tc.key_package.as_ref();
-    key_package_msg.read(&mut buf)?;
+    key_package_msg.deserialize(&mut buf)?;
     assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
     let key_package = if let WireFormatMessage::KeyPackage(key_package) = key_package_msg.message {
         key_package
@@ -154,7 +154,7 @@ fn test_message_protection_pub(
 ) -> Result<()> {
     let mut msg = MlsMessage::default();
     let mut buf = raw_pub;
-    msg.read(&mut buf)?;
+    msg.deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PublicMessage);
     let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
         pub_msg
@@ -193,8 +193,8 @@ fn verify_public_message(
 
     let raw = match &pub_msg.content.content {
         Content::Application(application) => application.clone(),
-        Content::Proposal(proposal) => write(proposal)?,
-        Content::Commit(commit) => write(commit)?,
+        Content::Proposal(proposal) => serialize(proposal)?,
+        Content::Commit(commit) => serialize(commit)?,
     };
     assert_eq!(raw.as_ref(), want_raw);
 
@@ -211,7 +211,7 @@ fn test_message_protection_priv(
 ) -> Result<()> {
     let mut msg = MlsMessage::default();
     let mut buf = raw_priv;
-    msg.read(&mut buf)?;
+    msg.deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PrivateMessage);
     let priv_msg = if let WireFormatMessage::PrivateMessage(priv_msg) = msg.message {
         priv_msg
@@ -304,8 +304,8 @@ fn decrypt_private_message(
 
     let raw = match &content.content {
         Content::Application(application) => application.clone(),
-        Content::Proposal(proposal) => write(proposal)?,
-        Content::Commit(commit) => write(commit)?,
+        Content::Proposal(proposal) => serialize(proposal)?,
+        Content::Commit(commit) => serialize(commit)?,
     };
     assert_eq!(raw.as_ref(), want_raw);
 

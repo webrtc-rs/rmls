@@ -1,5 +1,5 @@
-use crate::codec::*;
 use crate::key_schedule::GroupContext;
+use crate::serde::*;
 use crate::tree::*;
 
 use std::collections::HashMap;
@@ -7,16 +7,16 @@ use std::collections::HashMap;
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct RatchetTree(pub(crate) Vec<Option<Node>>);
 
-impl Reader for RatchetTree {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for RatchetTree {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
-            if read_optional(b)? {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
+            if deserialize_optional(b)? {
                 let mut node = Node::default();
-                node.read(b)?;
+                node.deserialize(b)?;
                 self.0.push(Some(node));
             } else {
                 self.0.push(None);
@@ -34,8 +34,8 @@ impl Reader for RatchetTree {
     }
 }
 
-impl Writer for RatchetTree {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for RatchetTree {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
@@ -45,10 +45,10 @@ impl Writer for RatchetTree {
             end -= 1;
         }
 
-        write_vector(end, buf, |i: usize, b: &mut BytesMut| -> Result<()> {
-            write_optional(self.0[i].is_some(), b)?;
+        serialize_vector(end, buf, |i: usize, b: &mut BytesMut| -> Result<()> {
+            serialize_optional(self.0[i].is_some(), b)?;
             if let Some(n) = &self.0[i] {
-                n.write(b)?;
+                n.serialize(b)?;
             }
             Ok(())
         })
@@ -337,9 +337,9 @@ impl RatchetTree {
     ) -> Result<()> {
         buf.put_u8(1); //NodeType::Leaf
         buf.put_u32(i.0);
-        write_optional(node.is_some(), buf)?;
+        serialize_optional(node.is_some(), buf)?;
         if let Some(node) = node {
-            node.write(buf)?;
+            node.serialize(buf)?;
         }
         Ok(())
     }
@@ -351,12 +351,12 @@ impl RatchetTree {
         right_hash: &[u8],
     ) -> Result<()> {
         buf.put_u8(2); //NodeType::Parent
-        write_optional(node.is_some(), buf)?;
+        serialize_optional(node.is_some(), buf)?;
         if let Some(node) = node {
-            node.write(buf)?;
+            node.serialize(buf)?;
         }
-        write_opaque_vec(left_hash, buf)?;
-        write_opaque_vec(right_hash, buf)
+        serialize_opaque_vec(left_hash, buf)?;
+        serialize_opaque_vec(right_hash, buf)
     }
 
     pub(crate) fn verify_parent_hashes(
@@ -455,7 +455,7 @@ impl RatchetTree {
                 }
 
                 // Make sure both nodes are identical
-                if let (Ok(raw1), Ok(raw2)) = (write(node), write(n)) {
+                if let (Ok(raw1), Ok(raw2)) = (serialize(node), serialize(n)) {
                     return (LeafIndex(li), raw1 == raw2);
                 } else {
                     return (LeafIndex(li), false);

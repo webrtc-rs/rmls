@@ -1,13 +1,13 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::error::*;
 use crate::key_schedule::{
     GroupContext, PreSharedKeyID, Psk, ResumptionPSKUsage, SECRET_LABEL_CONFIRM,
 };
+use crate::serde::*;
 use crate::tree::tree_math::LeafIndex;
-use crate::tree::{read_extensions, write_extensions, Extension};
+use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupInfo {
@@ -18,45 +18,45 @@ pub struct GroupInfo {
     signature: Bytes,
 }
 
-impl Reader for GroupInfo {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for GroupInfo {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_context.read(buf)?;
-        self.extensions = read_extensions(buf)?;
-        self.confirmation_tag = read_opaque_vec(buf)?;
+        self.group_context.deserialize(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
+        self.confirmation_tag = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
         self.signer = LeafIndex(buf.get_u32());
-        self.signature = read_opaque_vec(buf)?;
+        self.signature = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
 
-impl Writer for GroupInfo {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for GroupInfo {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.write_base(buf)?;
-        write_opaque_vec(&self.signature, buf)
+        self.serialize_base(buf)?;
+        serialize_opaque_vec(&self.signature, buf)
     }
 }
 
 impl GroupInfo {
-    fn write_base<B>(&self, buf: &mut B) -> Result<()>
+    fn serialize_base<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.group_context.write(buf)?;
-        write_extensions(&self.extensions, buf)?;
-        write_opaque_vec(&self.confirmation_tag, buf)?;
+        self.group_context.serialize(buf)?;
+        serialize_extensions(&self.extensions, buf)?;
+        serialize_opaque_vec(&self.confirmation_tag, buf)?;
         buf.put_u32(self.signer.0);
         Ok(())
     }
@@ -68,7 +68,7 @@ impl GroupInfo {
     ) -> Result<()> {
         let cipher_suite = self.group_context.cipher_suite;
         let mut buf = BytesMut::new();
-        self.write_base(&mut buf)?;
+        self.serialize_base(&mut buf)?;
         let tbs = buf.freeze();
 
         crypto_provider.verify_with_label(
@@ -113,47 +113,47 @@ pub struct GroupSecrets {
     psk_ids: Vec<PreSharedKeyID>,
 }
 
-impl Reader for GroupSecrets {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for GroupSecrets {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.joiner_secret = read_opaque_vec(buf)?;
+        self.joiner_secret = deserialize_opaque_vec(buf)?;
 
-        let has_path_secret = read_optional(buf)?;
+        let has_path_secret = deserialize_optional(buf)?;
         if has_path_secret {
-            self.path_secret = Some(read_opaque_vec(buf)?);
+            self.path_secret = Some(deserialize_opaque_vec(buf)?);
         } else {
             self.path_secret = None;
         }
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             let mut psk = PreSharedKeyID::default();
-            psk.read(b)?;
+            psk.deserialize(b)?;
             self.psk_ids.push(psk);
             Ok(())
         })
     }
 }
 
-impl Writer for GroupSecrets {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for GroupSecrets {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.joiner_secret, buf)?;
+        serialize_opaque_vec(&self.joiner_secret, buf)?;
 
-        write_optional(self.path_secret.is_some(), buf)?;
+        serialize_optional(self.path_secret.is_some(), buf)?;
         if let Some(path_secret) = &self.path_secret {
-            write_opaque_vec(path_secret, buf)?;
+            serialize_opaque_vec(path_secret, buf)?;
         }
 
-        write_vector(
+        serialize_vector(
             self.psk_ids.len(),
             buf,
-            |i: usize, b: &mut BytesMut| -> Result<()> { self.psk_ids[i].write(b) },
+            |i: usize, b: &mut BytesMut| -> Result<()> { self.psk_ids[i].serialize(b) },
         )
     }
 }

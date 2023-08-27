@@ -2,8 +2,8 @@ pub mod ring;
 pub mod rust;
 
 use crate::cipher_suite::CipherSuite;
-use crate::codec::*;
 use crate::error::*;
+use crate::serde::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};
@@ -74,8 +74,8 @@ pub trait CryptoProvider {
 
     fn ref_hash(&self, cipher_suite: CipherSuite, label: &[u8], value: &[u8]) -> Result<Bytes> {
         let mut buf = BytesMut::new();
-        write_opaque_vec(label, &mut buf)?;
-        write_opaque_vec(value, &mut buf)?;
+        serialize_opaque_vec(label, &mut buf)?;
+        serialize_opaque_vec(value, &mut buf)?;
         let input = buf.freeze();
         let h = self.hash(cipher_suite);
         Ok(h.digest(&input))
@@ -94,8 +94,8 @@ pub trait CryptoProvider {
 
         let mut buf = BytesMut::new();
         buf.put_u16(length);
-        write_opaque_vec(&mls_label, &mut buf)?;
-        write_opaque_vec(context, &mut buf)?;
+        serialize_opaque_vec(&mls_label, &mut buf)?;
+        serialize_opaque_vec(context, &mut buf)?;
         let info = buf.freeze();
         self.hpke(cipher_suite).kdf_expand(secret, &info, length)
     }
@@ -323,7 +323,7 @@ fn mls_prefix_label_data(label: &[u8], data: &[u8]) -> Result<Bytes> {
     mls_label.extend_from_slice(label);
 
     let mut buf = BytesMut::new();
-    write_opaque_vec(&mls_label, &mut buf)?;
-    write_opaque_vec(data, &mut buf)?;
+    serialize_opaque_vec(&mls_label, &mut buf)?;
+    serialize_opaque_vec(data, &mut buf)?;
     Ok(buf.freeze())
 }

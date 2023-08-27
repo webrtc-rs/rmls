@@ -1,8 +1,8 @@
 use super::*;
-use crate::codec::codec_test::load_test_vector;
 use crate::crypto::provider::{ring::RingCryptoProvider, rust::RustCryptoProvider, CryptoProvider};
 use crate::error::*;
 use crate::key_schedule::GroupContext;
+use crate::serde::serde_test::load_test_vector;
 use crate::tree::ratchet_tree::RatchetTree;
 
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ fn tree_validation_test(
 ) -> Result<()> {
     let mut tree = RatchetTree::default();
     let mut buf = tc.tree.as_ref();
-    read(&mut tree, &mut buf)?;
+    deserialize(&mut tree, &mut buf)?;
 
     for (i, want) in tc.resolutions.iter().enumerate() {
         let x = NodeIndex(i as u32);
@@ -154,11 +154,11 @@ fn tree_kem_test(
     for update_path_test in &tc.update_paths {
         let mut tree = RatchetTree::default();
         let mut buf = tc.ratchet_tree.as_ref();
-        read(&mut tree, &mut buf)?;
+        deserialize(&mut tree, &mut buf)?;
 
         let mut up = UpdatePath::default();
         let mut buf = update_path_test.update_path.as_ref();
-        read(&mut up, &mut buf)?;
+        deserialize(&mut up, &mut buf)?;
 
         // TODO: verify that UpdatePath is parent-hash valid relative to ratchet tree
         // TODO: process UpdatePath using private leaves
@@ -233,7 +233,7 @@ fn tree_operations_test(
 ) -> Result<()> {
     let mut tree = RatchetTree::default();
     let mut buf = tc.tree_before.as_ref();
-    read(&mut tree, &mut buf)?;
+    deserialize(&mut tree, &mut buf)?;
 
     let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
     assert_eq!(
@@ -244,7 +244,7 @@ fn tree_operations_test(
 
     let mut prop = Proposal::default();
     let mut buf = tc.proposal.as_ref();
-    read(&mut prop, &mut buf)?;
+    deserialize(&mut prop, &mut buf)?;
 
     match &prop {
         Proposal::Add(add) => {
@@ -283,7 +283,7 @@ fn tree_operations_test(
         _ => assert!(false),
     }
 
-    let raw_tree = write(&tree)?;
+    let raw_tree = serialize(&tree)?;
     assert_eq!(
         &raw_tree, &tc.tree_after,
         "marshal(tree) = {:?}, want {:?}",

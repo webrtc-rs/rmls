@@ -5,8 +5,8 @@ pub mod external;
 pub mod group_info;
 pub mod proposal;
 
-use crate::codec::*;
 use crate::error::*;
+use crate::serde::*;
 use crate::tree::*;
 use proposal::*;
 use std::collections::HashSet;
@@ -28,23 +28,23 @@ pub struct Commit {
     path: Option<UpdatePath>,
 }
 
-impl Reader for Commit {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Commit {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             let mut prop_or_ref = ProposalOrRef::default();
-            prop_or_ref.read(b)?;
+            prop_or_ref.deserialize(b)?;
             self.proposals.push(prop_or_ref);
             Ok(())
         })?;
 
-        let has_path = read_optional(buf)?;
+        let has_path = deserialize_optional(buf)?;
         if has_path {
             let mut update_path = UpdatePath::default();
-            update_path.read(buf)?;
+            update_path.deserialize(buf)?;
             self.path = Some(update_path);
         }
 
@@ -52,20 +52,20 @@ impl Reader for Commit {
     }
 }
 
-impl Writer for Commit {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Commit {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_vector(
+        serialize_vector(
             self.proposals.len(),
             buf,
-            |i: usize, b: &mut BytesMut| -> Result<()> { self.proposals[i].write(b) },
+            |i: usize, b: &mut BytesMut| -> Result<()> { self.proposals[i].serialize(b) },
         )?;
-        write_optional(self.path.is_some(), buf)?;
+        serialize_optional(self.path.is_some(), buf)?;
         if let Some(update_path) = &self.path {
-            update_path.write(buf)?;
+            update_path.serialize(buf)?;
         }
 
         Ok(())
@@ -127,7 +127,7 @@ pub fn verify_proposal_list(
                 update_or_remove_proposals.insert(proposal.removed);
             }
             Proposal::PreSharedKey(proposal) => {
-                let psk = write(&proposal.psk)?;
+                let psk = serialize(&proposal.psk)?;
                 if psk_proposals.contains(&psk) {
                     return Err(Error::MultiplePSKProposalsReferenceTheSamePSKId);
                 }
@@ -179,8 +179,8 @@ pub struct Welcome {
     encrypted_group_info: Bytes,
 }
 
-impl Reader for Welcome {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for Welcome {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -190,32 +190,32 @@ impl Reader for Welcome {
         }
         self.cipher_suite = buf.get_u16().try_into()?;
 
-        read_vector(buf, |b: &mut Bytes| -> Result<()> {
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             let mut secret = EncryptedGroupSecrets::default();
-            secret.read(b)?;
+            secret.deserialize(b)?;
             self.secrets.push(secret);
             Ok(())
         })?;
 
-        self.encrypted_group_info = read_opaque_vec(buf)?;
+        self.encrypted_group_info = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
 
-impl Writer for Welcome {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for Welcome {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.cipher_suite as u16);
-        write_vector(
+        serialize_vector(
             self.secrets.len(),
             buf,
-            |i: usize, b: &mut BytesMut| -> Result<()> { self.secrets[i].write(b) },
+            |i: usize, b: &mut BytesMut| -> Result<()> { self.secrets[i].serialize(b) },
         )?;
-        write_opaque_vec(&self.encrypted_group_info, buf)
+        serialize_opaque_vec(&self.encrypted_group_info, buf)
     }
 }
 
@@ -246,7 +246,7 @@ impl Welcome {
             )?;
 
             let mut group_secrets = GroupSecrets::default();
-            group_secrets.read(&mut raw_group_secrets)?;
+            group_secrets.deserialize(&mut raw_group_secrets)?;
 
             Ok(group_secrets)
         } else {
@@ -293,7 +293,7 @@ impl Welcome {
         )?;
 
         let mut group_info = GroupInfo::default();
-        group_info.read(&mut raw_group_info)?;
+        group_info.deserialize(&mut raw_group_info)?;
 
         Ok(group_info)
     }
@@ -305,24 +305,24 @@ pub struct EncryptedGroupSecrets {
     encrypted_group_secrets: HpkeCiphertext,
 }
 
-impl Reader for EncryptedGroupSecrets {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for EncryptedGroupSecrets {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
     {
-        self.new_member = read_opaque_vec(buf)?;
-        self.encrypted_group_secrets.read(buf)
+        self.new_member = deserialize_opaque_vec(buf)?;
+        self.encrypted_group_secrets.deserialize(buf)
     }
 }
 
-impl Writer for EncryptedGroupSecrets {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for EncryptedGroupSecrets {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        write_opaque_vec(&self.new_member, buf)?;
-        self.encrypted_group_secrets.write(buf)
+        serialize_opaque_vec(&self.new_member, buf)?;
+        self.encrypted_group_secrets.serialize(buf)
     }
 }

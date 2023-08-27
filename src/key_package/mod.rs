@@ -1,12 +1,12 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::cipher_suite::*;
-use crate::codec::*;
 use crate::crypto::provider::CryptoProvider;
 use crate::crypto::*;
 use crate::error::*;
 use crate::framing::*;
 use crate::key_schedule::*;
+use crate::serde::*;
 use crate::tree::*;
 
 pub type KeyPackageRef = Bytes;
@@ -21,8 +21,8 @@ pub struct KeyPackage {
     signature: Bytes,
 }
 
-impl Reader for KeyPackage {
-    fn read<B>(&mut self, buf: &mut B) -> Result<()>
+impl Deserializer for KeyPackage {
+    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: Buf,
@@ -33,42 +33,42 @@ impl Reader for KeyPackage {
 
         self.version = buf.get_u16();
         self.cipher_suite = buf.get_u16().try_into()?;
-        self.init_key = read_opaque_vec(buf)?;
-        self.leaf_node.read(buf)?;
-        self.extensions = read_extensions(buf)?;
-        self.signature = read_opaque_vec(buf)?;
+        self.init_key = deserialize_opaque_vec(buf)?;
+        self.leaf_node.deserialize(buf)?;
+        self.extensions = deserialize_extensions(buf)?;
+        self.signature = deserialize_opaque_vec(buf)?;
 
         Ok(())
     }
 }
 
-impl Writer for KeyPackage {
-    fn write<B>(&self, buf: &mut B) -> Result<()>
+impl Serializer for KeyPackage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
-        self.write_base(buf)?;
-        write_opaque_vec(&self.signature, buf)
+        self.serialize_base(buf)?;
+        serialize_opaque_vec(&self.signature, buf)
     }
 }
 
 impl KeyPackage {
-    fn write_base<B>(&self, buf: &mut B) -> Result<()>
+    fn serialize_base<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
         B: BufMut,
     {
         buf.put_u16(self.version);
         buf.put_u16(self.cipher_suite as u16);
-        write_opaque_vec(&self.init_key, buf)?;
-        self.leaf_node.write(buf)?;
-        write_extensions(&self.extensions, buf)
+        serialize_opaque_vec(&self.init_key, buf)?;
+        self.leaf_node.serialize(buf)?;
+        serialize_extensions(&self.extensions, buf)
     }
 
     fn verify_signature(&self, crypto_provider: &impl CryptoProvider) -> Result<()> {
         let mut buf = BytesMut::new();
-        self.write_base(&mut buf)?;
+        self.serialize_base(&mut buf)?;
         let raw = buf.freeze();
         crypto_provider.verify_with_label(
             self.cipher_suite,
@@ -109,7 +109,7 @@ impl KeyPackage {
         crypto_provider: &impl CryptoProvider,
     ) -> Result<KeyPackageRef> {
         let mut buf = BytesMut::new();
-        self.write(&mut buf)?;
+        self.serialize(&mut buf)?;
         let raw = buf.freeze();
 
         crypto_provider.ref_hash(self.cipher_suite, b"MLS 1.0 KeyPackage Reference", &raw)

@@ -1,5 +1,5 @@
 use super::*;
-use crate::codec::codec_test::load_test_vector;
+use crate::serde::serde_test::load_test_vector;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct TreeMathTest {

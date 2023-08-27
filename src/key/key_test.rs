@@ -65,7 +65,7 @@ fn test_psk_secret_with_crypto_provider(
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("test_psk_secret {}:{}", cipher_suite, cipher_suite as u16);
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             psk_secret_test(crypto_provider, cipher_suite, tc)?;
         }
     }
@@ -219,7 +219,7 @@ fn test_key_schedule_with_crypto_provider(
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("test_key_schedule {}:{}", cipher_suite, cipher_suite as u16);
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             key_schedule_test(crypto_provider, cipher_suite, tc)?;
         }
     }
@@ -315,7 +315,7 @@ fn test_transcript_hashes_with_crypto_provider(
             cipher_suite, cipher_suite as u16
         );
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             transcript_hashes_test(crypto_provider, cipher_suite, tc)?;
         }
     }

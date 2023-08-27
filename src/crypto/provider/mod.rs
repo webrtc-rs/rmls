@@ -49,7 +49,7 @@ pub trait Signature: Send + Sync {
 }
 
 pub trait CryptoProvider {
-    fn supports(&self, cipher_suite: CipherSuite) -> Result<()>;
+    fn supports(&self, cipher_suite: CipherSuite) -> bool;
 
     fn supported(&self) -> Vec<CipherSuite>;
 

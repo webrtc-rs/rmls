@@ -84,7 +84,7 @@ fn test_tree_validation_with_crypto_provider(
             cipher_suite, cipher_suite as u16
         );
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             tree_validation_test(crypto_provider, cipher_suite, tc)?;
         }
     }
@@ -197,7 +197,7 @@ fn test_tree_kem_with_crypto_provider(
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("test_tree_kem {}:{}", i, cipher_suite);
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             tree_kem_test(crypto_provider, cipher_suite, tc)?;
         }
     }

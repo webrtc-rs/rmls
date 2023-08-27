@@ -90,12 +90,12 @@ static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_
 pub struct RingCryptoProvider;
 
 impl CryptoProvider for RingCryptoProvider {
-    fn supports(&self, cipher_suite: CipherSuite) -> Result<()> {
+    fn supports(&self, cipher_suite: CipherSuite) -> bool {
         match cipher_suite {
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
             | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
-            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => Ok(()),
-            _ => Err(Error::UnsupportedCipherSuite),
+            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => true,
+            _ => false,
         }
     }
 

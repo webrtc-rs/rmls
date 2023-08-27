@@ -86,7 +86,7 @@ fn test_welcome_with_crypto_provider(
         let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
         println!("test_welcome {}:{}", cipher_suite, cipher_suite as u16);
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             welcome_test(crypto_provider, cipher_suite, tc)?;
         }
     }
@@ -375,7 +375,7 @@ fn test_message_protection_with_crypto_provider(
             cipher_suite, cipher_suite as u16
         );
 
-        if crypto_provider.supports(cipher_suite).is_ok() {
+        if crypto_provider.supports(cipher_suite) {
             message_protection_test(crypto_provider, cipher_suite, tc)?;
         }
     }

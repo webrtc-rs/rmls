@@ -132,15 +132,6 @@ fn test_sign_with_label(
     cipher_suite: CipherSuite,
     tc: &SignWithLabelTest,
 ) -> Result<()> {
-    if cipher_suite == CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
-        || cipher_suite == CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
-        || cipher_suite == CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
-    {
-        //TODO(yngrtc): implement ECDSA_P521_SHA512 and Ed448
-        println!("\t test_sign_with_label {:?} skipped", cipher_suite);
-        return Ok(());
-    }
-
     assert!(
         crypto_provider
             .verify_with_label(
@@ -199,15 +190,6 @@ fn test_encrypt_with_label(
     cipher_suite: CipherSuite,
     tc: &EncryptWithLabelTest,
 ) -> Result<()> {
-    if !(cipher_suite == CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
-        || cipher_suite == CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256
-        || cipher_suite == CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519)
-    {
-        //TODO(yngrtc): implement other CipherSuite
-        println!("\t test_encrypt_with_label {:?} skipped", cipher_suite);
-        return Ok(());
-    }
-
     let plaintext = crypto_provider.decrypt_with_label(
         cipher_suite,
         &tc.r#priv,
@@ -256,9 +238,11 @@ fn test_crypto_basics_with_crypto_provider(
 
         test_derive_tree_secret(crypto_provider, cipher_suite, &tc.derive_tree_secret)?;
 
-        test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
+        if crypto_provider.supports(cipher_suite) {
+            test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
 
-        test_encrypt_with_label(crypto_provider, cipher_suite, &tc.encrypt_with_label)?;
+            test_encrypt_with_label(crypto_provider, cipher_suite, &tc.encrypt_with_label)?;
+        }
     }
 
     Ok(())

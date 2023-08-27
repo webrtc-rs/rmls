@@ -20,7 +20,7 @@ pub struct KeyPackage {
 }
 
 impl Deserializer for KeyPackage {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -29,14 +29,21 @@ impl Deserializer for KeyPackage {
             return Err(Error::BufferTooSmall);
         }
 
-        self.version = buf.get_u16();
-        self.cipher_suite = buf.get_u16().try_into()?;
-        self.init_key = deserialize_opaque_vec(buf)?;
-        self.leaf_node.deserialize(buf)?;
-        self.extensions = deserialize_extensions(buf)?;
-        self.signature = deserialize_opaque_vec(buf)?;
+        let version = buf.get_u16();
+        let cipher_suite = buf.get_u16().try_into()?;
+        let init_key = deserialize_opaque_vec(buf)?;
+        let leaf_node = LeafNode::deserialize(buf)?;
+        let extensions = deserialize_extensions(buf)?;
+        let signature = deserialize_opaque_vec(buf)?;
 
-        Ok(())
+        Ok(Self {
+            version,
+            cipher_suite,
+            init_key,
+            leaf_node,
+            extensions,
+            signature,
+        })
     }
 }
 

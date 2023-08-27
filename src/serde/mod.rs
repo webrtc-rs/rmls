@@ -121,7 +121,7 @@ pub(crate) fn serialize_optional<B: BufMut>(present: bool, buf: &mut B) -> Resul
 }
 
 pub(crate) trait Deserializer {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf;
@@ -132,15 +132,6 @@ pub(crate) trait Serializer {
     where
         Self: Sized,
         B: BufMut;
-}
-
-pub(crate) fn deserialize<B: Buf, V: Deserializer>(v: &mut V, buf: &mut B) -> Result<()> {
-    v.deserialize(buf)?;
-    if buf.has_remaining() {
-        Err(Error::InputContainsExcessBytes(buf.remaining()))
-    } else {
-        Ok(())
-    }
 }
 
 pub(crate) fn serialize<V: Serializer>(v: &V) -> Result<Bytes> {

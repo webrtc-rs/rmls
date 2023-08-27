@@ -36,7 +36,7 @@ impl TryFrom<u8> for ContentType {
 }
 
 impl Deserializer for ContentType {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -44,8 +44,7 @@ impl Deserializer for ContentType {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        *self = buf.get_u8().try_into()?;
-        Ok(())
+        buf.get_u8().try_into()
     }
 }
 impl Serializer for ContentType {
@@ -73,7 +72,7 @@ impl Default for Content {
 }
 
 impl Deserializer for Content {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -83,23 +82,11 @@ impl Deserializer for Content {
         }
         let v = buf.get_u8();
         match v {
-            0x01 => {
-                *self = Content::Application(deserialize_opaque_vec(buf)?);
-            }
-            0x02 => {
-                let mut proposal = Proposal::default();
-                proposal.deserialize(buf)?;
-                *self = Content::Proposal(proposal);
-            }
-            0x03 => {
-                let mut commit = Commit::default();
-                commit.deserialize(buf)?;
-                *self = Content::Commit(commit);
-            }
-            _ => return Err(Error::InvalidContentTypeValue(v)),
+            0x01 => Ok(Content::Application(deserialize_opaque_vec(buf)?)),
+            0x02 => Ok(Content::Proposal(Proposal::deserialize(buf)?)),
+            0x03 => Ok(Content::Commit(Commit::deserialize(buf)?)),
+            _ => Err(Error::InvalidContentTypeValue(v)),
         }
-
-        Ok(())
     }
 }
 impl Serializer for Content {
@@ -147,7 +134,7 @@ pub(crate) enum Sender {
 }
 
 impl Deserializer for Sender {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -161,24 +148,18 @@ impl Deserializer for Sender {
                 if buf.remaining() < 4 {
                     return Err(Error::BufferTooSmall);
                 }
-                *self = Sender::Member(LeafIndex(buf.get_u32()));
+                Ok(Sender::Member(LeafIndex(buf.get_u32())))
             }
             2 => {
                 if buf.remaining() < 4 {
                     return Err(Error::BufferTooSmall);
                 }
-                *self = Sender::External(buf.get_u32());
+                Ok(Sender::External(buf.get_u32()))
             }
-            3 => {
-                *self = Sender::NewMemberProposal;
-            }
-            4 => {
-                *self = Sender::NewMemberCommit;
-            }
-            _ => return Err(Error::InvalidSenderTypeValue(v)),
+            3 => Ok(Sender::NewMemberProposal),
+            4 => Ok(Sender::NewMemberCommit),
+            _ => Err(Error::InvalidSenderTypeValue(v)),
         }
-
-        Ok(())
     }
 }
 
@@ -236,7 +217,7 @@ impl TryFrom<u16> for WireFormat {
 }
 
 impl Deserializer for WireFormat {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -245,9 +226,7 @@ impl Deserializer for WireFormat {
             return Err(Error::BufferTooSmall);
         }
 
-        *self = buf.get_u16().try_into()?;
-
-        Ok(())
+        buf.get_u16().try_into()
     }
 }
 
@@ -276,19 +255,27 @@ pub(crate) struct FramedContent {
 }
 
 impl Deserializer for FramedContent {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = deserialize_opaque_vec(buf)?;
+        let group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
-        self.epoch = buf.get_u64();
-        self.sender.deserialize(buf)?;
-        self.authenticated_data = deserialize_opaque_vec(buf)?;
-        self.content.deserialize(buf)
+        let epoch = buf.get_u64();
+        let sender = Sender::deserialize(buf)?;
+        let authenticated_data = deserialize_opaque_vec(buf)?;
+        let content = Content::deserialize(buf)?;
+
+        Ok(Self {
+            group_id,
+            epoch,
+            sender,
+            authenticated_data,
+            content,
+        })
     }
 }
 
@@ -314,15 +301,20 @@ pub(crate) struct AuthenticatedContent {
 }
 
 impl Deserializer for AuthenticatedContent {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.wire_format.deserialize(buf)?;
-        self.content.deserialize(buf)?;
-        self.auth
-            .deserialize(buf, self.content.content.content_type())
+        let wire_format = WireFormat::deserialize(buf)?;
+        let content = FramedContent::deserialize(buf)?;
+        let auth = FramedContentAuthData::deserialize(buf, content.content.content_type())?;
+
+        Ok(Self {
+            wire_format,
+            content,
+            auth,
+        })
     }
 }
 
@@ -400,17 +392,22 @@ pub(crate) struct FramedContentAuthData {
 }
 
 impl FramedContentAuthData {
-    fn deserialize<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
+    fn deserialize<B>(buf: &mut B, ct: ContentType) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.signature = deserialize_opaque_vec(buf)?;
-        if ct == ContentType::Commit {
-            self.confirmation_tag = deserialize_opaque_vec(buf)?;
-        }
+        let signature = deserialize_opaque_vec(buf)?;
+        let confirmation_tag = if ct == ContentType::Commit {
+            deserialize_opaque_vec(buf)?
+        } else {
+            Bytes::new()
+        };
 
-        Ok(())
+        Ok(Self {
+            signature,
+            confirmation_tag,
+        })
     }
 
     fn serialize<B>(&self, buf: &mut B, ct: ContentType) -> Result<()>
@@ -481,7 +478,7 @@ pub(crate) struct FramedContentTBS {
 }
 
 impl Deserializer for FramedContentTBS {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -489,21 +486,20 @@ impl Deserializer for FramedContentTBS {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        self.version = buf.get_u16();
-        self.wire_format.deserialize(buf)?;
-        self.content.deserialize(buf)?;
+        let version = buf.get_u16();
+        let wire_format = WireFormat::deserialize(buf)?;
+        let content = FramedContent::deserialize(buf)?;
+        let context = match &content.sender {
+            Sender::Member(_) | Sender::NewMemberCommit => Some(GroupContext::deserialize(buf)?),
+            _ => None,
+        };
 
-        let sender = self.content.sender;
-        match sender {
-            Sender::Member(_) | Sender::NewMemberCommit => {
-                let mut group_context = GroupContext::default();
-                group_context.deserialize(buf)?;
-                self.context = Some(group_context);
-            }
-            _ => self.context = None,
-        }
-
-        Ok(())
+        Ok(Self {
+            version,
+            wire_format,
+            content,
+            context,
+        })
     }
 }
 
@@ -562,20 +558,25 @@ pub(crate) fn sign_public_message(
 }
 
 impl Deserializer for PublicMessage {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.content.deserialize(buf)?;
-        self.auth
-            .deserialize(buf, self.content.content.content_type())?;
+        let content = FramedContent::deserialize(buf)?;
+        let auth = FramedContentAuthData::deserialize(buf, content.content.content_type())?;
 
-        if let Sender::Member(_) = &self.content.sender {
-            self.membership_tag = Some(deserialize_opaque_vec(buf)?);
-        }
+        let membership_tag = if let Sender::Member(_) = &content.sender {
+            Some(deserialize_opaque_vec(buf)?)
+        } else {
+            None
+        };
 
-        Ok(())
+        Ok(Self {
+            content,
+            auth,
+            membership_tag,
+        })
     }
 }
 impl Serializer for PublicMessage {
@@ -732,21 +733,29 @@ pub(crate) fn encrypt_private_message(
 }
 
 impl Deserializer for PrivateMessage {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = deserialize_opaque_vec(buf)?;
+        let group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
-        self.epoch = buf.get_u64();
-        self.content_type.deserialize(buf)?;
-        self.authenticated_data = deserialize_opaque_vec(buf)?;
-        self.encrypted_sender_data = deserialize_opaque_vec(buf)?;
-        self.ciphertext = deserialize_opaque_vec(buf)?;
-        Ok(())
+        let epoch = buf.get_u64();
+        let content_type = ContentType::deserialize(buf)?;
+        let authenticated_data = deserialize_opaque_vec(buf)?;
+        let encrypted_sender_data = deserialize_opaque_vec(buf)?;
+        let ciphertext = deserialize_opaque_vec(buf)?;
+
+        Ok(Self {
+            group_id,
+            epoch,
+            content_type,
+            authenticated_data,
+            encrypted_sender_data,
+            ciphertext,
+        })
     }
 }
 
@@ -798,10 +807,9 @@ impl PrivateMessage {
             &self.encrypted_sender_data,
             &raw_aad,
         )?;
-        let mut sender_data = SenderData::default();
+
         let mut buf = raw_sender_data.as_ref();
-        sender_data.deserialize(&mut buf)?;
-        Ok(sender_data)
+        SenderData::deserialize(&mut buf)
     }
 
     pub(crate) fn decrypt_content(
@@ -834,16 +842,7 @@ impl PrivateMessage {
         )?;
 
         let mut buf = raw_content.as_ref();
-        let mut content = PrivateMessageContent::default();
-        content.deserialize(&mut buf, self.content_type)?;
-
-        /*TODO(yngrtc):while buf.has_remaining() {
-            if buf.get_u8() != 0 {
-                return Err(Error::PaddingContainsNonZeroBytes);
-            }
-        }*/
-
-        Ok(content)
+        PrivateMessageContent::deserialize(&mut buf, self.content_type)
     }
 
     pub(crate) fn authenticated_content(
@@ -911,28 +910,20 @@ pub(crate) struct PrivateMessageContent {
 }
 
 impl PrivateMessageContent {
-    fn deserialize<B>(&mut self, buf: &mut B, ct: ContentType) -> Result<()>
+    fn deserialize<B>(buf: &mut B, ct: ContentType) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        match ct {
-            ContentType::Application => {
-                self.content = Content::Application(deserialize_opaque_vec(buf)?);
-            }
-            ContentType::Proposal => {
-                let mut proposal = Proposal::default();
-                proposal.deserialize(buf)?;
-                self.content = Content::Proposal(proposal);
-            }
-            ContentType::Commit => {
-                let mut commit = Commit::default();
-                commit.deserialize(buf)?;
-                self.content = Content::Commit(commit);
-            }
+        let content = match ct {
+            ContentType::Application => Content::Application(deserialize_opaque_vec(buf)?),
+            ContentType::Proposal => Content::Proposal(Proposal::deserialize(buf)?),
+            ContentType::Commit => Content::Commit(Commit::deserialize(buf)?),
         };
 
-        self.auth.deserialize(buf, ct)
+        let auth = FramedContentAuthData::deserialize(buf, ct)?;
+
+        Ok(Self { content, auth })
     }
 }
 
@@ -1066,7 +1057,7 @@ impl SenderData {
 }
 
 impl Deserializer for SenderData {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -1074,10 +1065,16 @@ impl Deserializer for SenderData {
         if buf.remaining() < 12 {
             return Err(Error::BufferTooSmall);
         }
-        self.leaf_index = LeafIndex(buf.get_u32());
-        self.generation = buf.get_u32();
-        buf.copy_to_slice(&mut self.reuse_guard);
-        Ok(())
+        let leaf_index = LeafIndex(buf.get_u32());
+        let generation = buf.get_u32();
+        let mut reuse_guard = [0u8; 4];
+        buf.copy_to_slice(&mut reuse_guard);
+
+        Ok(Self {
+            leaf_index,
+            generation,
+            reuse_guard,
+        })
     }
 }
 

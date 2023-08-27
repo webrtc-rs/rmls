@@ -54,7 +54,7 @@ impl From<ProposalTypeCapability> for u16 {
 }
 
 impl Deserializer for ProposalTypeCapability {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -62,8 +62,7 @@ impl Deserializer for ProposalTypeCapability {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        *self = buf.get_u16().into();
-        Ok(())
+        Ok(buf.get_u16().into())
     }
 }
 
@@ -96,7 +95,7 @@ impl Default for Proposal {
 }
 
 impl Deserializer for Proposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -107,45 +106,27 @@ impl Deserializer for Proposal {
         let proposal = buf.get_u16().into();
 
         match proposal {
-            ProposalTypeCapability::Add => {
-                let mut proposal = AddProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::Add(proposal);
-            }
+            ProposalTypeCapability::Add => Ok(Proposal::Add(AddProposal::deserialize(buf)?)),
             ProposalTypeCapability::Update => {
-                let mut proposal = UpdateProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::Update(proposal);
+                Ok(Proposal::Update(UpdateProposal::deserialize(buf)?))
             }
             ProposalTypeCapability::Remove => {
-                let mut proposal = RemoveProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::Remove(proposal);
+                Ok(Proposal::Remove(RemoveProposal::deserialize(buf)?))
             }
-            ProposalTypeCapability::PreSharedKey => {
-                let mut proposal = PreSharedKeyProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::PreSharedKey(proposal);
-            }
+            ProposalTypeCapability::PreSharedKey => Ok(Proposal::PreSharedKey(
+                PreSharedKeyProposal::deserialize(buf)?,
+            )),
             ProposalTypeCapability::ReInit => {
-                let mut proposal = ReInitProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::ReInit(proposal);
+                Ok(Proposal::ReInit(ReInitProposal::deserialize(buf)?))
             }
-            ProposalTypeCapability::ExternalInit => {
-                let mut proposal = ExternalInitProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::ExternalInit(proposal);
-            }
-            ProposalTypeCapability::GroupContextExtensions => {
-                let mut proposal = GroupContextExtensionsProposal::default();
-                proposal.deserialize(buf)?;
-                *self = Proposal::GroupContextExtensions(proposal);
-            }
-            ProposalTypeCapability::Unknown(v) => return Err(Error::InvalidProposalTypeValue(v)),
-        };
-
-        Ok(())
+            ProposalTypeCapability::ExternalInit => Ok(Proposal::ExternalInit(
+                ExternalInitProposal::deserialize(buf)?,
+            )),
+            ProposalTypeCapability::GroupContextExtensions => Ok(Proposal::GroupContextExtensions(
+                GroupContextExtensionsProposal::deserialize(buf)?,
+            )),
+            ProposalTypeCapability::Unknown(v) => Err(Error::InvalidProposalTypeValue(v)),
+        }
     }
 }
 
@@ -194,12 +175,13 @@ pub struct AddProposal {
 }
 
 impl Deserializer for AddProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.key_package.deserialize(buf)
+        let key_package = KeyPackage::deserialize(buf)?;
+        Ok(Self { key_package })
     }
 }
 
@@ -219,12 +201,13 @@ pub struct UpdateProposal {
 }
 
 impl Deserializer for UpdateProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.leaf_node.deserialize(buf)
+        let leaf_node = LeafNode::deserialize(buf)?;
+        Ok(Self { leaf_node })
     }
 }
 
@@ -244,7 +227,7 @@ pub struct RemoveProposal {
 }
 
 impl Deserializer for RemoveProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -252,8 +235,8 @@ impl Deserializer for RemoveProposal {
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
-        self.removed = LeafIndex(buf.get_u32());
-        Ok(())
+        let removed = LeafIndex(buf.get_u32());
+        Ok(Self { removed })
     }
 }
 
@@ -275,12 +258,13 @@ pub struct PreSharedKeyProposal {
 }
 
 impl Deserializer for PreSharedKeyProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.psk.deserialize(buf)
+        let psk = PreSharedKeyID::deserialize(buf)?;
+        Ok(Self { psk })
     }
 }
 impl Serializer for PreSharedKeyProposal {
@@ -302,22 +286,27 @@ pub struct ReInitProposal {
 }
 
 impl Deserializer for ReInitProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_id = deserialize_opaque_vec(buf)?;
+        let group_id = deserialize_opaque_vec(buf)?;
 
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
-        self.version = buf.get_u16();
-        self.cipher_suite = buf.get_u16().try_into()?;
+        let version = buf.get_u16();
+        let cipher_suite = buf.get_u16().try_into()?;
 
-        self.extensions = deserialize_extensions(buf)?;
+        let extensions = deserialize_extensions(buf)?;
 
-        Ok(())
+        Ok(Self {
+            group_id,
+            version,
+            cipher_suite,
+            extensions,
+        })
     }
 }
 impl Serializer for ReInitProposal {
@@ -339,14 +328,13 @@ pub struct ExternalInitProposal {
 }
 
 impl Deserializer for ExternalInitProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.kem_output = deserialize_opaque_vec(buf)?;
-
-        Ok(())
+        let kem_output = deserialize_opaque_vec(buf)?;
+        Ok(Self { kem_output })
     }
 }
 impl Serializer for ExternalInitProposal {
@@ -365,14 +353,13 @@ pub struct GroupContextExtensionsProposal {
 }
 
 impl Deserializer for GroupContextExtensionsProposal {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.extensions = deserialize_extensions(buf)?;
-
-        Ok(())
+        let extensions = deserialize_extensions(buf)?;
+        Ok(Self { extensions })
     }
 }
 impl Serializer for GroupContextExtensionsProposal {
@@ -400,7 +387,7 @@ impl Default for ProposalOrRef {
 }
 
 impl Deserializer for ProposalOrRef {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -410,19 +397,10 @@ impl Deserializer for ProposalOrRef {
         }
         let v = buf.get_u8();
         match v {
-            1 => {
-                let mut proposal = Proposal::default();
-                proposal.deserialize(buf)?;
-                *self = ProposalOrRef::Proposal(proposal);
-            }
-            2 => {
-                let proposal_ref = deserialize_opaque_vec(buf)?;
-                *self = ProposalOrRef::Reference(proposal_ref);
-            }
-            _ => return Err(Error::InvalidProposalOrRefValue(v)),
+            1 => Ok(ProposalOrRef::Proposal(Proposal::deserialize(buf)?)),
+            2 => Ok(ProposalOrRef::Reference(deserialize_opaque_vec(buf)?)),
+            _ => Err(Error::InvalidProposalOrRefValue(v)),
         }
-
-        Ok(())
     }
 }
 impl Serializer for ProposalOrRef {

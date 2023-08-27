@@ -31,9 +31,8 @@ fn tree_validation_test(
     cipher_suite: CipherSuite,
     tc: &TreeValidationTest,
 ) -> Result<()> {
-    let mut tree = RatchetTree::default();
     let mut buf = tc.tree.as_ref();
-    deserialize(&mut tree, &mut buf)?;
+    let tree = RatchetTree::deserialize(&mut buf)?;
 
     for (i, want) in tc.resolutions.iter().enumerate() {
         let x = NodeIndex(i as u32);
@@ -158,13 +157,11 @@ fn tree_kem_test(
     // TODO: test leaves_private
 
     for update_path_test in &tc.update_paths {
-        let mut tree = RatchetTree::default();
         let mut buf = tc.ratchet_tree.as_ref();
-        deserialize(&mut tree, &mut buf)?;
+        let mut tree = RatchetTree::deserialize(&mut buf)?;
 
-        let mut up = UpdatePath::default();
         let mut buf = update_path_test.update_path.as_ref();
-        deserialize(&mut up, &mut buf)?;
+        let up = UpdatePath::deserialize(&mut buf)?;
 
         // TODO: verify that UpdatePath is parent-hash valid relative to ratchet tree
         // TODO: process UpdatePath using private leaves
@@ -239,9 +236,8 @@ fn tree_operations_test(
     cipher_suite: CipherSuite,
     tc: &TreeOperationsTest,
 ) -> Result<()> {
-    let mut tree = RatchetTree::default();
     let mut buf = tc.tree_before.as_ref();
-    deserialize(&mut tree, &mut buf)?;
+    let mut tree = RatchetTree::deserialize(&mut buf)?;
 
     let tree_hash = tree.compute_root_tree_hash(crypto_provider, cipher_suite)?;
     assert_eq!(
@@ -250,9 +246,8 @@ fn tree_operations_test(
         tree_hash, tc.tree_hash_before
     );
 
-    let mut prop = Proposal::default();
     let mut buf = tc.proposal.as_ref();
-    deserialize(&mut prop, &mut buf)?;
+    let prop = Proposal::deserialize(&mut buf)?;
 
     match &prop {
         Proposal::Add(add) => {

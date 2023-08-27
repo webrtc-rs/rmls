@@ -20,7 +20,7 @@ pub(crate) struct GroupContext {
 }
 
 impl Deserializer for GroupContext {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -29,23 +29,31 @@ impl Deserializer for GroupContext {
             return Err(Error::BufferTooSmall);
         }
 
-        self.version = buf.get_u16();
-        self.cipher_suite = buf.get_u16().try_into()?;
-        self.group_id = deserialize_opaque_vec(buf)?;
+        let version = buf.get_u16();
+        let cipher_suite = buf.get_u16().try_into()?;
+        let group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
         }
-        self.epoch = buf.get_u64();
-        self.tree_hash = deserialize_opaque_vec(buf)?;
-        self.confirmed_transcript_hash = deserialize_opaque_vec(buf)?;
+        let epoch = buf.get_u64();
+        let tree_hash = deserialize_opaque_vec(buf)?;
+        let confirmed_transcript_hash = deserialize_opaque_vec(buf)?;
 
-        if self.version != PROTOCOL_VERSION_MLS10 {
-            return Err(Error::InvalidProposalTypeValue(self.version));
+        if version != PROTOCOL_VERSION_MLS10 {
+            return Err(Error::InvalidProposalTypeValue(version));
         }
 
-        self.extensions = deserialize_extensions(buf)?;
+        let extensions = deserialize_extensions(buf)?;
 
-        Ok(())
+        Ok(Self {
+            version,
+            cipher_suite,
+            group_id,
+            epoch,
+            tree_hash,
+            confirmed_transcript_hash,
+            extensions,
+        })
     }
 }
 impl Serializer for GroupContext {
@@ -159,21 +167,26 @@ pub(crate) struct ConfirmedTranscriptHashInput {
 }
 
 impl Deserializer for ConfirmedTranscriptHashInput {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.wire_format.deserialize(buf)?;
-        self.content.deserialize(buf)?;
-        match self.content.content {
+        let wire_format = WireFormat::deserialize(buf)?;
+        let content = FramedContent::deserialize(buf)?;
+        match &content.content {
             Content::Application(_) | Content::Proposal(_) => {
                 return Err(Error::ConfirmedTranscriptHashInputContainContentCommitOnly)
             }
             Content::Commit(_) => {}
         };
-        self.signature = deserialize_opaque_vec(buf)?;
-        Ok(())
+        let signature = deserialize_opaque_vec(buf)?;
+
+        Ok(Self {
+            wire_format,
+            content,
+            signature,
+        })
     }
 }
 
@@ -253,7 +266,7 @@ impl TryFrom<u8> for ResumptionPSKUsage {
 }
 
 impl Deserializer for ResumptionPSKUsage {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -261,8 +274,8 @@ impl Deserializer for ResumptionPSKUsage {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        *self = buf.get_u8().try_into()?;
-        Ok(())
+
+        buf.get_u8().try_into()
     }
 }
 impl Serializer for ResumptionPSKUsage {
@@ -302,7 +315,7 @@ pub(crate) struct PreSharedKeyID {
 }
 
 impl Deserializer for PreSharedKeyID {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -311,26 +324,27 @@ impl Deserializer for PreSharedKeyID {
             return Err(Error::BufferTooSmall);
         }
         let v = buf.get_u8();
-        match v {
-            1 => {
-                self.psk = Psk::External(deserialize_opaque_vec(buf)?);
-            }
+        let psk = match v {
+            1 => Psk::External(deserialize_opaque_vec(buf)?),
             2 => {
-                let mut resumption = Resumption::default();
-                resumption.usage.deserialize(buf)?;
-                resumption.psk_group_id = deserialize_opaque_vec(buf)?;
+                let usage = ResumptionPSKUsage::deserialize(buf)?;
+                let psk_group_id = deserialize_opaque_vec(buf)?;
                 if buf.remaining() < 8 {
                     return Err(Error::BufferTooSmall);
                 }
-                resumption.psk_epoch = buf.get_u64();
-                self.psk = Psk::Resumption(resumption);
+                let psk_epoch = buf.get_u64();
+                Psk::Resumption(Resumption {
+                    usage,
+                    psk_group_id,
+                    psk_epoch,
+                })
             }
             _ => return Err(Error::InvalidPskTypeValue(v)),
-        }
+        };
 
-        self.psk_nonce = deserialize_opaque_vec(buf)?;
+        let psk_nonce = deserialize_opaque_vec(buf)?;
 
-        Ok(())
+        Ok(Self { psk, psk_nonce })
     }
 }
 impl Serializer for PreSharedKeyID {
@@ -407,19 +421,19 @@ struct PskLabel {
 }
 
 impl Deserializer for PskLabel {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.id.deserialize(buf)?;
+        let id = PreSharedKeyID::deserialize(buf)?;
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
-        self.index = buf.get_u16();
-        self.count = buf.get_u16();
+        let index = buf.get_u16();
+        let count = buf.get_u16();
 
-        Ok(())
+        Ok(Self { id, index, count })
     }
 }
 

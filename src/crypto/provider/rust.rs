@@ -91,12 +91,12 @@ pub struct RustCryptoProvider;
 
 impl CryptoProvider for RustCryptoProvider {
     fn supports(&self, cipher_suite: CipherSuite) -> bool {
-        match cipher_suite {
+        matches!(
+            cipher_suite,
             CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519
-            | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
-            | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256 => true,
-            _ => false,
-        }
+                | CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519
+                | CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256
+        )
     }
 
     fn supported(&self) -> Vec<CipherSuite> {

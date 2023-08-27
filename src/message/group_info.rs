@@ -19,21 +19,27 @@ pub struct GroupInfo {
 }
 
 impl Deserializer for GroupInfo {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.group_context.deserialize(buf)?;
-        self.extensions = deserialize_extensions(buf)?;
-        self.confirmation_tag = deserialize_opaque_vec(buf)?;
+        let group_context = GroupContext::deserialize(buf)?;
+        let extensions = deserialize_extensions(buf)?;
+        let confirmation_tag = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
-        self.signer = LeafIndex(buf.get_u32());
-        self.signature = deserialize_opaque_vec(buf)?;
+        let signer = LeafIndex(buf.get_u32());
+        let signature = deserialize_opaque_vec(buf)?;
 
-        Ok(())
+        Ok(Self {
+            group_context,
+            extensions,
+            confirmation_tag,
+            signer,
+            signature,
+        })
     }
 }
 
@@ -114,25 +120,30 @@ pub struct GroupSecrets {
 }
 
 impl Deserializer for GroupSecrets {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.joiner_secret = deserialize_opaque_vec(buf)?;
+        let joiner_secret = deserialize_opaque_vec(buf)?;
 
         let has_path_secret = deserialize_optional(buf)?;
-        if has_path_secret {
-            self.path_secret = Some(deserialize_opaque_vec(buf)?);
+        let path_secret = if has_path_secret {
+            Some(deserialize_opaque_vec(buf)?)
         } else {
-            self.path_secret = None;
-        }
+            None
+        };
 
+        let mut psk_ids = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            let mut psk = PreSharedKeyID::default();
-            psk.deserialize(b)?;
-            self.psk_ids.push(psk);
+            psk_ids.push(PreSharedKeyID::deserialize(b)?);
             Ok(())
+        })?;
+
+        Ok(Self {
+            joiner_secret,
+            path_secret,
+            psk_ids,
         })
     }
 }

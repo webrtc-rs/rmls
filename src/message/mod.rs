@@ -1,6 +1,4 @@
 #[cfg(test)]
-mod framing_test;
-#[cfg(test)]
 mod message_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -34,26 +32,25 @@ pub struct Commit {
 }
 
 impl Deserializer for Commit {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
+        let mut proposals = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            let mut prop_or_ref = ProposalOrRef::default();
-            prop_or_ref.deserialize(b)?;
-            self.proposals.push(prop_or_ref);
+            proposals.push(ProposalOrRef::deserialize(b)?);
             Ok(())
         })?;
 
         let has_path = deserialize_optional(buf)?;
-        if has_path {
-            let mut update_path = UpdatePath::default();
-            update_path.deserialize(buf)?;
-            self.path = Some(update_path);
-        }
+        let path = if has_path {
+            Some(UpdatePath::deserialize(buf)?)
+        } else {
+            None
+        };
 
-        Ok(())
+        Ok(Self { proposals, path })
     }
 }
 
@@ -185,7 +182,7 @@ pub struct Welcome {
 }
 
 impl Deserializer for Welcome {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -193,18 +190,21 @@ impl Deserializer for Welcome {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        self.cipher_suite = buf.get_u16().try_into()?;
+        let cipher_suite = buf.get_u16().try_into()?;
 
+        let mut secrets = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            let mut secret = EncryptedGroupSecrets::default();
-            secret.deserialize(b)?;
-            self.secrets.push(secret);
+            secrets.push(EncryptedGroupSecrets::deserialize(b)?);
             Ok(())
         })?;
 
-        self.encrypted_group_info = deserialize_opaque_vec(buf)?;
+        let encrypted_group_info = deserialize_opaque_vec(buf)?;
 
-        Ok(())
+        Ok(Self {
+            cipher_suite,
+            secrets,
+            encrypted_group_info,
+        })
     }
 }
 
@@ -250,10 +250,7 @@ impl Welcome {
                 &sec.encrypted_group_secrets.ciphertext,
             )?;
 
-            let mut group_secrets = GroupSecrets::default();
-            group_secrets.deserialize(&mut raw_group_secrets)?;
-
-            Ok(group_secrets)
+            Ok(GroupSecrets::deserialize(&mut raw_group_secrets)?)
         } else {
             Err(Error::EncryptedGroupSecretsNotFoundForProvidedKeyPackageRef)
         }
@@ -297,10 +294,7 @@ impl Welcome {
             &[],
         )?;
 
-        let mut group_info = GroupInfo::default();
-        group_info.deserialize(&mut raw_group_info)?;
-
-        Ok(group_info)
+        GroupInfo::deserialize(&mut raw_group_info)
     }
 }
 
@@ -311,13 +305,18 @@ pub struct EncryptedGroupSecrets {
 }
 
 impl Deserializer for EncryptedGroupSecrets {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.new_member = deserialize_opaque_vec(buf)?;
-        self.encrypted_group_secrets.deserialize(buf)
+        let new_member = deserialize_opaque_vec(buf)?;
+        let encrypted_group_secrets = HpkeCiphertext::deserialize(buf)?;
+
+        Ok(Self {
+            new_member,
+            encrypted_group_secrets,
+        })
     }
 }
 
@@ -355,7 +354,7 @@ pub struct Message {
 }
 
 impl Deserializer for Message {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -363,42 +362,31 @@ impl Deserializer for Message {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        self.version = buf.get_u16();
+        let version = buf.get_u16();
 
-        if self.version != PROTOCOL_VERSION_MLS10 {
-            return Err(Error::InvalidProtocolVersion(self.version));
+        if version != PROTOCOL_VERSION_MLS10 {
+            return Err(Error::InvalidProtocolVersion(version));
         }
 
-        self.wire_format.deserialize(buf)?;
+        let wire_format = WireFormat::deserialize(buf)?;
 
-        match self.wire_format {
+        let message = match wire_format {
             WireFormat::PublicMessage => {
-                let mut message = PublicMessage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::PublicMessage(message);
+                WireFormatMessage::PublicMessage(PublicMessage::deserialize(buf)?)
             }
             WireFormat::PrivateMessage => {
-                let mut message = PrivateMessage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::PrivateMessage(message);
+                WireFormatMessage::PrivateMessage(PrivateMessage::deserialize(buf)?)
             }
-            WireFormat::Welcome => {
-                let mut message = Welcome::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::Welcome(message);
-            }
-            WireFormat::GroupInfo => {
-                let mut message = GroupInfo::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::GroupInfo(message);
-            }
-            WireFormat::KeyPackage => {
-                let mut message = KeyPackage::default();
-                message.deserialize(buf)?;
-                self.message = WireFormatMessage::KeyPackage(message);
-            }
-        }
-        Ok(())
+            WireFormat::Welcome => WireFormatMessage::Welcome(Welcome::deserialize(buf)?),
+            WireFormat::GroupInfo => WireFormatMessage::GroupInfo(GroupInfo::deserialize(buf)?),
+            WireFormat::KeyPackage => WireFormatMessage::KeyPackage(KeyPackage::deserialize(buf)?),
+        };
+
+        Ok(Self {
+            version,
+            wire_format,
+            message,
+        })
     }
 }
 impl Serializer for Message {

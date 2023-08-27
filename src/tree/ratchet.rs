@@ -8,29 +8,29 @@ use std::collections::HashMap;
 pub(crate) struct RatchetTree(pub(crate) Vec<Option<Node>>);
 
 impl Deserializer for RatchetTree {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
+        let mut nodes = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if deserialize_optional(b)? {
-                let mut node = Node::default();
-                node.deserialize(b)?;
-                self.0.push(Some(node));
+                let node = Node::deserialize(b)?;
+                nodes.push(Some(node));
             } else {
-                self.0.push(None);
+                nodes.push(None);
             }
             Ok(())
         })?;
 
         // The raw tree doesn't include blank nodes at the end, fill it until next
         // power of 2
-        while !is_power_of_two(self.0.len() as u32 + 1) {
-            self.0.push(None);
+        while !is_power_of_two(nodes.len() as u32 + 1) {
+            nodes.push(None);
         }
 
-        Ok(())
+        Ok(Self(nodes))
     }
 }
 

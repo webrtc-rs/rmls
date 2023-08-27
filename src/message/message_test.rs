@@ -14,12 +14,12 @@ use crate::message::{
         PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,
         PROTOCOL_VERSION_MLS10,
     },
-    Message, WireFormatMessage,
+    /*group_info::*,
+    proposal::*,
+    Commit,*/ Message, WireFormatMessage,
 };
-use crate::serde::serde_test::load_test_vector;
-use crate::serde::*;
-use crate::tree::math::{LeafIndex, NumLeaves};
-use crate::tree::secret::{derive_secret_tree, ratchet_label_from_content_type, RatchetSecret};
+use crate::serde::{serde_test::load_test_vector, *};
+use crate::tree::{math::*, /*ratchet::*,*/ secret::*};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {
@@ -39,9 +39,8 @@ fn welcome_test(
     _cipher_suite: CipherSuite,
     tc: &WelcomeTest,
 ) -> Result<()> {
-    let mut welcome_msg = Message::default();
     let mut buf = tc.welcome.as_ref();
-    welcome_msg.deserialize(&mut buf)?;
+    let welcome_msg = Message::deserialize(&mut buf)?;
     assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
     let welcome = if let WireFormatMessage::Welcome(welcome) = welcome_msg.message {
         welcome
@@ -49,9 +48,8 @@ fn welcome_test(
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let mut key_package_msg = Message::default();
     let mut buf = tc.key_package.as_ref();
-    key_package_msg.deserialize(&mut buf)?;
+    let key_package_msg = Message::deserialize(&mut buf)?;
     assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
     let key_package = if let WireFormatMessage::KeyPackage(key_package) = key_package_msg.message {
         key_package
@@ -158,9 +156,8 @@ fn test_message_protection_pub(
     want_raw: &[u8],
     raw_pub: &[u8],
 ) -> Result<()> {
-    let mut msg = Message::default();
     let mut buf = raw_pub;
-    msg.deserialize(&mut buf)?;
+    let msg = Message::deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PublicMessage);
     let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
         pub_msg
@@ -215,9 +212,8 @@ fn test_message_protection_priv(
     want_raw: &[u8],
     raw_priv: &[u8],
 ) -> Result<()> {
-    let mut msg = Message::default();
     let mut buf = raw_priv;
-    msg.deserialize(&mut buf)?;
+    let msg = Message::deserialize(&mut buf)?;
     assert_eq!(msg.wire_format, WireFormat::PrivateMessage);
     let priv_msg = if let WireFormatMessage::PrivateMessage(priv_msg) = msg.message {
         priv_msg
@@ -392,6 +388,65 @@ fn test_message_protection() -> Result<()> {
     test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider {})?;
     #[cfg(feature = "RustCryptoProvider")]
     test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+
+    Ok(())
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct MessagesTest {
+    #[serde(with = "hex")]
+    mls_welcome: Vec<u8>,
+    #[serde(with = "hex")]
+    mls_group_info: Vec<u8>,
+    #[serde(with = "hex")]
+    mls_key_package: Vec<u8>,
+
+    #[serde(with = "hex")]
+    ratchet_tree: Vec<u8>,
+    #[serde(with = "hex")]
+    group_secrets: Vec<u8>,
+
+    #[serde(with = "hex")]
+    add_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    update_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    remove_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    pre_shared_key_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    re_init_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    external_init_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    group_context_extensions_proposal: Vec<u8>,
+
+    #[serde(with = "hex")]
+    commit: Vec<u8>,
+
+    #[serde(with = "hex")]
+    public_message_application: Vec<u8>,
+    #[serde(with = "hex")]
+    public_message_proposal: Vec<u8>,
+    #[serde(with = "hex")]
+    public_message_commit: Vec<u8>,
+    #[serde(with = "hex")]
+    private_message: Vec<u8>,
+}
+
+//fn message_test<T>()
+
+fn messages_test(_tc: MessagesTest) -> Result<()> {
+    Ok(())
+}
+
+#[test]
+fn test_messages() -> Result<()> {
+    let tests: Vec<MessagesTest> = load_test_vector("test-vectors/messages.json")?;
+
+    for tc in tests {
+        messages_test(tc)?;
+    }
 
     Ok(())
 }

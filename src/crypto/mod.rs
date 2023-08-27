@@ -17,7 +17,7 @@ pub(crate) type SignaturePublicKey = Bytes;
 #[repr(u16)]
 pub enum CredentialType {
     #[default]
-    Basic = 0x0001,
+    Basic = 0x0001, //TODO(yngrtc): use enum for Credential
     X509 = 0x0002,
     Unknown(u16),
 }
@@ -50,28 +50,40 @@ pub(crate) struct Credential {
 }
 
 impl Deserializer for Credential {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        *self = Credential::default();
-
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        self.credential_type = buf.get_u16().into();
+        let credential_type = buf.get_u16().into();
+        let mut identity = Bytes::new();
+        let mut certificates = vec![];
 
-        match self.credential_type {
+        match credential_type {
             CredentialType::Basic => {
-                self.identity = deserialize_opaque_vec(buf)?;
-                Ok(())
+                identity = deserialize_opaque_vec(buf)?;
+                Ok(Self {
+                    credential_type,
+                    identity,
+                    certificates,
+                })
             }
-            CredentialType::X509 => deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-                let cert = deserialize_opaque_vec(b)?;
-                self.certificates.push(cert);
-                Ok(())
-            }),
+            CredentialType::X509 => {
+                deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
+                    let cert = deserialize_opaque_vec(b)?;
+                    certificates.push(cert);
+                    Ok(())
+                })?;
+
+                Ok(Self {
+                    credential_type,
+                    identity,
+                    certificates,
+                })
+            }
             _ => Err(Error::InvalidCredentialTypeValue),
         }
     }
@@ -105,15 +117,18 @@ pub(crate) struct HpkeCiphertext {
 }
 
 impl Deserializer for HpkeCiphertext {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.kem_output = deserialize_opaque_vec(buf)?;
-        self.ciphertext = deserialize_opaque_vec(buf)?;
+        let kem_output = deserialize_opaque_vec(buf)?;
+        let ciphertext = deserialize_opaque_vec(buf)?;
 
-        Ok(())
+        Ok(Self {
+            kem_output,
+            ciphertext,
+        })
     }
 }
 

@@ -28,23 +28,28 @@ pub(crate) struct ParentNode {
 }
 
 impl Deserializer for ParentNode {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        *self = ParentNode::default();
+        let encryption_key = deserialize_opaque_vec(buf)?;
+        let parent_hash = deserialize_opaque_vec(buf)?;
 
-        self.encryption_key = deserialize_opaque_vec(buf)?;
-        self.parent_hash = deserialize_opaque_vec(buf)?;
-
+        let mut unmerged_leaves = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if !b.has_remaining() {
                 return Err(Error::BufferTooSmall);
             }
             let i: LeafIndex = LeafIndex(b.get_u32());
-            self.unmerged_leaves.push(i);
+            unmerged_leaves.push(i);
             Ok(())
+        })?;
+
+        Ok(Self {
+            encryption_key,
+            parent_hash,
+            unmerged_leaves,
         })
     }
 }
@@ -106,7 +111,7 @@ pub(crate) enum LeafNodeSource {
 }
 
 impl Deserializer for LeafNodeSource {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -116,17 +121,11 @@ impl Deserializer for LeafNodeSource {
         }
         let v = buf.get_u8();
         match v {
-            1 => {
-                let mut lifetime = Lifetime::default();
-                lifetime.deserialize(buf)?;
-                *self = LeafNodeSource::KeyPackage(lifetime);
-            }
-            2 => *self = LeafNodeSource::Update,
-            3 => *self = LeafNodeSource::Commit(deserialize_opaque_vec(buf)?),
-            _ => return Err(Error::InvalidLeafNodeSourceValue(v)),
-        };
-
-        Ok(())
+            1 => Ok(LeafNodeSource::KeyPackage(Lifetime::deserialize(buf)?)),
+            2 => Ok(LeafNodeSource::Update),
+            3 => Ok(LeafNodeSource::Commit(deserialize_opaque_vec(buf)?)),
+            _ => Err(Error::InvalidLeafNodeSourceValue(v)),
+        }
     }
 }
 
@@ -162,60 +161,68 @@ pub(crate) struct Capabilities {
 }
 
 impl Deserializer for Capabilities {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        *self = Capabilities::default();
-
         // Note: all unknown values here must be ignored
-
+        let mut versions = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
             let ver: ProtocolVersion = b.get_u16();
-            self.versions.push(ver);
+            versions.push(ver);
             Ok(())
         })?;
 
+        let mut cipher_suites = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            self.cipher_suites.push(CipherSuiteCapability(b.get_u16()));
+            cipher_suites.push(CipherSuiteCapability(b.get_u16()));
             Ok(())
         })?;
 
+        let mut extensions = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
             let et: ExtensionType = b.get_u16().into();
-            self.extensions.push(et);
+            extensions.push(et);
             Ok(())
         })?;
 
+        let mut proposals = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
             let pt: ProposalTypeCapability = b.get_u16().into();
-            self.proposals.push(pt);
+            proposals.push(pt);
             Ok(())
         })?;
 
+        let mut credentials = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
             let ct: CredentialType = b.get_u16().into();
-            self.credentials.push(ct);
+            credentials.push(ct);
             Ok(())
         })?;
 
-        Ok(())
+        Ok(Self {
+            versions,
+            cipher_suites,
+            extensions,
+            proposals,
+            credentials,
+        })
     }
 }
 
@@ -284,7 +291,7 @@ pub(crate) struct Lifetime {
 }
 
 impl Deserializer for Lifetime {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -293,11 +300,13 @@ impl Deserializer for Lifetime {
             return Err(Error::BufferTooSmall);
         }
 
-        *self = Lifetime::default();
-        self.not_before = buf.get_u64();
-        self.not_after = buf.get_u64();
+        let not_before = buf.get_u64();
+        let not_after = buf.get_u64();
 
-        Ok(())
+        Ok(Self {
+            not_before,
+            not_after,
+        })
     }
 }
 
@@ -447,24 +456,30 @@ impl LeafNode {
 }
 
 impl Deserializer for LeafNode {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        *self = LeafNode::default();
+        let encryption_key = deserialize_opaque_vec(buf)?;
+        let signature_key = deserialize_opaque_vec(buf)?;
 
-        self.encryption_key = deserialize_opaque_vec(buf)?;
-        self.signature_key = deserialize_opaque_vec(buf)?;
+        let credential = Credential::deserialize(buf)?;
+        let capabilities = Capabilities::deserialize(buf)?;
+        let leaf_node_source = LeafNodeSource::deserialize(buf)?;
 
-        self.credential.deserialize(buf)?;
-        self.capabilities.deserialize(buf)?;
-        self.leaf_node_source.deserialize(buf)?;
+        let extensions = deserialize_extensions(buf)?;
+        let signature = deserialize_opaque_vec(buf)?;
 
-        self.extensions = deserialize_extensions(buf)?;
-        self.signature = deserialize_opaque_vec(buf)?;
-
-        Ok(())
+        Ok(Self {
+            encryption_key,
+            signature_key,
+            credential,
+            capabilities,
+            leaf_node_source,
+            extensions,
+            signature,
+        })
     }
 }
 
@@ -614,18 +629,22 @@ pub(crate) struct UpdatePathNode {
 }
 
 impl Deserializer for UpdatePathNode {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.encryption_key = deserialize_opaque_vec(buf)?;
+        let encryption_key = deserialize_opaque_vec(buf)?;
 
+        let mut encrypted_path_secret = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            let mut ciphertext = HpkeCiphertext::default();
-            ciphertext.deserialize(b)?;
-            self.encrypted_path_secret.push(ciphertext);
+            encrypted_path_secret.push(HpkeCiphertext::deserialize(b)?);
             Ok(())
+        })?;
+
+        Ok(Self {
+            encryption_key,
+            encrypted_path_secret,
         })
     }
 }
@@ -654,19 +673,20 @@ pub(crate) struct UpdatePath {
 }
 
 impl Deserializer for UpdatePath {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
     {
-        self.leaf_node.deserialize(buf)?;
+        let leaf_node = LeafNode::deserialize(buf)?;
 
+        let mut nodes = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            let mut node = UpdatePathNode::default();
-            node.deserialize(b)?;
-            self.nodes.push(node);
+            nodes.push(UpdatePathNode::deserialize(b)?);
             Ok(())
-        })
+        })?;
+
+        Ok(Self { leaf_node, nodes })
     }
 }
 
@@ -698,7 +718,7 @@ impl Default for Node {
 }
 
 impl Deserializer for Node {
-    fn deserialize<B>(&mut self, buf: &mut B) -> Result<()>
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
         B: Buf,
@@ -709,18 +729,8 @@ impl Deserializer for Node {
 
         let v = buf.get_u8();
         match v {
-            1 => {
-                let mut leaf_node = LeafNode::default();
-                leaf_node.deserialize(buf)?;
-                *self = Node::Leaf(leaf_node);
-                Ok(())
-            }
-            2 => {
-                let mut parent_node = ParentNode::default();
-                parent_node.deserialize(buf)?;
-                *self = Node::Parent(parent_node);
-                Ok(())
-            }
+            1 => Ok(Node::Leaf(LeafNode::deserialize(buf)?)),
+            2 => Ok(Node::Parent(ParentNode::deserialize(buf)?)),
             _ => Err(Error::InvalidNodeTypeValue(v)),
         }
     }

@@ -261,9 +261,8 @@ fn transcript_hashes_test(
     cipher_suite: CipherSuite,
     tc: &TranscriptHashesTest,
 ) -> Result<()> {
-    let mut auth_content = AuthenticatedContent::default();
     let mut buf = tc.authenticated_content.as_ref();
-    auth_content.deserialize(&mut buf)?;
+    let auth_content = AuthenticatedContent::deserialize(&mut buf)?;
     match auth_content.content.content {
         Content::Commit(_) => {}
         _ => assert!(

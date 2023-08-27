@@ -2,6 +2,7 @@
 mod messages_test;
 
 pub mod external;
+pub mod framing;
 pub mod group_info;
 pub mod proposal;
 

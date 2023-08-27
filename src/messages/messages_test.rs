@@ -6,12 +6,12 @@ use crate::crypto::{
     provider::{ring::RingCryptoProvider, CryptoProvider},
 };
 use crate::error::*;
-use crate::framing::{
+use crate::key_schedule::GroupContext;
+use crate::messages::framing::{
     encrypt_private_message, sign_public_message, Content, FramedContent, MlsMessage,
     PrivateMessage, PrivateMessageContent, PublicMessage, Sender, SenderData, WireFormat,
     WireFormatMessage, PROTOCOL_VERSION_MLS10,
 };
-use crate::key_schedule::GroupContext;
 use crate::serde::serde_test::load_test_vector;
 use crate::serde::*;
 use crate::tree::secret_tree::{

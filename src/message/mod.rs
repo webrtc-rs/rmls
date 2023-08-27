@@ -1,4 +1,6 @@
 #[cfg(test)]
+mod framing_test;
+#[cfg(test)]
 mod message_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};

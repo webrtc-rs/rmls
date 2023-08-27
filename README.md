@@ -24,6 +24,9 @@
  <a href="https://discord.gg/4Ju8UHdXMs">
   <img src="https://img.shields.io/discord/800204819540869120?logo=discord" alt="Discord">
  </a>
+ <a href="https://twitter.com/WebRTCrs">
+  <img src="https://img.shields.io/twitter/url/https/twitter.com/webrtcrs.svg?style=social&label=%40WebRTCrs" alt="Twitter">
+ </a>
 </p>
 <p align="center">
  Messaging Layer Security in Rust

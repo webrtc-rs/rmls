@@ -1,8 +1,4 @@
 #[cfg(test)]
-mod secret_tree_test;
-#[cfg(test)]
-mod tree_math_test;
-#[cfg(test)]
 mod tree_test;
 
 pub(crate) mod math;

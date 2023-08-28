@@ -66,12 +66,14 @@ are two cryptography providers implemented right now:
 - [ring](https://github.com/briansmith/ring) based crypto provider
 - [RustCrypto](https://github.com/RustCrypto) based crypto provider 
 
-Other cryptography providers, like [openssl](https://github.com/sfackler/rust-openssl) or [boring](https://github.com/cloudflare/boring), are also possible, see [CryptoProvider Trait](https://github.com/webrtc-rs/rmls/blob/bca90809d1f7b1db2b8dbab2b6df3125df8f3cfc/src/crypto/provider/mod.rs#L51) for more
+Other cryptography providers, like [openssl](https://github.com/sfackler/rust-openssl) or
+[boring](https://github.com/cloudflare/boring), are also possible, see [CryptoProvider Trait](https://github.com/webrtc-rs/rmls/blob/bca90809d1f7b1db2b8dbab2b6df3125df8f3cfc/src/crypto/provider/mod.rs#L51) for more
 details.
 
 ## Open Source License
 
-Dual licensing under both MIT and Apache-2.0 is the currently accepted standard by the Rust language community and has been used for both the compiler and many public libraries since (see <https://doc.rust-lang.org/1.6.0/complement-project-faq.html#why-dual-mitasl2-license>). In order to match the community standards, webrtc-rs is using the dual MIT+Apache-2.0 license.
+Dual licensing under both MIT and Apache-2.0 is the currently accepted standard by the Rust language community and has been used for both the compiler and many public libraries since (see <https://doc.rust-lang.org/1.6.0/complement-project-faq.html#why-dual-mitasl2-license>). 
+In order to match the community standards, *RMLS* is using the dual MIT+Apache-2.0 license.
 
 ## Contributing
 

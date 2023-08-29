@@ -4,10 +4,11 @@
 #[cfg(feature = "RingCryptoProvider")]
 mod ring;
 #[cfg(feature = "RingCryptoProvider")]
-pub use ring::RingCryptoProvider;
+pub use self::ring::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
 mod rust;
-pub use rust::RustCryptoProvider;
+#[cfg(feature = "RustCryptoProvider")]
+pub use self::rust::RustCryptoProvider;
 
 use crate::crypto::cipher_suite::CipherSuite;
 use crate::error::*;

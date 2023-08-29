@@ -10,7 +10,7 @@ pub mod framing;
 pub mod group_info;
 pub mod proposal;
 
-use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HpkeCiphertext};
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HPKECiphertext};
 use crate::error::*;
 use crate::key::{
     package::{KeyPackage, KeyPackageRef},
@@ -300,7 +300,7 @@ impl Welcome {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct EncryptedGroupSecrets {
     new_member: KeyPackageRef,
-    encrypted_group_secrets: HpkeCiphertext,
+    encrypted_group_secrets: HPKECiphertext,
 }
 
 impl Deserializer for EncryptedGroupSecrets {
@@ -310,7 +310,7 @@ impl Deserializer for EncryptedGroupSecrets {
         B: Buf,
     {
         let new_member = deserialize_opaque_vec(buf)?;
-        let encrypted_group_secrets = HpkeCiphertext::deserialize(buf)?;
+        let encrypted_group_secrets = HPKECiphertext::deserialize(buf)?;
 
         Ok(Self {
             new_member,

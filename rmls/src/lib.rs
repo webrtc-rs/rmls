@@ -4,6 +4,7 @@
 
 pub mod crypto;
 pub mod error;
+pub mod framing;
 pub mod key;
 pub mod message;
 pub mod serde;

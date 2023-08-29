@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
+use crate::crypto::{cipher_suite::*, credential::*, provider::CryptoProvider, *};
 use crate::error::*;
 use crate::message::{framing::*, proposal::*};
 use crate::serde::*;
@@ -18,7 +18,7 @@ use crate::tree::math::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ParentNode {
-    encryption_key: HpkePublicKey,
+    encryption_key: HPKEPublicKey,
     parent_hash: Bytes,
     unmerged_leaves: Vec<LeafIndex>,
 }
@@ -86,7 +86,7 @@ impl ParentNode {
     }
 
     pub(crate) fn serialize_parent_hash_input(
-        encryption_key: &HpkePublicKey,
+        encryption_key: &HPKEPublicKey,
         parent_hash: &[u8],
         original_sibling_tree_hash: &[u8],
     ) -> Result<Bytes> {
@@ -429,7 +429,7 @@ pub(crate) fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Optio
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct LeafNode {
-    pub(crate) encryption_key: HpkePublicKey,
+    pub(crate) encryption_key: HPKEPublicKey,
     pub(crate) signature_key: SignaturePublicKey,
     credential: Credential,
     capabilities: Capabilities,
@@ -621,8 +621,8 @@ pub(crate) struct LeafNodeVerifyOptions<'a> {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct UpdatePathNode {
-    pub(crate) encryption_key: HpkePublicKey,
-    encrypted_path_secret: Vec<HpkeCiphertext>,
+    pub(crate) encryption_key: HPKEPublicKey,
+    encrypted_path_secret: Vec<HPKECiphertext>,
 }
 
 impl Deserializer for UpdatePathNode {
@@ -635,7 +635,7 @@ impl Deserializer for UpdatePathNode {
 
         let mut encrypted_path_secret = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-            encrypted_path_secret.push(HpkeCiphertext::deserialize(b)?);
+            encrypted_path_secret.push(HPKECiphertext::deserialize(b)?);
             Ok(())
         })?;
 

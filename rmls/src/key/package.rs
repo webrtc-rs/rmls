@@ -13,7 +13,7 @@ pub type KeyPackageRef = Bytes;
 pub struct KeyPackage {
     pub(crate) version: ProtocolVersion,
     pub(crate) cipher_suite: CipherSuite,
-    pub(crate) init_key: HpkePublicKey,
+    pub(crate) init_key: HPKEPublicKey,
     pub(crate) leaf_node: LeafNode,
     extensions: Vec<Extension>,
     signature: Bytes,

@@ -1,7 +1,13 @@
+//! [RFC9420 Sec.5](https://www.rfc-editor.org/rfc/rfc9420.html#section-5) CryptoProvider trait and
+//! implementations that provide the cryptographic primitives to be used in group key computations.
+
 #[cfg(feature = "RingCryptoProvider")]
-pub mod ring;
+mod ring;
+#[cfg(feature = "RingCryptoProvider")]
+pub use ring::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
-pub mod rust;
+mod rust;
+pub use rust::RustCryptoProvider;
 
 use crate::crypto::cipher_suite::CipherSuite;
 use crate::error::*;
@@ -11,21 +17,42 @@ use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};
 use rand::{rngs::StdRng, SeedableRng};
 
-pub const MLS_PREFIX: &str = "MLS 1.0 ";
+/// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) MLS prefix string - "MLS 1.0 "
+const MLS_PREFIX: &str = "MLS 1.0 ";
 
+/// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Hash trait provides
+/// hash algorithm and Message Authentication Code (MAC) algorithm
 pub trait Hash: Send + Sync {
+    /// A hash algorithm
     fn digest(&self, data: &[u8]) -> Bytes;
 
-    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes;
+    /// A Message Authentication Code (MAC) algorithm
+    fn mac(&self, key: &[u8], message: &[u8]) -> Bytes;
 }
 
+/// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Hpke trait provides
+/// Key Derivation Function (KDF) algorithm and Authenticated Encryption with Associated Data (AEAD)
+/// algorithm
 pub trait Hpke: Send + Sync {
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) Expand a pseudorandom key
+    /// using optional string info into length bytes of output keying material.
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes>;
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) Extract a pseudorandom key
+    /// of fixed length Nh bytes from input keying material and an optional byte string salt.
     fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes>;
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) The output size of the
+    /// Extract function in bytes.
     fn kdf_extract_size(&self) -> usize;
 
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) The length in bytes of
+    /// a nonce for this algorithm.
     fn aead_nonce_size(&self) -> usize;
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) The length in bytes of
+    /// a key for this algorithm.
     fn aead_key_size(&self) -> usize;
+
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) Decrypt ciphertext using
+    /// associated data with symmetric key and nonce, returning plaintext message
     fn aead_open(
         &self,
         key: &[u8],
@@ -33,6 +60,8 @@ pub trait Hpke: Send + Sync {
         ciphertext: &[u8],
         additional_data: &[u8],
     ) -> Result<Bytes>;
+    /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) Encrypt and authenticate
+    /// plaintext with associated data aad using symmetric key and nonce, yielding ciphertext
     fn aead_seal(
         &self,
         key: &[u8],
@@ -42,28 +71,41 @@ pub trait Hpke: Send + Sync {
     ) -> Result<Bytes>;
 }
 
+/// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Signature trait provides
+/// signature algorithm
 pub trait Signature: Send + Sync {
+    /// Sign the message with the provided sign_key
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
 
+    /// Verify the message with the provided public key and signature
     fn verify(&self, public_key: &[u8], message: &[u8], signature: &[u8]) -> Result<()>;
 }
 
+/// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) CryptoProvider trait
+/// specifies the cryptographic primitives to be used in group key computations
 pub trait CryptoProvider {
+    /// Check whether the cipher suite is supported or not
     fn supports(&self, cipher_suite: CipherSuite) -> bool;
 
+    /// Return supported cipher suites
     fn supported(&self) -> Vec<CipherSuite>;
 
+    /// Derive Hash trait object based on the given cipher suite
     fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash;
 
+    /// Derive Hpke trait object based on the given cipher suite
     fn hpke(&self, cipher_suite: CipherSuite) -> &dyn Hpke;
 
+    /// Derive Signature trait object based on the given cipher suite
     fn signature(&self, cipher_suite: CipherSuite) -> &dyn Signature;
 
+    /// HMAC based sign based on the given cipher suite
     fn sign_mac(&self, cipher_suite: CipherSuite, key: &[u8], message: &[u8]) -> Bytes {
         // All cipher suites use HMAC
-        self.hash(cipher_suite).sign(key, message)
+        self.hash(cipher_suite).mac(key, message)
     }
 
+    /// HMAC based verify based on the given cipher suite
     fn verify_mac(
         &self,
         cipher_suite: CipherSuite,
@@ -74,6 +116,7 @@ pub trait CryptoProvider {
         tag == self.sign_mac(cipher_suite, key, message).as_ref()
     }
 
+    /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) Hash-Based Identifiers
     fn ref_hash(&self, cipher_suite: CipherSuite, label: &[u8], value: &[u8]) -> Result<Bytes> {
         let mut buf = BytesMut::new();
         serialize_opaque_vec(label, &mut buf)?;
@@ -83,6 +126,7 @@ pub trait CryptoProvider {
         Ok(h.digest(&input))
     }
 
+    /// Expand secret with label
     fn expand_with_label(
         &self,
         cipher_suite: CipherSuite,
@@ -91,7 +135,7 @@ pub trait CryptoProvider {
         context: &[u8],
         length: u16,
     ) -> Result<Bytes> {
-        let mut mls_label = "MLS 1.0 ".as_bytes().to_vec();
+        let mut mls_label = MLS_PREFIX.as_bytes().to_vec();
         mls_label.extend_from_slice(label);
 
         let mut buf = BytesMut::new();
@@ -102,6 +146,7 @@ pub trait CryptoProvider {
         self.hpke(cipher_suite).kdf_expand(secret, &info, length)
     }
 
+    /// Derive secret with label
     fn derive_secret(
         &self,
         cipher_suite: CipherSuite,
@@ -112,6 +157,7 @@ pub trait CryptoProvider {
         self.expand_with_label(cipher_suite, secret, label, &[], length as u16)
     }
 
+    /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) Sign message with label
     fn sign_with_label(
         &self,
         cipher_suite: CipherSuite,
@@ -123,6 +169,7 @@ pub trait CryptoProvider {
         self.signature(cipher_suite).sign(sign_key, &sign_content)
     }
 
+    /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) Verify message with label
     fn verify_with_label(
         &self,
         cipher_suite: CipherSuite,
@@ -136,6 +183,7 @@ pub trait CryptoProvider {
             .verify(verify_key, &sign_content, sign_value)
     }
 
+    /// [RFC9420 Sec.5.1.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.3) Encrypt message with label
     fn encrypt_with_label(
         &self,
         cipher_suite: CipherSuite,
@@ -233,6 +281,7 @@ pub trait CryptoProvider {
         }
     }
 
+    /// [RFC9420 Sec.5.1.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.3) Decrypt message with label
     fn decrypt_with_label(
         &self,
         cipher_suite: CipherSuite,

@@ -22,7 +22,7 @@ impl crate::crypto::provider::Hash for HashScheme {
         Bytes::from(d.as_ref().to_vec())
     }
 
-    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes {
+    fn mac(&self, key: &[u8], message: &[u8]) -> Bytes {
         let hmac_key = match *self {
             HashScheme::SHA256 => hmac::Key::new(hmac::HMAC_SHA256, key),
             HashScheme::SHA384 => hmac::Key::new(hmac::HMAC_SHA384, key),

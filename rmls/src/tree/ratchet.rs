@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
+use crate::crypto::credential::*;
 use crate::key::schedule::GroupContext;
 use crate::serde::*;
 use crate::tree::*;
-
-use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct RatchetTree(pub(crate) Vec<Option<Node>>);

@@ -87,6 +87,7 @@ static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_
     },
 ];
 
+/// [RustCrypto](https://github.com/RustCrypto) based crypto provider
 pub struct RustCryptoProvider;
 
 impl CryptoProvider for RustCryptoProvider {

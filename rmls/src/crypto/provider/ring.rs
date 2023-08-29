@@ -87,6 +87,7 @@ static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_
     },
 ];
 
+/// [ring](https://github.com/briansmith/ring) based crypto provider
 pub struct RingCryptoProvider;
 
 impl CryptoProvider for RingCryptoProvider {

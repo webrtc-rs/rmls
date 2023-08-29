@@ -31,7 +31,7 @@ impl crate::crypto::provider::Hash for HashScheme {
         }
     }
 
-    fn sign(&self, key: &[u8], message: &[u8]) -> Bytes {
+    fn mac(&self, key: &[u8], message: &[u8]) -> Bytes {
         match *self {
             HashScheme::SHA256 => {
                 let mut m = Hmac::<Sha256>::new_from_slice(key).unwrap();

@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+//! Errors returned by *RMLS*
 
 use thiserror::Error;
 

@@ -1,7 +1,11 @@
+//! [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Cipher Suite specifies
+//! the cryptographic primitives to be used in group key computations.
 use crate::error::*;
 
 use std::fmt::{Display, Formatter};
 
+/// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) A cipher suite is a
+/// combination of a protocol version and the set of cryptographic algorithms that should be used.
 #[allow(non_camel_case_types)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u16)]
@@ -39,5 +43,7 @@ impl Display for CipherSuite {
     }
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) CipherSuiteCapability is
+/// used in a leaf node in the tree to indicate an individual client's CipherSuite Capability.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct CipherSuiteCapability(pub(crate) u16);

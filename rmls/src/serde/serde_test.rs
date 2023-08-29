@@ -4,9 +4,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs::File, io::BufReader, path::Path};
 
 #[cfg(feature = "RingCryptoProvider")]
-use crate::crypto::provider::ring::RingCryptoProvider;
+use crate::crypto::provider::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
-use crate::crypto::provider::rust::RustCryptoProvider;
+use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::key::schedule::{

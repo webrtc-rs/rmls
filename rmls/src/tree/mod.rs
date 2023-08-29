@@ -12,7 +12,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::crypto::{cipher_suite::*, credential::*, provider::CryptoProvider, *};
 use crate::error::*;
-use crate::message::{framing::*, proposal::*};
+use crate::framing::*;
+use crate::group::proposal::*;
 use crate::serde::*;
 use crate::tree::math::*;
 

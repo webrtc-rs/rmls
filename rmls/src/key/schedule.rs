@@ -1,8 +1,6 @@
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
-use crate::message::framing::{
-    Content, FramedContent, GroupID, ProtocolVersion, WireFormat, PROTOCOL_VERSION_MLS10,
-};
+use crate::framing::*;
 use crate::serde::*;
 use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
 

@@ -9,13 +9,11 @@ use crate::crypto::provider::RingCryptoProvider;
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
+use crate::framing::*;
+use crate::group::proposal::{Proposal, ProposalOrRef};
+use crate::group::{proposal_list_needs_path, verify_proposal_list, Message, WireFormatMessage};
 use crate::key::schedule::{
     extract_psk_secret, Psk, SECRET_LABEL_AUTHENTICATION, SECRET_LABEL_MEMBERSHIP,
-};
-use crate::message::framing::{Content, ContentType, Sender};
-use crate::message::proposal::{Proposal, ProposalOrRef};
-use crate::message::{
-    framing::WireFormat, proposal_list_needs_path, verify_proposal_list, Message, WireFormatMessage,
 };
 use crate::serde::Deserializer;
 use crate::tree::ratchet::RatchetTree;

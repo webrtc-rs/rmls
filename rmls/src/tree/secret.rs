@@ -3,7 +3,7 @@ use std::fmt::{Display, Formatter};
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider};
 use crate::error::*;
-use crate::message::framing::*;
+use crate::framing::*;
 use crate::tree::math::*;
 
 const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";

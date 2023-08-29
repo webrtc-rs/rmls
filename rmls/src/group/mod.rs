@@ -1,25 +1,21 @@
 #[cfg(test)]
-mod message_test;
+mod group_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
 use std::iter::zip;
 
 pub mod external;
-pub mod framing;
 pub mod group_info;
 pub mod proposal;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HPKECiphertext};
 use crate::error::*;
+use crate::framing::*;
+use crate::group::{group_info::*, proposal::*};
 use crate::key::{
     package::{KeyPackage, KeyPackageRef},
     schedule::extract_welcome_secret,
-};
-use crate::message::{
-    framing::{PrivateMessage, ProtocolVersion, PublicMessage, WireFormat, PROTOCOL_VERSION_MLS10},
-    group_info::*,
-    proposal::*,
 };
 use crate::serde::*;
 use crate::tree::math::LeafIndex;

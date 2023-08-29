@@ -7,13 +7,13 @@ use crate::crypto::provider::RingCryptoProvider;
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
+use crate::framing::*;
 use crate::key::schedule::{
     extract_psk_secret, extract_welcome_secret, next_interim_transcript_hash, GroupContext,
     PreSharedKeyID, Psk, SECRET_LABEL_CONFIRM, SECRET_LABEL_ENCRYPTION, SECRET_LABEL_EXPORTER,
     SECRET_LABEL_EXTERNAL, SECRET_LABEL_INIT, SECRET_LABEL_MEMBERSHIP, SECRET_LABEL_RESUMPTION,
     SECRET_LABEL_SENDER_DATA,
 };
-use crate::message::framing::{AuthenticatedContent, Content, PROTOCOL_VERSION_MLS10};
 use crate::serde::{serde_test::load_test_vector, Deserializer, Serializer};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]

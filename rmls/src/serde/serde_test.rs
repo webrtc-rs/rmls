@@ -22,7 +22,7 @@ use crate::tree::ratchet::RatchetTree;
 use crate::tree::{find_extension_data, ExtensionType, LeafNodeSource, LeafNodeVerifyOptions};
 
 pub(crate) fn load_test_vector<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
-    let file = File::open(path)?;
+    let file = File::open(path).map_err(|err| Error::Other(err.to_string()))?;
     let reader = BufReader::new(file);
     Ok(serde_json::from_reader(reader)?)
 }

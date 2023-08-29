@@ -1,9 +1,12 @@
+//! [RFC9420 Sec.7](https://www.rfc-editor.org/rfc/rfc9420.html#section-7) Ratchet Tree Operations and
+//! [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-8) Secret Tree
+
 #[cfg(test)]
 mod tree_test;
 
-pub(crate) mod math;
-pub(crate) mod ratchet;
-pub(crate) mod secret;
+pub mod math;
+pub mod ratchet;
+pub mod secret;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;

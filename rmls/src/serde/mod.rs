@@ -1,3 +1,5 @@
+//! Serializer and Deserializer
+
 #[cfg(test)]
 pub(crate) mod serde_test;
 

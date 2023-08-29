@@ -1,4 +1,4 @@
-//! Errors returned by *RMLS*
+//! RMLS Errors
 
 use thiserror::Error;
 

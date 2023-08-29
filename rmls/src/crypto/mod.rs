@@ -1,4 +1,4 @@
-//! [RFC9420 Sec.5](https://www.rfc-editor.org/rfc/rfc9420.html#section-5) Cryptographic objects and primitives
+//! [RFC9420 Sec.5](https://www.rfc-editor.org/rfc/rfc9420.html#section-5) Cryptographic Objects
 #[cfg(test)]
 mod crypto_test;
 

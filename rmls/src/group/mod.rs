@@ -1,3 +1,6 @@
+//! [RFC9420 Sec.11](https://www.rfc-editor.org/rfc/rfc9420.html#section-11) Group Creation and
+//! [RFC9420 Sec.12](https://www.rfc-editor.org/rfc/rfc9420.html#section-12) Group Evolution
+
 #[cfg(test)]
 mod group_test;
 
@@ -5,7 +8,6 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
 use std::iter::zip;
 
-pub mod external;
 pub mod group_info;
 pub mod proposal;
 

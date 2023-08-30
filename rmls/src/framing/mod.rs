@@ -14,12 +14,15 @@ use crate::serde::*;
 use crate::tree::math::LeafIndex;
 use crate::tree::secret::RatchetSecret;
 
-/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) ProtocolVersion
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Protocol Version
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u16)]
 pub enum ProtocolVersion {
+    /// Current supported version in *RMLS*
     #[default]
     MLS10 = 1,
+
+    /// Unsupported version
     Unsupported(u16),
 }
 
@@ -41,12 +44,18 @@ impl From<ProtocolVersion> for u16 {
     }
 }
 
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Content Type
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
-pub(crate) enum ContentType {
+pub enum ContentType {
+    /// Application Content
     #[default]
     Application = 1,
+
+    /// Proposal Content
     Proposal = 2,
+
+    /// Commit Content
     Commit = 3,
 }
 
@@ -86,10 +95,16 @@ impl Serializer for ContentType {
     }
 }
 
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Content Container
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) enum Content {
+pub enum Content {
+    /// Application Content Container
     Application(Bytes),
+
+    /// Proposal Content Container
     Proposal(Proposal),
+
+    /// Commit Content Container
     Commit(Commit),
 }
 
@@ -143,7 +158,8 @@ impl Serializer for Content {
 }
 
 impl Content {
-    pub(crate) fn content_type(&self) -> ContentType {
+    /// Return ContentType of Content Container
+    pub fn content_type(&self) -> ContentType {
         match self {
             Content::Application(_) => ContentType::Application,
             Content::Proposal(_) => ContentType::Proposal,
@@ -152,11 +168,74 @@ impl Content {
     }
 }
 
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Sender Type
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum Sender {
+#[repr(u8)]
+pub enum SenderType {
+    /// Member Sender
+    Member = 1,
+
+    /// External Sender
+    External = 2,
+
+    /// New Member Proposal Sender
+    NewMemberProposal = 3,
+
+    /// New Member Commit Sender
+    #[default]
+    NewMemberCommit = 4,
+}
+
+impl TryFrom<u8> for SenderType {
+    type Error = Error;
+
+    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
+        match v {
+            0x01 => Ok(SenderType::Member),
+            0x02 => Ok(SenderType::External),
+            0x03 => Ok(SenderType::NewMemberProposal),
+            0x04 => Ok(SenderType::NewMemberCommit),
+            _ => Err(Error::InvalidSenderTypeValue(v)),
+        }
+    }
+}
+
+impl Deserializer for SenderType {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+        buf.get_u8().try_into()
+    }
+}
+impl Serializer for SenderType {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u8(*self as u8);
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Sender Container
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Sender {
+    /// Member Sender Container
     Member(LeafIndex),
+
+    /// External Sender Container
     External(u32),
+
+    /// New Member Proposal Sender Container
     NewMemberProposal,
+
+    /// New Member Commit Sender Container
     #[default]
     NewMemberCommit,
 }
@@ -217,7 +296,6 @@ impl Serializer for Sender {
     }
 }
 
-// http://www.iana.org/assignments/mls/mls.xhtml#mls-wire-formats
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u16)]
 pub(crate) enum WireFormat {

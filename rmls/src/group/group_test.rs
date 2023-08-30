@@ -8,7 +8,6 @@ use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::framing::*;
-use crate::group::{Message, WireFormatMessage};
 use crate::key::schedule::GroupContext;
 use crate::serde::{serde_test::load_test_vector, *};
 use crate::tree::{math::*, secret::*};
@@ -31,17 +30,23 @@ fn welcome_test(
     _cipher_suite: CipherSuite,
     tc: &WelcomeTest,
 ) -> Result<()> {
-    let welcome_msg = Message::deserialize_exact(&tc.welcome)?;
-    assert_eq!(welcome_msg.wire_format, WireFormat::Welcome);
-    let welcome = if let WireFormatMessage::Welcome(welcome) = welcome_msg.message {
+    let welcome_msg = MLSMessage::deserialize_exact(&tc.welcome)?;
+    assert_eq!(
+        welcome_msg.wire_format.wire_format_type(),
+        WireFormatType::Welcome
+    );
+    let welcome = if let WireFormat::Welcome(welcome) = welcome_msg.wire_format {
         welcome
     } else {
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let key_package_msg = Message::deserialize_exact(&tc.key_package)?;
-    assert_eq!(key_package_msg.wire_format, WireFormat::KeyPackage);
-    let key_package = if let WireFormatMessage::KeyPackage(key_package) = key_package_msg.message {
+    let key_package_msg = MLSMessage::deserialize_exact(&tc.key_package)?;
+    assert_eq!(
+        key_package_msg.wire_format.wire_format_type(),
+        WireFormatType::KeyPackage
+    );
+    let key_package = if let WireFormat::KeyPackage(key_package) = key_package_msg.wire_format {
         key_package
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -146,9 +151,12 @@ fn test_message_protection_pub(
     want_raw: &[u8],
     raw_pub: &[u8],
 ) -> Result<()> {
-    let msg = Message::deserialize_exact(raw_pub)?;
-    assert_eq!(msg.wire_format, WireFormat::PublicMessage);
-    let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
+    let msg = MLSMessage::deserialize_exact(raw_pub)?;
+    assert_eq!(
+        msg.wire_format.wire_format_type(),
+        WireFormatType::PublicMessage
+    );
+    let pub_msg = if let WireFormat::PublicMessage(pub_msg) = msg.wire_format {
         pub_msg
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -201,9 +209,12 @@ fn test_message_protection_priv(
     want_raw: &[u8],
     raw_priv: &[u8],
 ) -> Result<()> {
-    let msg = Message::deserialize_exact(raw_priv)?;
-    assert_eq!(msg.wire_format, WireFormat::PrivateMessage);
-    let priv_msg = if let WireFormatMessage::PrivateMessage(priv_msg) = msg.message {
+    let msg = MLSMessage::deserialize_exact(raw_priv)?;
+    assert_eq!(
+        msg.wire_format.wire_format_type(),
+        WireFormatType::PrivateMessage
+    );
+    let priv_msg = if let WireFormat::PrivateMessage(priv_msg) = msg.wire_format {
         priv_msg
     } else {
         return Err(Error::Other("unreachable".to_string()));

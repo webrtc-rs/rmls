@@ -8,7 +8,8 @@ use rand::Rng;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
-use crate::group::{proposal::Proposal, Commit};
+use crate::group::{group_info::GroupInfo, proposal::Proposal, Commit, Welcome};
+use crate::key::package::KeyPackage;
 use crate::key::schedule::{ConfirmedTranscriptHashInput, GroupContext};
 use crate::serde::*;
 use crate::tree::math::LeafIndex;
@@ -123,12 +124,11 @@ impl Deserializer for Content {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        let v = buf.get_u8();
-        match v {
-            0x01 => Ok(Content::Application(deserialize_opaque_vec(buf)?)),
-            0x02 => Ok(Content::Proposal(Proposal::deserialize(buf)?)),
-            0x03 => Ok(Content::Commit(Commit::deserialize(buf)?)),
-            _ => Err(Error::InvalidContentTypeValue(v)),
+        let content_type = ContentType::deserialize(buf)?;
+        match content_type {
+            ContentType::Application => Ok(Content::Application(deserialize_opaque_vec(buf)?)),
+            ContentType::Proposal => Ok(Content::Proposal(Proposal::deserialize(buf)?)),
+            ContentType::Commit => Ok(Content::Commit(Commit::deserialize(buf)?)),
         }
     }
 }
@@ -138,19 +138,15 @@ impl Serializer for Content {
         Self: Sized,
         B: BufMut,
     {
+        self.content_type().serialize(buf)?;
         match self {
             Content::Application(application) => {
-                buf.put_u8(1);
                 serialize_opaque_vec(application, buf)?;
             }
             Content::Proposal(proposal) => {
-                buf.put_u8(2);
                 proposal.serialize(buf)?;
             }
-            Content::Commit(commit) => {
-                buf.put_u8(3);
-                commit.serialize(buf)?
-            }
+            Content::Commit(commit) => commit.serialize(buf)?,
         }
 
         Ok(())
@@ -296,33 +292,43 @@ impl Serializer for Sender {
     }
 }
 
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Wire Format Type
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u16)]
-pub(crate) enum WireFormat {
-    #[default]
+pub enum WireFormatType {
+    /// Public Message Wire Format Type
     PublicMessage = 0x0001,
+
+    /// Private Message Wire Format Type
     PrivateMessage = 0x0002,
+
+    /// Welcome Wire Format Type
+    #[default]
     Welcome = 0x0003,
+
+    /// Group Info Wire Format Type
     GroupInfo = 0x0004,
+
+    /// Key Package Wire Format Type
     KeyPackage = 0x0005,
 }
 
-impl TryFrom<u16> for WireFormat {
+impl TryFrom<u16> for WireFormatType {
     type Error = Error;
 
     fn try_from(v: u16) -> std::result::Result<Self, Self::Error> {
         match v {
-            0x0001 => Ok(WireFormat::PublicMessage),
-            0x0002 => Ok(WireFormat::PrivateMessage),
-            0x0003 => Ok(WireFormat::Welcome),
-            0x0004 => Ok(WireFormat::GroupInfo),
-            0x0005 => Ok(WireFormat::KeyPackage),
+            0x0001 => Ok(WireFormatType::PublicMessage),
+            0x0002 => Ok(WireFormatType::PrivateMessage),
+            0x0003 => Ok(WireFormatType::Welcome),
+            0x0004 => Ok(WireFormatType::GroupInfo),
+            0x0005 => Ok(WireFormatType::KeyPackage),
             _ => Err(Error::InvalidWireFormatValue(v)),
         }
     }
 }
 
-impl Deserializer for WireFormat {
+impl Deserializer for WireFormatType {
     fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
@@ -336,7 +342,7 @@ impl Deserializer for WireFormat {
     }
 }
 
-impl Serializer for WireFormat {
+impl Serializer for WireFormatType {
     fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
@@ -348,16 +354,55 @@ impl Serializer for WireFormat {
     }
 }
 
-// GroupID is an application-specific group identifier.
-pub(crate) type GroupID = Bytes;
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Wire Format Container
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum WireFormat {
+    /// Public Message Wire Format Container
+    PublicMessage(PublicMessage),
 
+    /// Private Message Wire Format Container
+    PrivateMessage(PrivateMessage),
+
+    /// Welcome Wire Format Container
+    Welcome(Welcome),
+
+    /// Group Info Wire Format Container
+    GroupInfo(GroupInfo),
+
+    /// Key Package Wire Format Container
+    KeyPackage(KeyPackage),
+}
+
+impl Default for WireFormat {
+    fn default() -> Self {
+        WireFormat::Welcome(Welcome::default())
+    }
+}
+
+impl WireFormat {
+    pub fn wire_format_type(&self) -> WireFormatType {
+        match self {
+            WireFormat::PublicMessage(_) => WireFormatType::PublicMessage,
+            WireFormat::PrivateMessage(_) => WireFormatType::PrivateMessage,
+            WireFormat::Welcome(_) => WireFormatType::Welcome,
+            WireFormat::GroupInfo(_) => WireFormatType::GroupInfo,
+            WireFormat::KeyPackage(_) => WireFormatType::KeyPackage,
+        }
+    }
+}
+
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) GroupID is an
+/// application-specific group identifier.
+pub type GroupID = Bytes;
+
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Framed Content
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct FramedContent {
-    pub(crate) group_id: GroupID,
-    pub(crate) epoch: u64,
-    pub(crate) sender: Sender,
-    pub(crate) authenticated_data: Bytes,
-    pub(crate) content: Content,
+pub struct FramedContent {
+    pub group_id: GroupID,
+    pub epoch: u64,
+    pub sender: Sender,
+    pub authenticated_data: Bytes,
+    pub content: Content,
 }
 
 impl Deserializer for FramedContent {
@@ -399,11 +444,83 @@ impl Serializer for FramedContent {
     }
 }
 
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) MLS Message
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct AuthenticatedContent {
-    pub(crate) wire_format: WireFormat,
-    pub(crate) content: FramedContent,
-    pub(crate) auth: FramedContentAuthData,
+pub struct MLSMessage {
+    pub version: ProtocolVersion,
+    pub wire_format: WireFormat,
+}
+
+impl Deserializer for MLSMessage {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 2 {
+            return Err(Error::BufferTooSmall);
+        }
+        let version: ProtocolVersion = buf.get_u16().into();
+
+        if version != ProtocolVersion::MLS10 {
+            return Err(Error::InvalidProtocolVersion(version.into()));
+        }
+
+        let wire_format_type = WireFormatType::deserialize(buf)?;
+
+        let wire_format = match wire_format_type {
+            WireFormatType::PublicMessage => {
+                WireFormat::PublicMessage(PublicMessage::deserialize(buf)?)
+            }
+            WireFormatType::PrivateMessage => {
+                WireFormat::PrivateMessage(PrivateMessage::deserialize(buf)?)
+            }
+            WireFormatType::Welcome => WireFormat::Welcome(Welcome::deserialize(buf)?),
+            WireFormatType::GroupInfo => WireFormat::GroupInfo(GroupInfo::deserialize(buf)?),
+            WireFormatType::KeyPackage => WireFormat::KeyPackage(KeyPackage::deserialize(buf)?),
+        };
+
+        Ok(Self {
+            version,
+            wire_format,
+        })
+    }
+}
+impl Serializer for MLSMessage {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u16(self.version.into());
+        self.wire_format.wire_format_type().serialize(buf)?;
+        match &self.wire_format {
+            WireFormat::PublicMessage(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormat::PrivateMessage(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormat::Welcome(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormat::GroupInfo(message) => {
+                message.serialize(buf)?;
+            }
+            WireFormat::KeyPackage(message) => {
+                message.serialize(buf)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Authenticated Content
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct AuthenticatedContent {
+    pub wire_format: WireFormatType,
+    pub content: FramedContent,
+    pub auth: FramedContentAuthData,
 }
 
 impl Deserializer for AuthenticatedContent {
@@ -412,7 +529,7 @@ impl Deserializer for AuthenticatedContent {
         Self: Sized,
         B: Buf,
     {
-        let wire_format = WireFormat::deserialize(buf)?;
+        let wire_format = WireFormatType::deserialize(buf)?;
         let content = FramedContent::deserialize(buf)?;
         let auth = FramedContentAuthData::deserialize(buf, content.content.content_type())?;
 
@@ -441,7 +558,7 @@ fn sign_authenticated_content(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     sign_key: &[u8],
-    wf: WireFormat,
+    wf: WireFormatType,
     content: &FramedContent,
     ctx: &GroupContext,
 ) -> Result<AuthenticatedContent> {
@@ -492,7 +609,7 @@ impl AuthenticatedContent {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct FramedContentAuthData {
+pub struct FramedContentAuthData {
     signature: Bytes,
     pub(crate) confirmation_tag: Bytes, // for contentTypeCommit
 }
@@ -578,7 +695,7 @@ fn sign_framed_content(
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FramedContentTBS {
     version: ProtocolVersion,
-    wire_format: WireFormat,
+    wire_format: WireFormatType,
     content: FramedContent,
     context: Option<GroupContext>, // for senderTypeMember and senderTypeNewMemberCommit
 }
@@ -593,7 +710,7 @@ impl Deserializer for FramedContentTBS {
             return Err(Error::BufferTooSmall);
         }
         let version = buf.get_u16().into();
-        let wire_format = WireFormat::deserialize(buf)?;
+        let wire_format = WireFormatType::deserialize(buf)?;
         let content = FramedContent::deserialize(buf)?;
         let context = match &content.sender {
             Sender::Member(_) | Sender::NewMemberCommit => Some(GroupContext::deserialize(buf)?),
@@ -651,7 +768,7 @@ pub(crate) fn sign_public_message(
         crypto_provider,
         cipher_suite,
         sign_key,
-        WireFormat::PublicMessage,
+        WireFormatType::PublicMessage,
         content,
         ctx,
     )?;
@@ -708,7 +825,7 @@ impl Serializer for PublicMessage {
 impl PublicMessage {
     pub(crate) fn authenticated_content(&self) -> AuthenticatedContent {
         AuthenticatedContent {
-            wire_format: WireFormat::PublicMessage,
+            wire_format: WireFormatType::PublicMessage,
             content: self.content.clone(),
             auth: self.auth.clone(),
         }
@@ -956,7 +1073,7 @@ impl PrivateMessage {
         content: &PrivateMessageContent,
     ) -> AuthenticatedContent {
         AuthenticatedContent {
-            wire_format: WireFormat::PrivateMessage,
+            wire_format: WireFormatType::PrivateMessage,
             content: FramedContent {
                 group_id: self.group_id.clone(),
                 epoch: self.epoch,
@@ -1080,7 +1197,7 @@ pub(crate) fn encrypt_private_message_content(
         crypto_provider,
         cipher_suite,
         sign_key,
-        WireFormat::PrivateMessage,
+        WireFormatType::PrivateMessage,
         content,
         ctx,
     )?;

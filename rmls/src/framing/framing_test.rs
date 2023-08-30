@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::*;
-use crate::group::{group_info::*, proposal::*, Commit, Message};
+use crate::framing::MLSMessage;
+use crate::group::{group_info::*, proposal::*, Commit};
 use crate::serde::{serde_test::load_test_vector, *};
 use crate::tree::ratchet::RatchetTree;
 
@@ -51,15 +52,17 @@ pub struct MessagesTest {
 
 fn messages_test(tc: MessagesTest) -> Result<()> {
     // Welcome
-    let my_mls_welcome = Message::deserialize_exact(&tc.mls_welcome)?.serialize_detached()?;
+    let my_mls_welcome = MLSMessage::deserialize_exact(&tc.mls_welcome)?.serialize_detached()?;
     assert_eq!(&tc.mls_welcome, my_mls_welcome.as_ref());
 
     // (Verifiable)GroupInfo
-    let my_mls_group_info = Message::deserialize_exact(&tc.mls_group_info)?.serialize_detached()?;
+    let my_mls_group_info =
+        MLSMessage::deserialize_exact(&tc.mls_group_info)?.serialize_detached()?;
     assert_eq!(&tc.mls_group_info, my_mls_group_info.as_ref());
 
     // KeyPackage
-    let my_key_package = Message::deserialize_exact(&tc.mls_key_package)?.serialize_detached()?;
+    let my_key_package =
+        MLSMessage::deserialize_exact(&tc.mls_key_package)?.serialize_detached()?;
     assert_eq!(&tc.mls_key_package, my_key_package.as_ref());
 
     // RatchetTree
@@ -104,7 +107,7 @@ fn messages_test(tc: MessagesTest) -> Result<()> {
 
     // MlsPlaintextApplication
     let my_public_message_application =
-        Message::deserialize_exact(&tc.public_message_application)?.serialize_detached()?;
+        MLSMessage::deserialize_exact(&tc.public_message_application)?.serialize_detached()?;
     assert_eq!(
         &tc.public_message_application,
         my_public_message_application.as_ref()
@@ -112,7 +115,7 @@ fn messages_test(tc: MessagesTest) -> Result<()> {
 
     // PublicMessage(Proposal)
     let my_public_message_proposal =
-        Message::deserialize_exact(&tc.public_message_proposal)?.serialize_detached()?;
+        MLSMessage::deserialize_exact(&tc.public_message_proposal)?.serialize_detached()?;
     assert_eq!(
         &tc.public_message_proposal,
         my_public_message_proposal.as_ref()
@@ -120,12 +123,12 @@ fn messages_test(tc: MessagesTest) -> Result<()> {
 
     // PublicMessage(Commit)
     let my_public_message_commit =
-        Message::deserialize_exact(&tc.public_message_commit)?.serialize_detached()?;
+        MLSMessage::deserialize_exact(&tc.public_message_commit)?.serialize_detached()?;
     assert_eq!(&tc.public_message_commit, my_public_message_commit.as_ref());
 
     // PrivateMessage
     let my_private_message =
-        Message::deserialize_exact(&tc.private_message)?.serialize_detached()?;
+        MLSMessage::deserialize_exact(&tc.private_message)?.serialize_detached()?;
     assert_eq!(&tc.private_message, my_private_message.as_ref());
 
     Ok(())

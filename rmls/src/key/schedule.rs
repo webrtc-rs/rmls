@@ -159,7 +159,7 @@ pub const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ConfirmedTranscriptHashInput {
-    pub(crate) wire_format: WireFormat,
+    pub(crate) wire_format: WireFormatType,
     pub(crate) content: FramedContent,
     pub(crate) signature: Bytes,
 }
@@ -170,7 +170,7 @@ impl Deserializer for ConfirmedTranscriptHashInput {
         Self: Sized,
         B: Buf,
     {
-        let wire_format = WireFormat::deserialize(buf)?;
+        let wire_format = WireFormatType::deserialize(buf)?;
         let content = FramedContent::deserialize(buf)?;
         match &content.content {
             Content::Application(_) | Content::Proposal(_) => {

@@ -13,12 +13,8 @@ pub mod proposal;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HPKECiphertext};
 use crate::error::*;
-use crate::framing::*;
 use crate::group::{group_info::*, proposal::*};
-use crate::key::{
-    package::{KeyPackage, KeyPackageRef},
-    schedule::extract_welcome_secret,
-};
+use crate::key::{package::KeyPackageRef, schedule::extract_welcome_secret};
 use crate::serde::*;
 use crate::tree::math::LeafIndex;
 use crate::tree::*;
@@ -325,92 +321,5 @@ impl Serializer for EncryptedGroupSecrets {
     {
         serialize_opaque_vec(&self.new_member, buf)?;
         self.encrypted_group_secrets.serialize(buf)
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum WireFormatMessage {
-    PublicMessage(PublicMessage),
-    PrivateMessage(PrivateMessage),
-    Welcome(Welcome),
-    GroupInfo(GroupInfo),
-    KeyPackage(KeyPackage),
-}
-
-impl Default for WireFormatMessage {
-    fn default() -> Self {
-        WireFormatMessage::Welcome(Welcome::default())
-    }
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct Message {
-    version: ProtocolVersion,
-    pub(crate) wire_format: WireFormat,
-    pub(crate) message: WireFormatMessage,
-}
-
-impl Deserializer for Message {
-    fn deserialize<B>(buf: &mut B) -> Result<Self>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        if buf.remaining() < 2 {
-            return Err(Error::BufferTooSmall);
-        }
-        let version: ProtocolVersion = buf.get_u16().into();
-
-        if version != ProtocolVersion::MLS10 {
-            return Err(Error::InvalidProtocolVersion(version.into()));
-        }
-
-        let wire_format = WireFormat::deserialize(buf)?;
-
-        let message = match wire_format {
-            WireFormat::PublicMessage => {
-                WireFormatMessage::PublicMessage(PublicMessage::deserialize(buf)?)
-            }
-            WireFormat::PrivateMessage => {
-                WireFormatMessage::PrivateMessage(PrivateMessage::deserialize(buf)?)
-            }
-            WireFormat::Welcome => WireFormatMessage::Welcome(Welcome::deserialize(buf)?),
-            WireFormat::GroupInfo => WireFormatMessage::GroupInfo(GroupInfo::deserialize(buf)?),
-            WireFormat::KeyPackage => WireFormatMessage::KeyPackage(KeyPackage::deserialize(buf)?),
-        };
-
-        Ok(Self {
-            version,
-            wire_format,
-            message,
-        })
-    }
-}
-impl Serializer for Message {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        buf.put_u16(self.version.into());
-        self.wire_format.serialize(buf)?;
-        match &self.message {
-            WireFormatMessage::PublicMessage(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::PrivateMessage(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::Welcome(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::GroupInfo(message) => {
-                message.serialize(buf)?;
-            }
-            WireFormatMessage::KeyPackage(message) => {
-                message.serialize(buf)?;
-            }
-        }
-        Ok(())
     }
 }

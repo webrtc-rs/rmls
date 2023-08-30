@@ -10,11 +10,9 @@ use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::error::*;
 use crate::framing::*;
-use crate::group::proposal::{Proposal, ProposalOrRef};
-use crate::group::{proposal_list_needs_path, verify_proposal_list, Message, WireFormatMessage};
-use crate::key::schedule::{
-    extract_psk_secret, Psk, SECRET_LABEL_AUTHENTICATION, SECRET_LABEL_MEMBERSHIP,
-};
+use crate::group::proposal::*;
+use crate::group::*;
+use crate::key::schedule::*;
 use crate::serde::Deserializer;
 use crate::tree::ratchet::RatchetTree;
 use crate::tree::{find_extension_data, ExtensionType, LeafNodeSource, LeafNodeVerifyOptions};
@@ -71,15 +69,15 @@ fn passive_client_test(
     cipher_suite: CipherSuite,
     tc: &PassiveClientTest,
 ) -> Result<()> {
-    let msg = deserialize_message(&tc.welcome, WireFormat::Welcome)?;
-    let welcome = if let WireFormatMessage::Welcome(welcome) = msg.message {
+    let msg = deserialize_message(&tc.welcome, WireFormatType::Welcome)?;
+    let welcome = if let WireFormat::Welcome(welcome) = msg.wire_format {
         welcome
     } else {
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let msg = deserialize_message(&tc.key_package, WireFormat::KeyPackage)?;
-    let key_pkg = if let WireFormatMessage::KeyPackage(key_pkg) = msg.message {
+    let msg = deserialize_message(&tc.key_package, WireFormatType::KeyPackage)?;
+    let key_pkg = if let WireFormat::KeyPackage(key_pkg) = msg.wire_format {
         key_pkg
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -179,8 +177,8 @@ fn passive_client_test(
     );
 
     for epoch in &tc.epochs {
-        let msg = deserialize_message(&epoch.commit, WireFormat::PublicMessage)?;
-        let pub_msg = if let WireFormatMessage::PublicMessage(pub_msg) = msg.message {
+        let msg = deserialize_message(&epoch.commit, WireFormatType::PublicMessage)?;
+        let pub_msg = if let WireFormat::PublicMessage(pub_msg) = msg.wire_format {
             pub_msg
         } else {
             return Err(Error::Other("unreachable".to_string()));
@@ -305,9 +303,9 @@ fn passive_client_test(
     Ok(())
 }
 
-fn deserialize_message(raw: &[u8], wf: WireFormat) -> Result<Message> {
-    let msg = Message::deserialize_exact(raw)?;
-    assert_eq!(msg.wire_format, wf);
+fn deserialize_message(raw: &[u8], wf: WireFormatType) -> Result<MLSMessage> {
+    let msg = MLSMessage::deserialize_exact(raw)?;
+    assert_eq!(msg.wire_format.wire_format_type(), wf);
     Ok(msg)
 }
 

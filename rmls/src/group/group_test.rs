@@ -31,11 +31,8 @@ fn welcome_test(
     tc: &WelcomeTest,
 ) -> Result<()> {
     let welcome_msg = MLSMessage::deserialize_exact(&tc.welcome)?;
-    assert_eq!(
-        welcome_msg.wire_format.wire_format_type(),
-        WireFormatType::Welcome
-    );
-    let welcome = if let WireFormat::Welcome(welcome) = welcome_msg.wire_format {
+    assert_eq!(welcome_msg.wire_message.wire_format(), WireFormat::Welcome);
+    let welcome = if let WireMessage::Welcome(welcome) = welcome_msg.wire_message {
         welcome
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -43,10 +40,10 @@ fn welcome_test(
 
     let key_package_msg = MLSMessage::deserialize_exact(&tc.key_package)?;
     assert_eq!(
-        key_package_msg.wire_format.wire_format_type(),
-        WireFormatType::KeyPackage
+        key_package_msg.wire_message.wire_format(),
+        WireFormat::KeyPackage
     );
-    let key_package = if let WireFormat::KeyPackage(key_package) = key_package_msg.wire_format {
+    let key_package = if let WireMessage::KeyPackage(key_package) = key_package_msg.wire_message {
         key_package
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -152,11 +149,8 @@ fn test_message_protection_pub(
     raw_pub: &[u8],
 ) -> Result<()> {
     let msg = MLSMessage::deserialize_exact(raw_pub)?;
-    assert_eq!(
-        msg.wire_format.wire_format_type(),
-        WireFormatType::PublicMessage
-    );
-    let pub_msg = if let WireFormat::PublicMessage(pub_msg) = msg.wire_format {
+    assert_eq!(msg.wire_message.wire_format(), WireFormat::PublicMessage);
+    let pub_msg = if let WireMessage::PublicMessage(pub_msg) = msg.wire_message {
         pub_msg
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -210,11 +204,8 @@ fn test_message_protection_priv(
     raw_priv: &[u8],
 ) -> Result<()> {
     let msg = MLSMessage::deserialize_exact(raw_priv)?;
-    assert_eq!(
-        msg.wire_format.wire_format_type(),
-        WireFormatType::PrivateMessage
-    );
-    let priv_msg = if let WireFormat::PrivateMessage(priv_msg) = msg.wire_format {
+    assert_eq!(msg.wire_message.wire_format(), WireFormat::PrivateMessage);
+    let priv_msg = if let WireMessage::PrivateMessage(priv_msg) = msg.wire_message {
         priv_msg
     } else {
         return Err(Error::Other("unreachable".to_string()));

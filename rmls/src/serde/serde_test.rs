@@ -69,15 +69,15 @@ fn passive_client_test(
     cipher_suite: CipherSuite,
     tc: &PassiveClientTest,
 ) -> Result<()> {
-    let msg = deserialize_message(&tc.welcome, WireFormatType::Welcome)?;
-    let welcome = if let WireFormat::Welcome(welcome) = msg.wire_format {
+    let msg = deserialize_message(&tc.welcome, WireFormat::Welcome)?;
+    let welcome = if let WireMessage::Welcome(welcome) = msg.wire_message {
         welcome
     } else {
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let msg = deserialize_message(&tc.key_package, WireFormatType::KeyPackage)?;
-    let key_pkg = if let WireFormat::KeyPackage(key_pkg) = msg.wire_format {
+    let msg = deserialize_message(&tc.key_package, WireFormat::KeyPackage)?;
+    let key_pkg = if let WireMessage::KeyPackage(key_pkg) = msg.wire_message {
         key_pkg
     } else {
         return Err(Error::Other("unreachable".to_string()));
@@ -177,8 +177,8 @@ fn passive_client_test(
     );
 
     for epoch in &tc.epochs {
-        let msg = deserialize_message(&epoch.commit, WireFormatType::PublicMessage)?;
-        let pub_msg = if let WireFormat::PublicMessage(pub_msg) = msg.wire_format {
+        let msg = deserialize_message(&epoch.commit, WireFormat::PublicMessage)?;
+        let pub_msg = if let WireMessage::PublicMessage(pub_msg) = msg.wire_message {
             pub_msg
         } else {
             return Err(Error::Other("unreachable".to_string()));
@@ -303,9 +303,9 @@ fn passive_client_test(
     Ok(())
 }
 
-fn deserialize_message(raw: &[u8], wf: WireFormatType) -> Result<MLSMessage> {
+fn deserialize_message(raw: &[u8], wf: WireFormat) -> Result<MLSMessage> {
     let msg = MLSMessage::deserialize_exact(raw)?;
-    assert_eq!(msg.wire_format.wire_format_type(), wf);
+    assert_eq!(msg.wire_message.wire_format(), wf);
     Ok(msg)
 }
 

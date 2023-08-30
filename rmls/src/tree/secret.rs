@@ -125,7 +125,7 @@ impl SecretTree {
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct RatchetSecret {
+pub struct RatchetSecret {
     pub(crate) secret: Bytes,
     pub(crate) generation: u32,
 }

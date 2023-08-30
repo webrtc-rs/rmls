@@ -242,7 +242,7 @@ fn test_message_protection_priv(
         content: content.content.clone(),
     };
 
-    let priv_msg = encrypt_private_message(
+    let priv_msg = PrivateMessage::new(
         crypto_provider,
         cipher_suite,
         &tc.signature_priv,

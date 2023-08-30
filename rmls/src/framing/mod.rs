@@ -979,6 +979,8 @@ impl Serializer for AuthenticatedContentTBM {
     }
 }
 
+/// [RFC9420 Sec.6.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3) Authenticated and
+/// encrypted messages are encoded using the PrivateMessage structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PrivateMessage {
     group_id: GroupID,
@@ -987,45 +989,6 @@ pub struct PrivateMessage {
     authenticated_data: Bytes,
     encrypted_sender_data: Bytes,
     ciphertext: Bytes,
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn encrypt_private_message(
-    crypto_provider: &impl CryptoProvider,
-    cipher_suite: CipherSuite,
-    sign_priv: &[u8],
-    secret: &RatchetSecret,
-    sender_data_secret: &[u8],
-    content: &FramedContent,
-    sender_data: &SenderData,
-    ctx: &GroupContext,
-) -> Result<PrivateMessage> {
-    let ciphertext = encrypt_private_message_content(
-        crypto_provider,
-        cipher_suite,
-        sign_priv,
-        secret,
-        content,
-        ctx,
-        &sender_data.reuse_guard,
-    )?;
-    let encrypted_sender_data = encrypt_sender_data(
-        crypto_provider,
-        cipher_suite,
-        sender_data_secret,
-        sender_data,
-        content,
-        &ciphertext,
-    )?;
-
-    Ok(PrivateMessage {
-        group_id: content.group_id.clone(),
-        epoch: content.epoch,
-        content_type: content.content.content_type(),
-        authenticated_data: content.authenticated_data.clone(),
-        encrypted_sender_data,
-        ciphertext,
-    })
 }
 
 impl Deserializer for PrivateMessage {
@@ -1071,6 +1034,45 @@ impl Serializer for PrivateMessage {
 }
 
 impl PrivateMessage {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        sign_key: &[u8],
+        secret: &RatchetSecret,
+        sender_data_secret: &[u8],
+        content: &FramedContent,
+        sender_data: &SenderData,
+        ctx: &GroupContext,
+    ) -> Result<PrivateMessage> {
+        let ciphertext = encrypt_private_message_content(
+            crypto_provider,
+            cipher_suite,
+            sign_key,
+            secret,
+            content,
+            ctx,
+            &sender_data.reuse_guard,
+        )?;
+        let encrypted_sender_data = encrypt_sender_data(
+            crypto_provider,
+            cipher_suite,
+            sender_data_secret,
+            sender_data,
+            content,
+            &ciphertext,
+        )?;
+
+        Ok(PrivateMessage {
+            group_id: content.group_id.clone(),
+            epoch: content.epoch,
+            content_type: content.content.content_type(),
+            authenticated_data: content.authenticated_data.clone(),
+            encrypted_sender_data,
+            ciphertext,
+        })
+    }
+
     pub(crate) fn decrypt_sender_data(
         &self,
         crypto_provider: &impl CryptoProvider,
@@ -1158,6 +1160,55 @@ impl PrivateMessage {
         }
     }
 }
+
+/// [RFC9420 Sec.6.3.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3.1) Content to be
+/// encrypted is encoded in a PrivateMessageContent structure.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub(crate) struct PrivateMessageContent {
+    pub(crate) content: Content,
+    auth: FramedContentAuthData,
+}
+
+impl PrivateMessageContent {
+    fn deserialize<B>(buf: &mut B, ct: ContentType) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let content = match ct {
+            ContentType::Application => Content::Application(deserialize_opaque_vec(buf)?),
+            ContentType::Proposal => Content::Proposal(Proposal::deserialize(buf)?),
+            ContentType::Commit => Content::Commit(Commit::deserialize(buf)?),
+        };
+
+        let auth = FramedContentAuthData::deserialize(buf, ct)?;
+        /*TODO(yngrtc): fix padding check for ring
+        while buf.has_remaining() {
+            if buf.get_u8() != 0 {
+                return Err(Error::PaddingContainsNonZeroBytes);
+            }
+        }*/
+
+        Ok(Self { content, auth })
+    }
+}
+
+impl Serializer for PrivateMessageContent {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        match &self.content {
+            Content::Application(application) => serialize_opaque_vec(application, buf)?,
+            Content::Proposal(proposal) => proposal.serialize(buf)?,
+            Content::Commit(commit) => commit.serialize(buf)?,
+        }
+
+        self.auth.serialize(buf, self.content.content_type())
+    }
+}
+
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 struct SenderDataAAD {
     group_id: GroupID,
@@ -1195,46 +1246,6 @@ impl Serializer for PrivateContentAAD {
         buf.put_u64(self.epoch);
         self.content_type.serialize(buf)?;
         serialize_opaque_vec(&self.authenticated_data, buf)
-    }
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct PrivateMessageContent {
-    pub(crate) content: Content,
-    auth: FramedContentAuthData,
-}
-
-impl PrivateMessageContent {
-    fn deserialize<B>(buf: &mut B, ct: ContentType) -> Result<Self>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        let content = match ct {
-            ContentType::Application => Content::Application(deserialize_opaque_vec(buf)?),
-            ContentType::Proposal => Content::Proposal(Proposal::deserialize(buf)?),
-            ContentType::Commit => Content::Commit(Commit::deserialize(buf)?),
-        };
-
-        let auth = FramedContentAuthData::deserialize(buf, ct)?;
-
-        Ok(Self { content, auth })
-    }
-}
-
-impl Serializer for PrivateMessageContent {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        match &self.content {
-            Content::Application(application) => serialize_opaque_vec(application, buf)?,
-            Content::Proposal(proposal) => proposal.serialize(buf)?,
-            Content::Commit(commit) => commit.serialize(buf)?,
-        }
-
-        self.auth.serialize(buf, self.content.content_type())
     }
 }
 
@@ -1333,7 +1344,7 @@ fn encrypt_sender_data(
 }
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) struct SenderData {
+pub struct SenderData {
     leaf_index: LeafIndex,
     pub(crate) generation: u32,
     pub(crate) reuse_guard: [u8; 4],

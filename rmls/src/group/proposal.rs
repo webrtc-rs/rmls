@@ -296,7 +296,7 @@ impl Deserializer for ReInitProposal {
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
         }
-        let version = buf.get_u16();
+        let version = buf.get_u16().into();
         let cipher_suite = buf.get_u16().try_into()?;
 
         let extensions = deserialize_extensions(buf)?;
@@ -316,7 +316,7 @@ impl Serializer for ReInitProposal {
         B: BufMut,
     {
         serialize_opaque_vec(&self.group_id, buf)?;
-        buf.put_u16(self.version);
+        buf.put_u16(self.version.into());
         buf.put_u16(self.cipher_suite as u16);
         serialize_extensions(&self.extensions, buf)
     }

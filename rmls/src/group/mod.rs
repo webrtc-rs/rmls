@@ -359,10 +359,10 @@ impl Deserializer for Message {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        let version = buf.get_u16();
+        let version: ProtocolVersion = buf.get_u16().into();
 
-        if version != PROTOCOL_VERSION_MLS10 {
-            return Err(Error::InvalidProtocolVersion(version));
+        if version != ProtocolVersion::MLS10 {
+            return Err(Error::InvalidProtocolVersion(version.into()));
         }
 
         let wire_format = WireFormat::deserialize(buf)?;
@@ -392,7 +392,7 @@ impl Serializer for Message {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.version);
+        buf.put_u16(self.version.into());
         self.wire_format.serialize(buf)?;
         match &self.message {
             WireFormatMessage::PublicMessage(message) => {

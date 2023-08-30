@@ -29,7 +29,7 @@ impl Deserializer for KeyPackage {
             return Err(Error::BufferTooSmall);
         }
 
-        let version = buf.get_u16();
+        let version = buf.get_u16().into();
         let cipher_suite = buf.get_u16().try_into()?;
         let init_key = deserialize_opaque_vec(buf)?;
         let leaf_node = LeafNode::deserialize(buf)?;
@@ -64,7 +64,7 @@ impl KeyPackage {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.version);
+        buf.put_u16(self.version.into());
         buf.put_u16(self.cipher_suite as u16);
         serialize_opaque_vec(&self.init_key, buf)?;
         self.leaf_node.serialize(buf)?;

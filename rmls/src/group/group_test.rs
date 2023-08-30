@@ -308,7 +308,7 @@ fn message_protection_test(
     tc: &MessageProtectionTest,
 ) -> Result<()> {
     let ctx = GroupContext {
-        version: PROTOCOL_VERSION_MLS10,
+        version: ProtocolVersion::MLS10,
         cipher_suite,
         group_id: tc.group_id.clone().into(),
         epoch: tc.epoch,

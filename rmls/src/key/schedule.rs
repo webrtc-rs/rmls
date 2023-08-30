@@ -27,7 +27,7 @@ impl Deserializer for GroupContext {
             return Err(Error::BufferTooSmall);
         }
 
-        let version = buf.get_u16();
+        let version: ProtocolVersion = buf.get_u16().into();
         let cipher_suite = buf.get_u16().try_into()?;
         let group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
@@ -37,8 +37,8 @@ impl Deserializer for GroupContext {
         let tree_hash = deserialize_opaque_vec(buf)?;
         let confirmed_transcript_hash = deserialize_opaque_vec(buf)?;
 
-        if version != PROTOCOL_VERSION_MLS10 {
-            return Err(Error::InvalidProposalTypeValue(version));
+        if version != ProtocolVersion::MLS10 {
+            return Err(Error::InvalidProposalTypeValue(version.into()));
         }
 
         let extensions = deserialize_extensions(buf)?;
@@ -60,7 +60,7 @@ impl Serializer for GroupContext {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.version);
+        buf.put_u16(self.version.into());
         buf.put_u16(self.cipher_suite as u16);
         serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);

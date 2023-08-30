@@ -14,9 +14,32 @@ use crate::serde::*;
 use crate::tree::math::LeafIndex;
 use crate::tree::secret::RatchetSecret;
 
-pub(crate) type ProtocolVersion = u16;
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) ProtocolVersion
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[repr(u16)]
+pub enum ProtocolVersion {
+    #[default]
+    MLS10 = 1,
+    Unsupported(u16),
+}
 
-pub(crate) const PROTOCOL_VERSION_MLS10: ProtocolVersion = 1;
+impl From<u16> for ProtocolVersion {
+    fn from(v: u16) -> Self {
+        match v {
+            1 => ProtocolVersion::MLS10,
+            _ => ProtocolVersion::Unsupported(v),
+        }
+    }
+}
+
+impl From<ProtocolVersion> for u16 {
+    fn from(val: ProtocolVersion) -> u16 {
+        match val {
+            ProtocolVersion::MLS10 => 1,
+            ProtocolVersion::Unsupported(v) => v,
+        }
+    }
+}
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -367,7 +390,7 @@ impl AuthenticatedContent {
 
     fn framed_content_tbs(&self, ctx: &GroupContext) -> FramedContentTBS {
         FramedContentTBS {
-            version: PROTOCOL_VERSION_MLS10,
+            version: ProtocolVersion::MLS10,
             wire_format: self.wire_format,
             content: self.content.clone(),
             context: Some(ctx.clone()),
@@ -491,7 +514,7 @@ impl Deserializer for FramedContentTBS {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        let version = buf.get_u16();
+        let version = buf.get_u16().into();
         let wire_format = WireFormat::deserialize(buf)?;
         let content = FramedContent::deserialize(buf)?;
         let context = match &content.sender {
@@ -514,7 +537,7 @@ impl Serializer for FramedContentTBS {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.version);
+        buf.put_u16(self.version.into());
         self.wire_format.serialize(buf)?;
         self.content.serialize(buf)?;
         match &self.content.sender {

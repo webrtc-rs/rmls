@@ -172,7 +172,7 @@ impl Deserializer for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            let ver: ProtocolVersion = b.get_u16();
+            let ver: ProtocolVersion = b.get_u16().into();
             versions.push(ver);
             Ok(())
         })?;
@@ -236,7 +236,7 @@ impl Serializer for Capabilities {
             self.versions.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.versions[i]);
+                b.put_u16(self.versions[i].into());
                 Ok(())
             },
         )?;

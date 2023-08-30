@@ -159,7 +159,7 @@ fn key_schedule_test(
         println!("epoch {}", i);
 
         let ctx = GroupContext {
-            version: PROTOCOL_VERSION_MLS10,
+            version: ProtocolVersion::MLS10,
             cipher_suite,
             group_id: tc.group_id.clone().into(),
             epoch: i as u64,

@@ -614,7 +614,7 @@ impl AuthenticatedContent {
         }
     }
 
-    fn framed_content_tbs(&self, ctx: &GroupContext) -> FramedContentTBS {
+    pub(crate) fn framed_content_tbs(&self, ctx: &GroupContext) -> FramedContentTBS {
         FramedContentTBS {
             version: ProtocolVersion::MLS10,
             wire_format: self.wire_format,
@@ -623,7 +623,8 @@ impl AuthenticatedContent {
         }
     }
 
-    pub(crate) fn verify_signature(
+    /// Verify the signature of FramedContentAuthData
+    pub fn verify_signature(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -796,34 +797,13 @@ impl FramedContentAuthData {
     }
 }
 
+/// [RFC9420 Sec.6.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.2) Messages that are
+/// authenticated but not encrypted are encoded using the PublicMessage structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PublicMessage {
     pub(crate) content: FramedContent,
     auth: FramedContentAuthData,
-    membership_tag: Option<Bytes>, // for senderTypeMember
-}
-
-pub(crate) fn sign_public_message(
-    crypto_provider: &impl CryptoProvider,
-    cipher_suite: CipherSuite,
-    sign_key: &[u8],
-    content: &FramedContent,
-    ctx: &GroupContext,
-) -> Result<PublicMessage> {
-    let auth_content = AuthenticatedContent::new(
-        crypto_provider,
-        cipher_suite,
-        sign_key,
-        WireFormat::PublicMessage,
-        content,
-        ctx,
-    )?;
-
-    Ok(PublicMessage {
-        content: auth_content.content,
-        auth: auth_content.auth,
-        membership_tag: None,
-    })
+    membership_tag: Option<Bytes>, // for SenderType::Member
 }
 
 impl Deserializer for PublicMessage {
@@ -848,6 +828,7 @@ impl Deserializer for PublicMessage {
         })
     }
 }
+
 impl Serializer for PublicMessage {
     fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
@@ -869,6 +850,31 @@ impl Serializer for PublicMessage {
 }
 
 impl PublicMessage {
+    /// Create a new PublicMessage by signing FramedContent with GroupContext to get
+    /// FramedContentAuthData and setting membership_tag to None
+    pub fn new(
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        sign_key: &[u8],
+        content: &FramedContent,
+        ctx: &GroupContext,
+    ) -> Result<PublicMessage> {
+        let auth_content = AuthenticatedContent::new(
+            crypto_provider,
+            cipher_suite,
+            sign_key,
+            WireFormat::PublicMessage,
+            content,
+            ctx,
+        )?;
+
+        Ok(PublicMessage {
+            content: auth_content.content,
+            auth: auth_content.auth,
+            membership_tag: None,
+        })
+    }
+
     pub(crate) fn authenticated_content(&self) -> AuthenticatedContent {
         AuthenticatedContent {
             wire_format: WireFormat::PublicMessage,
@@ -877,14 +883,16 @@ impl PublicMessage {
         }
     }
 
-    fn authenticated_content_tbm(&self, ctx: &GroupContext) -> AuthenticatedContentTBM {
+    pub(crate) fn authenticated_content_tbm(&self, ctx: &GroupContext) -> AuthenticatedContentTBM {
         AuthenticatedContentTBM {
             content_tbs: self.authenticated_content().framed_content_tbs(ctx),
             auth: self.auth.clone(),
         }
     }
 
-    pub(crate) fn sign_membership_tag(
+    /// [RFC9420 Sec.6.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.2) The membership_tag
+    /// field in the PublicMessage object authenticates the sender's membership in the group.
+    pub fn sign_membership_tag(
         &mut self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -903,7 +911,10 @@ impl PublicMessage {
         Ok(())
     }
 
-    pub(crate) fn verify_membership_tag(
+    /// [RFC9420 Sec.6.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.2) When decoding a
+    /// PublicMessage into an AuthenticatedContent, the application MUST check
+    /// membership_tag and MUST check that the FramedContentAuthData is valid.
+    pub fn verify_membership_tag(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -934,10 +945,26 @@ impl PublicMessage {
         }
     }
 }
+
+/// [RFC9420 Sec.6.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.2) For messages sent
+/// by members, it MUST be set to AuthenticatedContentTBM
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct AuthenticatedContentTBM {
+pub struct AuthenticatedContentTBM {
     content_tbs: FramedContentTBS,
     auth: FramedContentAuthData,
+}
+
+impl Deserializer for AuthenticatedContentTBM {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let content_tbs = FramedContentTBS::deserialize(buf)?;
+        let auth =
+            FramedContentAuthData::deserialize(buf, content_tbs.content.content.content_type())?;
+        Ok(Self { content_tbs, auth })
+    }
 }
 
 impl Serializer for AuthenticatedContentTBM {

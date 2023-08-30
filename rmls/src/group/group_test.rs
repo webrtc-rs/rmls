@@ -158,7 +158,7 @@ fn test_message_protection_pub(
 
     verify_public_message(crypto_provider, cipher_suite, tc, ctx, &pub_msg, want_raw)?;
 
-    let mut pub_msg = sign_public_message(
+    let mut pub_msg = PublicMessage::new(
         crypto_provider,
         cipher_suite,
         &tc.signature_priv,

@@ -1164,7 +1164,7 @@ impl PrivateMessage {
 /// [RFC9420 Sec.6.3.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3.1) Content to be
 /// encrypted is encoded in a PrivateMessageContent structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct PrivateMessageContent {
+pub struct PrivateMessageContent {
     pub(crate) content: Content,
     auth: FramedContentAuthData,
 }
@@ -1209,8 +1209,116 @@ impl Serializer for PrivateMessageContent {
     }
 }
 
+/// [RFC9420 Sec.6.3.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3.1) The Additional
+/// Authenticated Data (AAD) input to the encryption contains an object of the following form,
+/// with the values used to identify the key and nonce
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct SenderDataAAD {
+pub struct PrivateContentAAD {
+    group_id: GroupID,
+    epoch: u64,
+    content_type: ContentType,
+    authenticated_data: Bytes,
+}
+
+impl Deserializer for PrivateContentAAD {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let group_id = deserialize_opaque_vec(buf)?;
+        if buf.remaining() < 8 {
+            return Err(Error::BufferTooSmall);
+        }
+        let epoch = buf.get_u64();
+        let content_type = ContentType::deserialize(buf)?;
+        let authenticated_data = deserialize_opaque_vec(buf)?;
+
+        Ok(Self {
+            group_id,
+            epoch,
+            content_type,
+            authenticated_data,
+        })
+    }
+}
+
+impl Serializer for PrivateContentAAD {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.group_id, buf)?;
+        buf.put_u64(self.epoch);
+        self.content_type.serialize(buf)?;
+        serialize_opaque_vec(&self.authenticated_data, buf)
+    }
+}
+
+/// [RFC9420 Sec.6.3.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3.2) The SenderData
+/// used to look up the key for content encryption is encrypted with the cipher suite's AEAD with
+/// a key and nonce derived from both the sender_data_secret and a sample of the encrypted content.
+/// Before being encrypted, the sender data is encoded as an object of the following form
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SenderData {
+    leaf_index: LeafIndex,
+    pub(crate) generation: u32,
+    pub(crate) reuse_guard: [u8; 4],
+}
+
+impl SenderData {
+    /// Create a new SenderData
+    pub fn new(leaf_index: LeafIndex, generation: u32) -> Self {
+        let mut reuse_guard: [u8; 4] = [0u8; 4];
+        rand::thread_rng().fill(&mut reuse_guard[..]);
+        Self {
+            leaf_index,
+            generation,
+            reuse_guard,
+        }
+    }
+}
+
+impl Deserializer for SenderData {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 12 {
+            return Err(Error::BufferTooSmall);
+        }
+        let leaf_index = LeafIndex(buf.get_u32());
+        let generation = buf.get_u32();
+        let mut reuse_guard = [0u8; 4];
+        buf.copy_to_slice(&mut reuse_guard);
+
+        Ok(Self {
+            leaf_index,
+            generation,
+            reuse_guard,
+        })
+    }
+}
+
+impl Serializer for SenderData {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u32(self.leaf_index.0);
+        buf.put_u32(self.generation);
+        buf.put_slice(&self.reuse_guard);
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.6.3.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.3.2) The AAD for the
+/// SenderData ciphertext is the first three fields of PrivateMessage.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct SenderDataAAD {
     group_id: GroupID,
     epoch: u64,
     content_type: ContentType,
@@ -1225,27 +1333,6 @@ impl Serializer for SenderDataAAD {
         serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
         self.content_type.serialize(buf)
-    }
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct PrivateContentAAD {
-    group_id: GroupID,
-    epoch: u64,
-    content_type: ContentType,
-    authenticated_data: Bytes,
-}
-
-impl Serializer for PrivateContentAAD {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        serialize_opaque_vec(&self.group_id, buf)?;
-        buf.put_u64(self.epoch);
-        self.content_type.serialize(buf)?;
-        serialize_opaque_vec(&self.authenticated_data, buf)
     }
 }
 
@@ -1341,60 +1428,6 @@ fn encrypt_sender_data(
     crypto_provider
         .hpke(cipher_suite)
         .aead_seal(&key, &nonce, &raw_sender_data, &raw_aad)
-}
-
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub struct SenderData {
-    leaf_index: LeafIndex,
-    pub(crate) generation: u32,
-    pub(crate) reuse_guard: [u8; 4],
-}
-
-impl SenderData {
-    pub(crate) fn new(leaf_index: LeafIndex, generation: u32) -> Self {
-        let mut reuse_guard: [u8; 4] = [0u8; 4];
-        rand::thread_rng().fill(&mut reuse_guard[..]);
-        Self {
-            leaf_index,
-            generation,
-            reuse_guard,
-        }
-    }
-}
-
-impl Deserializer for SenderData {
-    fn deserialize<B>(buf: &mut B) -> Result<Self>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        if buf.remaining() < 12 {
-            return Err(Error::BufferTooSmall);
-        }
-        let leaf_index = LeafIndex(buf.get_u32());
-        let generation = buf.get_u32();
-        let mut reuse_guard = [0u8; 4];
-        buf.copy_to_slice(&mut reuse_guard);
-
-        Ok(Self {
-            leaf_index,
-            generation,
-            reuse_guard,
-        })
-    }
-}
-
-impl Serializer for SenderData {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        buf.put_u32(self.leaf_index.0);
-        buf.put_u32(self.generation);
-        buf.put_slice(&self.reuse_guard);
-        Ok(())
-    }
 }
 
 pub(crate) fn expand_sender_data_key(

@@ -1,13 +1,10 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::provider::CryptoProvider;
-use crate::error::*;
-use crate::key::schedule::{
-    GroupContext, PreSharedKeyID, Psk, ResumptionPSKUsage, SECRET_LABEL_CONFIRM,
-};
-use crate::serde::*;
-use crate::tree::math::LeafIndex;
-use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
+use crate::key_schedule::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupInfo {

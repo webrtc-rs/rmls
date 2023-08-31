@@ -1,10 +1,15 @@
-use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::error::*;
-use crate::framing::*;
-use crate::serde::*;
-use crate::tree::{deserialize_extensions, serialize_extensions, Extension};
+//! [RFC9420 Sec.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-8) Key Schedule
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+
+use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
+use crate::framing::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::{deserialize_extensions, serialize_extensions, Extension};
+
+#[cfg(test)]
+mod key_schedule_test;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupContext {

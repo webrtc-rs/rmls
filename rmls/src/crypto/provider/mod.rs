@@ -11,8 +11,8 @@ mod rust;
 pub use self::rust::RustCryptoProvider;
 
 use crate::crypto::cipher_suite::CipherSuite;
-use crate::error::*;
-use crate::serde::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};

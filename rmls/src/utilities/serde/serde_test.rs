@@ -8,14 +8,16 @@ use crate::crypto::provider::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::error::*;
 use crate::framing::*;
 use crate::group::proposal::*;
 use crate::group::*;
-use crate::key::schedule::*;
-use crate::serde::Deserializer;
-use crate::tree::ratchet::RatchetTree;
-use crate::tree::{find_extension_data, ExtensionType, LeafNodeSource, LeafNodeVerifyOptions};
+use crate::key_schedule::*;
+use crate::ratchet_tree::RatchetTree;
+use crate::utilities::error::*;
+use crate::utilities::serde::Deserializer;
+use crate::utilities::tree::{
+    find_extension_data, ExtensionType, LeafNodeSource, LeafNodeVerifyOptions,
+};
 
 pub(crate) fn load_test_vector<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
     let file = File::open(path).map_err(|err| Error::Other(err.to_string()))?;

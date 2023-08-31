@@ -1,10 +1,15 @@
+//! [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-8) Secret Tree
+
+#[cfg(test)]
+mod secret_tree_test;
+
 use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::{Display, Formatter};
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider};
-use crate::error::*;
 use crate::framing::*;
-use crate::tree::math::*;
+use crate::utilities::error::*;
+use crate::utilities::tree::*;
 
 const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";
 const RATCHET_LABEL_APPLICATION_STR: &str = "application";

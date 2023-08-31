@@ -12,12 +12,12 @@ pub mod group_info;
 pub mod proposal;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HPKECiphertext};
-use crate::error::*;
 use crate::group::{group_info::*, proposal::*};
-use crate::key::{package::KeyPackageRef, schedule::extract_welcome_secret};
-use crate::serde::*;
-use crate::tree::math::LeafIndex;
-use crate::tree::*;
+use crate::key_package::KeyPackageRef;
+use crate::key_schedule::extract_welcome_secret;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Commit {

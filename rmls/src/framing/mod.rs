@@ -7,13 +7,13 @@ use bytes::{Buf, BufMut, Bytes};
 use rand::Rng;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::error::*;
-use crate::group::{group_info::GroupInfo, proposal::Proposal, Commit, Welcome};
-use crate::key::package::KeyPackage;
-use crate::key::schedule::{ConfirmedTranscriptHashInput, GroupContext};
-use crate::serde::*;
-use crate::tree::math::LeafIndex;
-use crate::tree::secret::RatchetSecret;
+use crate::group::{group_info::*, proposal::*, *};
+use crate::key_package::KeyPackage;
+use crate::key_schedule::*;
+use crate::secret_tree::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::*;
 
 /// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Protocol Version
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]

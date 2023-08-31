@@ -5,7 +5,7 @@ pub(crate) mod serde_test;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::error::{Error, Result};
+use crate::utilities::error::{Error, Result};
 
 pub(crate) fn deserialize_varint<B: Buf>(buf: &mut B) -> Result<u32> {
     if !buf.has_remaining() {

@@ -1,6 +1,6 @@
 //! [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Cipher Suite specifies
 //! the cryptographic primitives to be used in group key computations.
-use crate::error::*;
+use crate::utilities::error::*;
 
 use std::fmt::{Display, Formatter};
 

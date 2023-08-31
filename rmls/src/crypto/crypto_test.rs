@@ -3,9 +3,9 @@ use crate::crypto::provider::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::error::*;
-use crate::serde::serde_test::*;
-use crate::tree::secret::derive_tree_secret;
+use crate::secret_tree::derive_tree_secret;
+use crate::utilities::error::*;
+use crate::utilities::serde::serde_test::*;
 
 use serde::{Deserialize, Serialize};
 

@@ -1,11 +1,13 @@
+//! [RFC9420 Sec.10](https://www.rfc-editor.org/rfc/rfc9420.html#section-10) Key Packages
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
-use crate::error::*;
 use crate::framing::*;
-use crate::key::schedule::*;
-use crate::serde::*;
-use crate::tree::*;
+use crate::key_schedule::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::*;
 
 pub type KeyPackageRef = Bytes;
 

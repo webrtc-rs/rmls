@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-use crate::error::*;
 use crate::framing::MLSMessage;
 use crate::group::{group_info::*, proposal::*, Commit};
-use crate::serde::{serde_test::load_test_vector, *};
-use crate::tree::ratchet::RatchetTree;
+use crate::ratchet_tree::RatchetTree;
+use crate::utilities::error::*;
+use crate::utilities::serde::{serde_test::load_test_vector, *};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct MessagesTest {

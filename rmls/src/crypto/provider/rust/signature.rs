@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use signature::{Signer, Verifier};
 
-use crate::error::*;
+use crate::utilities::error::*;
 
 #[allow(non_camel_case_types)]
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]

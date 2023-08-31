@@ -2,8 +2,8 @@
 #[cfg(test)]
 mod crypto_test;
 
-use crate::error::*;
-use crate::serde::*;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
 
 use bytes::{Buf, BufMut, Bytes};
 

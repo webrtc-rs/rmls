@@ -1,10 +1,10 @@
 use crate::crypto::cipher_suite::CipherSuite;
-use crate::error::*;
 use crate::framing::{GroupID, ProtocolVersion};
-use crate::key::{package::KeyPackage, schedule::PreSharedKeyID};
-use crate::serde::{deserialize_opaque_vec, serialize_opaque_vec, Deserializer, Serializer};
-use crate::tree::math::LeafIndex;
-use crate::tree::{deserialize_extensions, serialize_extensions, Extension, LeafNode};
+use crate::key_package::KeyPackage;
+use crate::key_schedule::PreSharedKeyID;
+use crate::utilities::error::*;
+use crate::utilities::serde::*;
+use crate::utilities::tree::*;
 
 use bytes::{Buf, BufMut, Bytes};
 

@@ -29,7 +29,7 @@ use crate::utilities::error::*;
 
 // NumLeaves exposes operations on a tree with a given number of leaves.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct NumLeaves(pub(crate) u32);
+pub struct NumLeaves(pub(crate) u32);
 
 impl NumLeaves {
     pub(crate) fn new(width: u32) -> Self {

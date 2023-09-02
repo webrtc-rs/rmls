@@ -213,14 +213,14 @@ fn test_message_protection_priv(
         return Err(Error::Other("unreachable".to_string()));
     };
 
-    let tree = derive_secret_tree(
+    let tree = SecretTree::new(
         crypto_provider,
         cipher_suite,
         NumLeaves(2),
         &tc.encryption_secret,
     )?;
 
-    let label = ratchet_label_from_content_type(priv_msg.content_type)?;
+    let label = priv_msg.content_type.into();
     let li = LeafIndex(1);
     let secret = tree.derive_ratchet_root(crypto_provider, cipher_suite, li.node_index(), label)?;
 

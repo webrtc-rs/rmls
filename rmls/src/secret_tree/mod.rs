@@ -1,4 +1,4 @@
-//! [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-8) Secret Tree
+//! [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-9) Secret Tree
 
 #[cfg(test)]
 mod secret_tree_test;
@@ -14,8 +14,13 @@ use crate::utilities::tree_math::*;
 const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";
 const RATCHET_LABEL_APPLICATION_STR: &str = "application";
 
+/// [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-9) RatchetLabel
+///
+/// RatchetLabel::Handshake: "handshake"
+///
+/// RatchetLabel::Application: "application"
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) enum RatchetLabel {
+pub enum RatchetLabel {
     #[default]
     Handshake,
     Application,
@@ -30,31 +35,40 @@ impl Display for RatchetLabel {
     }
 }
 
-pub(crate) fn ratchet_label_from_content_type(ct: ContentType) -> Result<RatchetLabel> {
-    match ct {
-        ContentType::Application => Ok(RatchetLabel::Application),
-        ContentType::Proposal | ContentType::Commit => Ok(RatchetLabel::Handshake),
+impl From<ContentType> for RatchetLabel {
+    fn from(content_type: ContentType) -> Self {
+        match content_type {
+            ContentType::Application => RatchetLabel::Application,
+            ContentType::Proposal | ContentType::Commit => RatchetLabel::Handshake,
+        }
     }
 }
 
-// secretTree holds tree node secrets used for the generation of encryption
-// keys and nonces.
+/// [RFC9420 Sec.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-9) SecretTree
+///
+/// It holds tree node secrets used for the generation of encryption keys and nonces.
+///
+/// For the generation of encryption keys and nonces, the key schedule begins with the
+/// encryption_secret at the root and derives a tree of secrets with the same structure
+/// as the group's ratchet tree. Each leaf in the secret tree is associated with the same
+/// group member as the corresponding leaf in the ratchet tree.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct SecretTree(pub(crate) Vec<Option<Bytes>>);
-
-pub(crate) fn derive_secret_tree(
-    crypto_provider: &impl CryptoProvider,
-    cipher_suite: CipherSuite,
-    n: NumLeaves,
-    encryption_secret: &[u8],
-) -> Result<SecretTree> {
-    let mut tree = SecretTree(vec![None; n.width() as usize]);
-    tree.set(n.root(), encryption_secret.to_vec().into());
-    tree.derive_children(crypto_provider, cipher_suite, n.root())?;
-    Ok(tree)
-}
+pub struct SecretTree(pub(crate) Vec<Option<Bytes>>);
 
 impl SecretTree {
+    /// Create a SecretTree
+    pub fn new(
+        crypto_provider: &impl CryptoProvider,
+        cipher_suite: CipherSuite,
+        n: NumLeaves,
+        encryption_secret: &[u8],
+    ) -> Result<Self> {
+        let mut tree = SecretTree(vec![None; n.width() as usize]);
+        tree.set(n.root(), encryption_secret.to_vec().into());
+        tree.derive_children(crypto_provider, cipher_suite, n.root())?;
+        Ok(tree)
+    }
+
     fn derive_children(
         &mut self,
         crypto_provider: &impl CryptoProvider,
@@ -101,8 +115,8 @@ impl SecretTree {
         }
     }
 
-    // derive_ratchet_root derives the root of a ratchet for a tree node.
-    pub(crate) fn derive_ratchet_root(
+    /// derive_ratchet_root derives the root of a ratchet for a tree node.
+    pub fn derive_ratchet_root(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -129,14 +143,16 @@ impl SecretTree {
     }
 }
 
+/// [RFC9420 Sec.9.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-9.1) RatchetSecret
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct RatchetSecret {
-    pub(crate) secret: Bytes,
-    pub(crate) generation: u32,
+    pub secret: Bytes,
+    pub generation: u32,
 }
 
 impl RatchetSecret {
-    pub(crate) fn derive_nonce(
+    /// nonce in RatchetSecret is derived using derive_tree_secret.
+    pub fn derive_nonce(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -152,7 +168,8 @@ impl RatchetSecret {
         )
     }
 
-    pub(crate) fn derive_key(
+    /// Key in ratchet is derived using derive_tree_secret.
+    pub fn derive_key(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -168,7 +185,8 @@ impl RatchetSecret {
         )
     }
 
-    pub(crate) fn derive_next(
+    /// Next RatchetSecret is derived using derive_tree_secret.
+    pub fn derive_next(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -189,6 +207,12 @@ impl RatchetSecret {
     }
 }
 
+/// [RFC9420 Sec.9.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-9.1)
+/// Keys, nonces, and the secrets in ratchets are derived using derive_tree_secret.
+/// ```text
+/// DeriveTreeSecret(Secret, Label, Generation, Length) =
+///     ExpandWithLabel(Secret, Label, Generation, Length)
+/// ```
 pub fn derive_tree_secret(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,

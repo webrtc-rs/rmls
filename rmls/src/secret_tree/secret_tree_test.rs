@@ -64,7 +64,7 @@ fn secret_tree_test(
     )?;
     assert_eq!(&nonce, &tc.sender_data.nonce);
 
-    let tree = derive_secret_tree(
+    let tree = SecretTree::new(
         crypto_provider,
         cipher_suite,
         NumLeaves(tc.leaves.len() as u32),

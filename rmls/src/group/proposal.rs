@@ -283,7 +283,7 @@ pub struct ReInitProposal {
     group_id: GroupID,
     version: ProtocolVersion,
     cipher_suite: CipherSuite,
-    extensions: Vec<Extension>,
+    extensions: Extensions,
 }
 
 impl Deserializer for ReInitProposal {
@@ -300,7 +300,7 @@ impl Deserializer for ReInitProposal {
         let version = buf.get_u16().into();
         let cipher_suite = buf.get_u16().try_into()?;
 
-        let extensions = deserialize_extensions(buf)?;
+        let extensions = Extensions::deserialize(buf)?;
 
         Ok(Self {
             group_id,
@@ -319,7 +319,7 @@ impl Serializer for ReInitProposal {
         serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u16(self.version.into());
         buf.put_u16(self.cipher_suite as u16);
-        serialize_extensions(&self.extensions, buf)
+        self.extensions.serialize(buf)
     }
 }
 
@@ -350,7 +350,7 @@ impl Serializer for ExternalInitProposal {
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupContextExtensionsProposal {
-    extensions: Vec<Extension>,
+    extensions: Extensions,
 }
 
 impl Deserializer for GroupContextExtensionsProposal {
@@ -359,8 +359,9 @@ impl Deserializer for GroupContextExtensionsProposal {
         Self: Sized,
         B: Buf,
     {
-        let extensions = deserialize_extensions(buf)?;
-        Ok(Self { extensions })
+        Ok(Self {
+            extensions: Extensions::deserialize(buf)?,
+        })
     }
 }
 impl Serializer for GroupContextExtensionsProposal {
@@ -369,7 +370,7 @@ impl Serializer for GroupContextExtensionsProposal {
         Self: Sized,
         B: BufMut,
     {
-        serialize_extensions(&self.extensions, buf)
+        self.extensions.serialize(buf)
     }
 }
 

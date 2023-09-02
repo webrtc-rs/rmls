@@ -1,4 +1,9 @@
 //! [RFC9420 Sec.7](https://www.rfc-editor.org/rfc/rfc9420.html#section-7) Ratchet Tree Operations
+//!
+//! The ratchet tree for an epoch describes the membership of a group in that epoch,
+//! providing public key encryption (HPKE) keys that can be used to encrypt to subsets of the group
+//! as well as information to authenticate the members. In order to reflect changes to the membership
+//! of the group from one epoch to the next, corresponding changes are made to the ratchet tree.
 
 #[cfg(test)]
 mod ratchet_tree_test;
@@ -16,11 +21,21 @@ use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;
 
+/// [RFC9420 Sec.7.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.1) Parent Node
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ParentNode {
-    pub(crate) encryption_key: HPKEPublicKey,
-    pub(crate) parent_hash: Bytes,
-    pub(crate) unmerged_leaves: Vec<LeafIndex>,
+    /// The encryption_key field contains an HPKE public key whose private key is held only
+    /// by the members at the leaves among its descendants.
+    pub encryption_key: HPKEPublicKey,
+
+    /// The parent_hash field contains a hash of this node's parent node, as described in
+    /// [RFC9420 Sec.7.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.9)
+    pub parent_hash: Bytes,
+
+    /// The unmerged_leaves field lists the leaves under this parent node that are unmerged,
+    /// according to their indices among all the leaves in the tree.
+    /// The entries in the unmerged_leaves vector MUST be sorted in increasing order.
+    pub unmerged_leaves: Vec<LeafIndex>,
 }
 
 impl Deserializer for ParentNode {
@@ -70,7 +85,10 @@ impl Serializer for ParentNode {
 }
 
 impl ParentNode {
-    pub(crate) fn compute_parent_hash(
+    /// [RFC9420 Sec.7.9](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.9) Compute parent hash,
+    /// where original_sibling_tree_hash is the tree hash of S in the ratchet tree modified as follows:
+    /// For each leaf L in P.unmerged_leaves, blank L and remove it from the unmerged_leaves sets of all parent nodes.
+    pub fn compute_parent_hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -85,7 +103,7 @@ impl ParentNode {
         Ok(h.digest(&input))
     }
 
-    pub(crate) fn serialize_parent_hash_input(
+    fn serialize_parent_hash_input(
         encryption_key: &HPKEPublicKey,
         parent_hash: &[u8],
         original_sibling_tree_hash: &[u8],
@@ -98,8 +116,9 @@ impl ParentNode {
     }
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNodeSource
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) enum LeafNodeSource {
+pub enum LeafNodeSource {
     KeyPackage(Lifetime), // = 1,
     #[default]
     Update, // = 2,
@@ -147,8 +166,9 @@ impl Serializer for LeafNodeSource {
     }
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Capabilities
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Capabilities {
+pub struct Capabilities {
     versions: Vec<ProtocolVersion>,
     cipher_suites: Vec<CipherSuiteCapability>,
     extensions: Vec<ExtensionType>,
@@ -280,8 +300,9 @@ impl Serializer for Capabilities {
 const ZERO_DURATION: Duration = Duration::from_secs(0);
 const MAX_LEAF_NODE_LIFETIME: Duration = Duration::from_secs(3 * 30 * 24);
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Lifetime
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(crate) struct Lifetime {
+pub struct Lifetime {
     not_before: u64,
     not_after: u64,
 }
@@ -344,10 +365,10 @@ impl Lifetime {
     }
 }
 
-// http://www.iana.org/assignments/mls/mls.xhtml#mls-extension-types
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) ExtensionType
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(u16)]
-pub(crate) enum ExtensionType {
+pub enum ExtensionType {
     #[default]
     ApplicationId = 0x0001,
     RatchetTree = 0x0002,
@@ -384,40 +405,47 @@ impl From<ExtensionType> for u16 {
     }
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Extension
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct Extension {
+pub struct Extension {
     extension_type: ExtensionType,
     extension_data: Bytes,
 }
 
-pub(crate) fn deserialize_extensions<B: Buf>(buf: &mut B) -> Result<Vec<Extension>> {
-    let mut exts = vec![];
-    deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-        if b.remaining() < 2 {
-            return Err(Error::BufferTooSmall);
-        }
-        let extension_type: ExtensionType = b.get_u16().into();
-        let extension_data = deserialize_opaque_vec(b)?;
-        exts.push(Extension {
-            extension_type,
-            extension_data,
-        });
-        Ok(())
-    })?;
-    Ok(exts)
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct Extensions(pub Vec<Extension>);
+
+impl Deserializer for Extensions {
+    fn deserialize<B: Buf>(buf: &mut B) -> Result<Self> {
+        let mut exts = vec![];
+        deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
+            if b.remaining() < 2 {
+                return Err(Error::BufferTooSmall);
+            }
+            let extension_type: ExtensionType = b.get_u16().into();
+            let extension_data = deserialize_opaque_vec(b)?;
+            exts.push(Extension {
+                extension_type,
+                extension_data,
+            });
+            Ok(())
+        })?;
+        Ok(Extensions(exts))
+    }
 }
 
-pub(crate) fn serialize_extensions<B: BufMut>(exts: &[Extension], buf: &mut B) -> Result<()> {
-    serialize_vector(
-        exts.len(),
-        buf,
-        |i: usize, b: &mut BytesMut| -> Result<()> {
-            b.put_u16(exts[i].extension_type.into());
-            serialize_opaque_vec(&exts[i].extension_data, b)
-        },
-    )
+impl Serializer for Extensions {
+    fn serialize<B: BufMut>(&self, buf: &mut B) -> Result<()> {
+        serialize_vector(
+            self.0.len(),
+            buf,
+            |i: usize, b: &mut BytesMut| -> Result<()> {
+                b.put_u16(self.0[i].extension_type.into());
+                serialize_opaque_vec(&self.0[i].extension_data, b)
+            },
+        )
+    }
 }
-
 pub(crate) fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
     for ext in exts {
         if ext.extension_type == t {
@@ -434,7 +462,7 @@ pub struct LeafNode {
     credential: Credential,
     pub(crate) capabilities: Capabilities,
     pub(crate) leaf_node_source: LeafNodeSource,
-    extensions: Vec<Extension>,
+    extensions: Extensions,
 
     signature: Bytes,
 }
@@ -446,8 +474,7 @@ impl LeafNode {
         self.credential.serialize(buf)?;
         self.capabilities.serialize(buf)?;
         self.leaf_node_source.serialize(buf)?;
-
-        serialize_extensions(&self.extensions, buf)
+        self.extensions.serialize(buf)
     }
 }
 
@@ -464,7 +491,7 @@ impl Deserializer for LeafNode {
         let capabilities = Capabilities::deserialize(buf)?;
         let leaf_node_source = LeafNodeSource::deserialize(buf)?;
 
-        let extensions = deserialize_extensions(buf)?;
+        let extensions = Extensions::deserialize(buf)?;
         let signature = deserialize_opaque_vec(buf)?;
 
         Ok(Self {
@@ -588,7 +615,7 @@ impl LeafNode {
         for et in &self.capabilities.extensions {
             supported_exts.insert(*et);
         }
-        for ext in &self.extensions {
+        for ext in &self.extensions.0 {
             if !supported_exts.contains(&ext.extension_type) {
                 return Err(
                     Error::ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(
@@ -617,6 +644,42 @@ pub(crate) struct LeafNodeVerifyOptions<'a> {
     pub(crate) signature_keys: &'a HashSet<Bytes>,
     pub(crate) encryption_keys: &'a HashSet<Bytes>,
     pub(crate) now: &'a dyn Fn() -> SystemTime,
+}
+
+/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) HPKECiphertext is used to
+/// keep encrypted path secret in Update Path.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct HPKECiphertext {
+    pub(crate) kem_output: Bytes,
+    pub(crate) ciphertext: Bytes,
+}
+
+impl Deserializer for HPKECiphertext {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let kem_output = deserialize_opaque_vec(buf)?;
+        let ciphertext = deserialize_opaque_vec(buf)?;
+
+        Ok(Self {
+            kem_output,
+            ciphertext,
+        })
+    }
+}
+
+impl Serializer for HPKECiphertext {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.kem_output, buf)?;
+        serialize_opaque_vec(&self.ciphertext, buf)?;
+        Ok(())
+    }
 }
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]

@@ -16,7 +16,7 @@ pub struct KeyPackage {
     pub(crate) cipher_suite: CipherSuite,
     pub(crate) init_key: HPKEPublicKey,
     pub(crate) leaf_node: LeafNode,
-    extensions: Vec<Extension>,
+    extensions: Extensions,
     signature: Bytes,
 }
 
@@ -34,7 +34,7 @@ impl Deserializer for KeyPackage {
         let cipher_suite = buf.get_u16().try_into()?;
         let init_key = deserialize_opaque_vec(buf)?;
         let leaf_node = LeafNode::deserialize(buf)?;
-        let extensions = deserialize_extensions(buf)?;
+        let extensions = Extensions::deserialize(buf)?;
         let signature = deserialize_opaque_vec(buf)?;
 
         Ok(Self {
@@ -69,7 +69,7 @@ impl KeyPackage {
         buf.put_u16(self.cipher_suite as u16);
         serialize_opaque_vec(&self.init_key, buf)?;
         self.leaf_node.serialize(buf)?;
-        serialize_extensions(&self.extensions, buf)
+        self.extensions.serialize(buf)
     }
 
     fn verify_signature(&self, crypto_provider: &impl CryptoProvider) -> Result<()> {

@@ -7,7 +7,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::utilities::error::{Error, Result};
 
-pub(crate) fn deserialize_varint<B: Buf>(buf: &mut B) -> Result<u32> {
+pub fn deserialize_varint<B: Buf>(buf: &mut B) -> Result<u32> {
     if !buf.has_remaining() {
         return Err(Error::BufferTooSmall);
     }
@@ -35,7 +35,7 @@ pub(crate) fn deserialize_varint<B: Buf>(buf: &mut B) -> Result<u32> {
     Ok(v)
 }
 
-pub(crate) fn serialize_varint<B: BufMut>(n: u32, buf: &mut B) -> Result<()> {
+pub fn serialize_varint<B: BufMut>(n: u32, buf: &mut B) -> Result<()> {
     if n < (1 << 6) {
         buf.put_u8(n as u8);
     } else if n < (1 << 14) {
@@ -48,7 +48,7 @@ pub(crate) fn serialize_varint<B: BufMut>(n: u32, buf: &mut B) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn deserialize_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
+pub fn deserialize_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
     let n = deserialize_varint(buf)? as usize;
     if buf.remaining() < n {
         return Err(Error::BufferTooSmall);
@@ -57,7 +57,7 @@ pub(crate) fn deserialize_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
     Ok(buf.copy_to_bytes(n))
 }
 
-pub(crate) fn serialize_opaque_vec<B: BufMut>(v: &[u8], buf: &mut B) -> Result<()> {
+pub fn serialize_opaque_vec<B: BufMut>(v: &[u8], buf: &mut B) -> Result<()> {
     if v.len() >= 1 << 32 {
         return Err(Error::OpaqueSizeExceedsMaximumValueOfU32);
     }
@@ -69,7 +69,7 @@ pub(crate) fn serialize_opaque_vec<B: BufMut>(v: &[u8], buf: &mut B) -> Result<(
     Ok(())
 }
 
-pub(crate) fn deserialize_vector<B: Buf>(
+pub fn deserialize_vector<B: Buf>(
     buf: &mut B,
     mut f: impl FnMut(&mut Bytes) -> Result<()>,
 ) -> Result<()> {
@@ -86,7 +86,7 @@ pub(crate) fn deserialize_vector<B: Buf>(
     Ok(())
 }
 
-pub(crate) fn serialize_vector<B: BufMut>(
+pub fn serialize_vector<B: BufMut>(
     n: usize,
     buf: &mut B,
     mut f: impl FnMut(usize, &mut BytesMut) -> Result<()>,
@@ -103,7 +103,7 @@ pub(crate) fn serialize_vector<B: BufMut>(
     serialize_opaque_vec(&raw, buf)
 }
 
-pub(crate) fn deserialize_optional<B: Buf>(buf: &mut B) -> Result<bool> {
+pub fn deserialize_optional<B: Buf>(buf: &mut B) -> Result<bool> {
     if !buf.has_remaining() {
         return Err(Error::BufferTooSmall);
     }
@@ -116,13 +116,13 @@ pub(crate) fn deserialize_optional<B: Buf>(buf: &mut B) -> Result<bool> {
     }
 }
 
-pub(crate) fn serialize_optional<B: BufMut>(present: bool, buf: &mut B) -> Result<()> {
+pub fn serialize_optional<B: BufMut>(present: bool, buf: &mut B) -> Result<()> {
     let n: u8 = if present { 1 } else { 0 };
     buf.put_u8(n);
     Ok(())
 }
 
-pub(crate) trait Deserializer {
+pub trait Deserializer {
     fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
@@ -137,7 +137,7 @@ pub(crate) trait Deserializer {
     }
 }
 
-pub(crate) trait Serializer {
+pub trait Serializer {
     fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,

@@ -8,6 +8,7 @@ use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::framing::*;
 use crate::key_schedule::GroupContext;
+use crate::ratchet_tree::Extensions;
 use crate::secret_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::{serde_test::load_test_vector, *};
@@ -317,7 +318,7 @@ fn message_protection_test(
         epoch: tc.epoch,
         tree_hash: tc.tree_hash.clone().into(),
         confirmed_transcript_hash: tc.confirmed_transcript_hash.clone().into(),
-        extensions: vec![],
+        extensions: Extensions::default(),
     };
 
     let wire_formats = vec![

@@ -19,7 +19,7 @@ pub struct GroupContext {
     pub(crate) epoch: u64,
     pub(crate) tree_hash: Bytes,
     pub(crate) confirmed_transcript_hash: Bytes,
-    pub(crate) extensions: Vec<Extension>,
+    pub(crate) extensions: Extensions,
 }
 
 impl Deserializer for GroupContext {
@@ -46,7 +46,7 @@ impl Deserializer for GroupContext {
             return Err(Error::InvalidProposalTypeValue(version.into()));
         }
 
-        let extensions = deserialize_extensions(buf)?;
+        let extensions = Extensions::deserialize(buf)?;
 
         Ok(Self {
             version,
@@ -71,7 +71,7 @@ impl Serializer for GroupContext {
         buf.put_u64(self.epoch);
         serialize_opaque_vec(&self.tree_hash, buf)?;
         serialize_opaque_vec(&self.confirmed_transcript_hash, buf)?;
-        serialize_extensions(&self.extensions, buf)
+        self.extensions.serialize(buf)
     }
 }
 

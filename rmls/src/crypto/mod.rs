@@ -2,10 +2,9 @@
 #[cfg(test)]
 mod crypto_test;
 
-use crate::utilities::error::*;
-use crate::utilities::serde::*;
+use bytes::Bytes;
 
-use bytes::{Buf, BufMut, Bytes};
+use crate::utilities::error::*;
 
 pub mod cipher_suite;
 pub mod credential;
@@ -19,43 +18,6 @@ pub type HPKEPublicKey = Bytes;
 /// [RFC9420 Sec.5.1.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.1) Signature public keys
 /// are likewise represented as opaque values in a format defined by the cipher suite's signature scheme.
 pub type SignaturePublicKey = Bytes;
-
-//TODO(yngrtc): move to tree mode?
-/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) HPKECiphertext is used to
-/// keep encrypted path secret in Update Path.
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct HPKECiphertext {
-    pub(crate) kem_output: Bytes,
-    pub(crate) ciphertext: Bytes,
-}
-
-impl Deserializer for HPKECiphertext {
-    fn deserialize<B>(buf: &mut B) -> Result<Self>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        let kem_output = deserialize_opaque_vec(buf)?;
-        let ciphertext = deserialize_opaque_vec(buf)?;
-
-        Ok(Self {
-            kem_output,
-            ciphertext,
-        })
-    }
-}
-
-impl Serializer for HPKECiphertext {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        serialize_opaque_vec(&self.kem_output, buf)?;
-        serialize_opaque_vec(&self.ciphertext, buf)?;
-        Ok(())
-    }
-}
 
 /// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Key Encapsulation
 /// Mechanism (KEM) of HPKE parameters

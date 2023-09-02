@@ -158,7 +158,7 @@ fn key_schedule_test(
             epoch: i as u64,
             tree_hash: epoch.tree_hash.clone().into(),
             confirmed_transcript_hash: epoch.confirmed_transcript_hash.clone().into(),
-            extensions: vec![],
+            extensions: Extensions::default(),
         };
 
         let raw_ctx = ctx.serialize_detached()?;

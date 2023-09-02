@@ -10,7 +10,7 @@ use crate::utilities::tree_math::*;
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupInfo {
     pub(crate) group_context: GroupContext,
-    pub(crate) extensions: Vec<Extension>,
+    pub(crate) extensions: Extensions,
     confirmation_tag: Bytes,
     pub(crate) signer: LeafIndex,
     signature: Bytes,
@@ -23,7 +23,7 @@ impl Deserializer for GroupInfo {
         B: Buf,
     {
         let group_context = GroupContext::deserialize(buf)?;
-        let extensions = deserialize_extensions(buf)?;
+        let extensions = Extensions::deserialize(buf)?;
         let confirmation_tag = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 4 {
             return Err(Error::BufferTooSmall);
@@ -59,7 +59,7 @@ impl GroupInfo {
         B: BufMut,
     {
         self.group_context.serialize(buf)?;
-        serialize_extensions(&self.extensions, buf)?;
+        self.extensions.serialize(buf)?;
         serialize_opaque_vec(&self.confirmation_tag, buf)?;
         buf.put_u32(self.signer.0);
         Ok(())

@@ -14,8 +14,9 @@ use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree::*;
 
+/// [RFC9420 Sec.7](https://www.rfc-editor.org/rfc/rfc9420.html#section-7) Ratchet Tree
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct RatchetTree(pub(crate) Vec<Option<Node>>);
+pub struct RatchetTree(pub(crate) Vec<Option<Node>>);
 
 impl Deserializer for RatchetTree {
     fn deserialize<B>(buf: &mut B) -> Result<Self>
@@ -66,10 +67,8 @@ impl Serializer for RatchetTree {
 }
 
 impl RatchetTree {
-    // get returns the node at the provided index.
-    //
-    // nil is returned for blank nodes. get panics if the index is out of range.
-    fn get(&self, i: NodeIndex) -> Option<&Node> {
+    /// Return the ref node at the provided index.
+    pub fn get(&self, i: NodeIndex) -> Option<&Node> {
         if (i.0 as usize) < self.0.len() {
             self.0[i.0 as usize].as_ref()
         } else {
@@ -77,7 +76,8 @@ impl RatchetTree {
         }
     }
 
-    fn get_mut(&mut self, i: NodeIndex) -> Option<&mut Node> {
+    /// Return the mutable node at the provided index
+    pub fn get_mut(&mut self, i: NodeIndex) -> Option<&mut Node> {
         if (i.0 as usize) < self.0.len() {
             self.0[i.0 as usize].as_mut()
         } else {
@@ -85,13 +85,15 @@ impl RatchetTree {
         }
     }
 
-    fn set(&mut self, i: NodeIndex, node: Option<Node>) {
+    /// Set the node at the provided index
+    pub fn set(&mut self, i: NodeIndex, node: Option<Node>) {
         if (i.0 as usize) < self.0.len() {
             self.0[i.0 as usize] = node;
         }
     }
 
-    pub(crate) fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
+    /// Return the ref LeafNode at the provided index.
+    pub fn get_leaf(&self, li: LeafIndex) -> Option<&LeafNode> {
         if let Some(Node::Leaf(leaf_node)) = self.get(li.node_index()) {
             Some(leaf_node)
         } else {
@@ -99,8 +101,8 @@ impl RatchetTree {
         }
     }
 
-    // resolve computes the resolution of a node.
-    pub(crate) fn resolve(&self, x: NodeIndex) -> Vec<NodeIndex> {
+    /// Compute the resolution of a node.
+    pub fn resolve(&self, x: NodeIndex) -> Vec<NodeIndex> {
         if let Some(n) = self.get(x) {
             let mut res = vec![x];
             if let Node::Parent(parent_node) = n {
@@ -122,7 +124,8 @@ impl RatchetTree {
         }
     }
 
-    pub(crate) fn supported_creds(&self) -> HashSet<CredentialType> {
+    /// Return supported CredentialTypes
+    pub fn supported_creds(&self) -> HashSet<CredentialType> {
         let mut num_members = 0;
         let mut supported_creds_count = HashMap::<CredentialType, usize>::new();
         for li in 0..self.num_leaves().0 {
@@ -148,7 +151,8 @@ impl RatchetTree {
         supported_creds
     }
 
-    pub(crate) fn keys(&self) -> (HashSet<Bytes>, HashSet<Bytes>) {
+    /// Return signature keys and encryption keys
+    pub fn keys(&self) -> (HashSet<Bytes>, HashSet<Bytes>) {
         let mut signature_keys = HashSet::new();
         let mut encryption_keys = HashSet::new();
         for li in 0..self.num_leaves().0 {
@@ -160,14 +164,14 @@ impl RatchetTree {
         (signature_keys, encryption_keys)
     }
 
-    // verify_integrity verifies the integrity of the ratchet tree, as described in
-    // section 12.4.3.1.
-    //
-    // This function does not perform full leaf node validation. In particular:
-    //
-    //   - It doesn't check that credentials are valid.
-    //   - It doesn't check the lifetime field.
-    pub(crate) fn verify_integrity(
+    /// Verify the integrity of the ratchet tree, as described in
+    /// section 12.4.3.1.
+    ///
+    /// This function does not perform full leaf node validation. In particular:
+    ///
+    ///   - It doesn't check that credentials are valid.
+    ///   - It doesn't check the lifetime field.
+    pub fn verify_integrity(
         &self,
         crypto_provider: &impl CryptoProvider,
         ctx: &GroupContext,
@@ -244,7 +248,8 @@ impl RatchetTree {
         Ok(())
     }
 
-    fn has_unmerged_leaf(node: &ParentNode, unmerged_leaf: &LeafIndex) -> bool {
+    /// Check whether the parent node has unmerged leaf at LeafIndex or not
+    pub fn has_unmerged_leaf(node: &ParentNode, unmerged_leaf: &LeafIndex) -> bool {
         for li in &node.unmerged_leaves {
             if li == unmerged_leaf {
                 return true;
@@ -253,7 +258,8 @@ impl RatchetTree {
         false
     }
 
-    pub(crate) fn compute_root_tree_hash(
+    /// Compute the tree hash for root of this Ratchet tree
+    pub fn compute_root_tree_hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -266,7 +272,8 @@ impl RatchetTree {
         )
     }
 
-    pub(crate) fn compute_tree_hash(
+    /// Compute the tree hash for the given node index of this Ratchet tree, excluding some LeafIndices
+    pub fn compute_tree_hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -369,7 +376,8 @@ impl RatchetTree {
         serialize_opaque_vec(right_hash, buf)
     }
 
-    pub(crate) fn verify_parent_hashes(
+    /// Verify parent hashes
+    pub fn verify_parent_hashes(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -456,7 +464,8 @@ impl RatchetTree {
         NumLeaves::new(self.0.len() as u32)
     }
 
-    pub(crate) fn find_leaf(&self, node: &LeafNode) -> (LeafIndex, bool) {
+    /// Find leaf index given the leaf node
+    pub fn find_leaf(&self, node: &LeafNode) -> (LeafIndex, bool) {
         for li in 0..self.num_leaves().0 {
             if let Some(n) = self.get_leaf(LeafIndex(li)) {
                 // Encryption keys are unique
@@ -475,7 +484,8 @@ impl RatchetTree {
         (LeafIndex(0), false)
     }
 
-    pub(crate) fn add(&mut self, leaf_node: LeafNode) {
+    /// Add the leaf node into the Ratchet tree
+    pub fn add(&mut self, leaf_node: LeafNode) {
         let mut li = LeafIndex(0);
         let mut ni: NodeIndex;
         let mut found = false;
@@ -514,7 +524,8 @@ impl RatchetTree {
         self.set(ni, Some(Node::Leaf(leaf_node)));
     }
 
-    pub(crate) fn update(&mut self, li: LeafIndex, leaf_node: LeafNode) {
+    /// Update the leaf index position with the given leaf node
+    pub fn update(&mut self, li: LeafIndex, leaf_node: LeafNode) {
         let mut ni = li.node_index();
 
         self.set(ni, Some(Node::Leaf(leaf_node)));
@@ -530,7 +541,8 @@ impl RatchetTree {
         }
     }
 
-    pub(crate) fn remove(&mut self, mut li: LeafIndex) {
+    /// Remove the leaf node for the given leaf index position
+    pub fn remove(&mut self, mut li: LeafIndex) {
         let mut ni = li.node_index();
 
         let num_leaves = self.num_leaves();
@@ -593,7 +605,8 @@ impl RatchetTree {
         Ok(path)
     }
 
-    pub(crate) fn merge_update_path(
+    /// Merge UpdatePath
+    pub fn merge_update_path(
         &mut self,
         crypto_provide: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -686,7 +699,8 @@ impl RatchetTree {
         Ok(())
     }
 
-    pub(crate) fn apply(&mut self, proposals: &[Proposal], senders: &[LeafIndex]) {
+    /// Apply the proposals
+    pub fn apply(&mut self, proposals: &[Proposal], senders: &[LeafIndex]) {
         // Apply all update proposals
         for (i, prop) in proposals.iter().enumerate() {
             if let Proposal::Update(update) = prop {

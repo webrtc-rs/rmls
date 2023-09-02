@@ -1182,12 +1182,16 @@ impl PrivateMessageContent {
         };
 
         let auth = FramedContentAuthData::deserialize(buf, ct)?;
-        /*TODO(yngrtc): fix padding check for ring
-        while buf.has_remaining() {
-            if buf.get_u8() != 0 {
-                return Err(Error::PaddingContainsNonZeroBytes);
+
+        //FIXME(yngrtc): https://github.com/webrtc-rs/rmls/issues/5 fix padding check for RingCryptoProvider
+        #[cfg(not(feature = "RingCryptoProvider"))]
+        {
+            while buf.has_remaining() {
+                if buf.get_u8() != 0 {
+                    return Err(Error::PaddingContainsNonZeroBytes);
+                }
             }
-        }*/
+        }
 
         Ok(Self { content, auth })
     }

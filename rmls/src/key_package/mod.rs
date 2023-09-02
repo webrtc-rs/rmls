@@ -5,9 +5,8 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::framing::*;
 use crate::key_schedule::*;
-use crate::utilities::error::*;
-use crate::utilities::serde::*;
-use crate::utilities::tree::*;
+use crate::ratchet_tree::*;
+use crate::utilities::{error::*, serde::*};
 
 pub type KeyPackageRef = Bytes;
 

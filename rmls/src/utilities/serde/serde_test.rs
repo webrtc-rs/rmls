@@ -12,12 +12,9 @@ use crate::framing::*;
 use crate::group::proposal::*;
 use crate::group::*;
 use crate::key_schedule::*;
-use crate::ratchet_tree::RatchetTree;
+use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::Deserializer;
-use crate::utilities::tree::{
-    find_extension_data, ExtensionType, LeafNodeSource, LeafNodeVerifyOptions,
-};
 
 pub(crate) fn load_test_vector<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
     let file = File::open(path).map_err(|err| Error::Other(err.to_string()))?;

@@ -11,7 +11,7 @@ use crate::key_schedule::GroupContext;
 use crate::secret_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::{serde_test::load_test_vector, *};
-use crate::utilities::tree::*;
+use crate::utilities::tree_math::*;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct WelcomeTest {

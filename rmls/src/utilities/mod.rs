@@ -2,4 +2,4 @@
 
 pub mod error;
 pub mod serde;
-pub mod tree;
+pub mod tree_math;

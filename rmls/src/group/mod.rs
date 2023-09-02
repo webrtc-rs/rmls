@@ -15,9 +15,10 @@ use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider, HPKECip
 use crate::group::{group_info::*, proposal::*};
 use crate::key_package::KeyPackageRef;
 use crate::key_schedule::extract_welcome_secret;
+use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
-use crate::utilities::tree::*;
+use crate::utilities::tree_math::*;
 
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Commit {

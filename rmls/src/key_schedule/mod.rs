@@ -4,9 +4,9 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::framing::*;
+use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
-use crate::utilities::tree::{deserialize_extensions, serialize_extensions, Extension};
 
 #[cfg(test)]
 mod key_schedule_test;

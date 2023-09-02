@@ -13,7 +13,7 @@ use crate::key_schedule::*;
 use crate::secret_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
-use crate::utilities::tree::*;
+use crate::utilities::tree_math::*;
 
 /// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Protocol Version
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]

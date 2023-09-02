@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider};
 use crate::framing::*;
 use crate::utilities::error::*;
-use crate::utilities::tree::*;
+use crate::utilities::tree_math::*;
 
 const RATCHET_LABEL_HANDSHAKE_STR: &str = "handshake";
 const RATCHET_LABEL_APPLICATION_STR: &str = "application";

@@ -2,9 +2,10 @@ use crate::crypto::cipher_suite::CipherSuite;
 use crate::framing::{GroupID, ProtocolVersion};
 use crate::key_package::KeyPackage;
 use crate::key_schedule::PreSharedKeyID;
+use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
-use crate::utilities::tree::*;
+use crate::utilities::tree_math::*;
 
 use bytes::{Buf, BufMut, Bytes};
 

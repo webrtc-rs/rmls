@@ -134,7 +134,9 @@ fn passive_client_test(
     let raw_tree = if let Some(raw_tree) = &tc.ratchet_tree {
         raw_tree.0.clone().into()
     } else {
-        find_extension_data(&group_info.extensions.0, ExtensionType::RatchetTree)
+        group_info
+            .extensions
+            .find_extension_data(ExtensionType::RatchetTree)
             .ok_or(Error::Other("missing ratchet tree".to_string()))?
     };
 

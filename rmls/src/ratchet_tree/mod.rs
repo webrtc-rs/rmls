@@ -412,6 +412,7 @@ pub struct Extension {
     extension_data: Bytes,
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Extensions
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Extensions(pub Vec<Extension>);
 
@@ -446,15 +447,19 @@ impl Serializer for Extensions {
         )
     }
 }
-pub(crate) fn find_extension_data(exts: &[Extension], t: ExtensionType) -> Option<Bytes> {
-    for ext in exts {
-        if ext.extension_type == t {
-            return Some(ext.extension_data.clone());
+
+impl Extensions {
+    pub(crate) fn find_extension_data(&self, t: ExtensionType) -> Option<Bytes> {
+        for ext in &self.0 {
+            if ext.extension_type == t {
+                return Some(ext.extension_data.clone());
+            }
         }
+        None
     }
-    None
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNode
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct LeafNode {
     pub(crate) encryption_key: HPKEPublicKey,
@@ -517,8 +522,9 @@ impl Serializer for LeafNode {
     }
 }
 
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNodeTBS
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub(crate) struct LeafNodeTBS<'a> {
+pub struct LeafNodeTBS<'a> {
     leaf_node: &'a LeafNode,
 
     // for LEAF_NODE_SOURCE_UPDATE and LEAF_NODE_SOURCE_COMMIT
@@ -546,11 +552,11 @@ impl<'a> Serializer for LeafNodeTBS<'a> {
 }
 
 impl LeafNode {
-    // verify_signature verifies the signature of the leaf node.
-    //
-    // group_id and li can be left unspecified if the leaf node source is neither
-    // update nor commit.
-    pub(crate) fn verify_signature(
+    /// Verify the signature of the leaf node.
+    ///
+    /// group_id and li can be left unspecified if the leaf node source is neither
+    /// update nor commit.
+    pub fn verify_signature(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -578,11 +584,10 @@ impl LeafNode {
             .is_ok()
     }
 
-    // verify performs leaf node validation described in section 7.3.
-    //
-    // It does not perform all checks: it does not check that the credential is
-    // valid.
-    pub(crate) fn verify(
+    /// [RFC9420 Sec.7.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.3) Leaf Node Validation
+    ///
+    /// It does not perform all checks: it does not check that the credential is valid.
+    pub fn verify(
         &self,
         crypto_provider: &impl CryptoProvider,
         options: LeafNodeVerifyOptions<'_>,
@@ -636,22 +641,23 @@ impl LeafNode {
     }
 }
 
-pub(crate) struct LeafNodeVerifyOptions<'a> {
-    pub(crate) cipher_suite: CipherSuite,
-    pub(crate) group_id: &'a GroupID,
-    pub(crate) leaf_index: LeafIndex,
-    pub(crate) supported_creds: &'a HashSet<CredentialType>,
-    pub(crate) signature_keys: &'a HashSet<Bytes>,
-    pub(crate) encryption_keys: &'a HashSet<Bytes>,
-    pub(crate) now: &'a dyn Fn() -> SystemTime,
+/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) LeafNodeVerifyOptions
+pub struct LeafNodeVerifyOptions<'a> {
+    pub cipher_suite: CipherSuite,
+    pub group_id: &'a GroupID,
+    pub leaf_index: LeafIndex,
+    pub supported_creds: &'a HashSet<CredentialType>,
+    pub signature_keys: &'a HashSet<Bytes>,
+    pub encryption_keys: &'a HashSet<Bytes>,
+    pub now: &'a dyn Fn() -> SystemTime,
 }
 
 /// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) HPKECiphertext is used to
 /// keep encrypted path secret in Update Path.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct HPKECiphertext {
-    pub(crate) kem_output: Bytes,
-    pub(crate) ciphertext: Bytes,
+    pub kem_output: Bytes,
+    pub ciphertext: Bytes,
 }
 
 impl Deserializer for HPKECiphertext {
@@ -682,10 +688,11 @@ impl Serializer for HPKECiphertext {
     }
 }
 
+/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) UpdatePathNode
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct UpdatePathNode {
-    pub(crate) encryption_key: HPKEPublicKey,
-    encrypted_path_secret: Vec<HPKECiphertext>,
+pub struct UpdatePathNode {
+    pub encryption_key: HPKEPublicKey,
+    pub encrypted_path_secret: Vec<HPKECiphertext>,
 }
 
 impl Deserializer for UpdatePathNode {
@@ -726,6 +733,12 @@ impl Serializer for UpdatePathNode {
     }
 }
 
+/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) UpdatePath
+///
+/// each Commit message may optionally contain an UpdatePath, with a new LeafNode and set of parent
+/// nodes for the sender's filtered direct path. For each parent node, the UpdatePath contains
+/// a new public key and encrypted path secret. The parent nodes are kept in the same order
+/// as the filtered direct path.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct UpdatePath {
     pub(crate) leaf_node: LeafNode,
@@ -765,6 +778,54 @@ impl Serializer for UpdatePath {
     }
 }
 
+/// [RFC9420 Sec.7.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.8) Node Type
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+#[repr(u8)]
+pub enum NodeType {
+    #[default]
+    Leaf = 1,
+    Parent = 2,
+}
+
+impl Deserializer for NodeType {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let v = buf.get_u8();
+        match v {
+            1 => Ok(NodeType::Leaf),
+            2 => Ok(NodeType::Parent),
+            _ => Err(Error::InvalidNodeTypeValue(v)),
+        }
+    }
+}
+
+impl Serializer for NodeType {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        match self {
+            NodeType::Leaf => {
+                buf.put_u8(1);
+            }
+            NodeType::Parent => {
+                buf.put_u8(2);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.7.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.8) Node
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Node {
     Leaf(LeafNode),
@@ -787,11 +848,10 @@ impl Deserializer for Node {
             return Err(Error::BufferTooSmall);
         }
 
-        let v = buf.get_u8();
-        match v {
-            1 => Ok(Node::Leaf(LeafNode::deserialize(buf)?)),
-            2 => Ok(Node::Parent(ParentNode::deserialize(buf)?)),
-            _ => Err(Error::InvalidNodeTypeValue(v)),
+        let node_type = NodeType::deserialize(buf)?;
+        match node_type {
+            NodeType::Leaf => Ok(Node::Leaf(LeafNode::deserialize(buf)?)),
+            NodeType::Parent => Ok(Node::Parent(ParentNode::deserialize(buf)?)),
         }
     }
 }
@@ -802,15 +862,19 @@ impl Serializer for Node {
         Self: Sized,
         B: BufMut,
     {
+        self.node_type().serialize(buf)?;
         match self {
-            Node::Leaf(leaf_node) => {
-                buf.put_u8(1);
-                leaf_node.serialize(buf)
-            }
-            Node::Parent(parent_node) => {
-                buf.put_u8(2);
-                parent_node.serialize(buf)
-            }
+            Node::Leaf(leaf_node) => leaf_node.serialize(buf),
+            Node::Parent(parent_node) => parent_node.serialize(buf),
+        }
+    }
+}
+
+impl Node {
+    pub fn node_type(&self) -> NodeType {
+        match self {
+            Node::Leaf(_) => NodeType::Leaf,
+            Node::Parent(_) => NodeType::Parent,
         }
     }
 }

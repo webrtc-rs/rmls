@@ -1,0 +1,5 @@
+[type.po]
+extend-glob = ["*.csr"]
+check-file = false
+
+[default.extend-words]

@@ -27,7 +27,7 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-  rustfmt_and_clippy:
+  quality:
     name: Check rustfmt style && run clippy
     runs-on: ubuntu-latest
     steps:
@@ -52,3 +52,5 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+      - name: Check for typos
+        uses: crate-ci/typos@master

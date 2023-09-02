@@ -12,7 +12,7 @@ use bytes::{Buf, BufMut, Bytes};
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u16)]
-pub(crate) enum ProposalTypeCapability {
+pub enum ProposalTypeCapability {
     #[default]
     Add = 0x0001,
     Update = 0x0002,

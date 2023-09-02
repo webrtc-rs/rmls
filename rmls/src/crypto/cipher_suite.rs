@@ -47,3 +47,20 @@ impl Display for CipherSuite {
 /// used in a leaf node in the tree to indicate an individual client's CipherSuite Capability.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct CipherSuiteCapability(pub(crate) u16);
+
+impl TryFrom<CipherSuiteCapability> for CipherSuite {
+    type Error = Error;
+
+    fn try_from(c: CipherSuiteCapability) -> std::result::Result<Self, Self::Error> {
+        match c.0 {
+            0x0001 => Ok(CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519),
+            0x0002 => Ok(CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256),
+            0x0003 => Ok(CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519),
+            0x0004 => Ok(CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448),
+            0x0005 => Ok(CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521),
+            0x0006 => Ok(CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448),
+            0x0007 => Ok(CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384),
+            _ => Err(Error::InvalidCipherSuiteValue(c.0)),
+        }
+    }
+}

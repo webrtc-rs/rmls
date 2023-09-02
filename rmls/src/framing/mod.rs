@@ -643,10 +643,10 @@ impl AuthenticatedContent {
 /// [RFC9420 Sec.6.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-6.1) FramedContentTBS
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct FramedContentTBS {
-    version: ProtocolVersion,
-    wire_format: WireFormat,
-    content: FramedContent,
-    context: Option<GroupContext>, // for SenderType::Member and SenderType::NewMemberCommit
+    pub version: ProtocolVersion,
+    pub wire_format: WireFormat,
+    pub content: FramedContent,
+    pub context: Option<GroupContext>, // for SenderType::Member and SenderType::NewMemberCommit
 }
 
 impl Deserializer for FramedContentTBS {
@@ -703,8 +703,8 @@ impl Serializer for FramedContentTBS {
 /// is used for authenticating FramedContent
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct FramedContentAuthData {
-    signature: Bytes,
-    pub(crate) confirmation_tag: Bytes, // for ContentType::Commit
+    pub signature: Bytes,
+    pub confirmation_tag: Bytes, // for ContentType::Commit
 }
 
 impl FramedContentAuthData {
@@ -801,9 +801,9 @@ impl FramedContentAuthData {
 /// authenticated but not encrypted are encoded using the PublicMessage structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PublicMessage {
-    pub(crate) content: FramedContent,
-    auth: FramedContentAuthData,
-    membership_tag: Option<Bytes>, // for SenderType::Member
+    pub content: FramedContent,
+    pub auth: FramedContentAuthData,
+    pub membership_tag: Option<Bytes>, // for SenderType::Member
 }
 
 impl Deserializer for PublicMessage {
@@ -950,8 +950,8 @@ impl PublicMessage {
 /// by members, it MUST be set to AuthenticatedContentTBM
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct AuthenticatedContentTBM {
-    content_tbs: FramedContentTBS,
-    auth: FramedContentAuthData,
+    pub content_tbs: FramedContentTBS,
+    pub auth: FramedContentAuthData,
 }
 
 impl Deserializer for AuthenticatedContentTBM {
@@ -983,12 +983,12 @@ impl Serializer for AuthenticatedContentTBM {
 /// encrypted messages are encoded using the PrivateMessage structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PrivateMessage {
-    group_id: GroupID,
-    epoch: u64,
-    pub(crate) content_type: ContentType,
-    authenticated_data: Bytes,
-    encrypted_sender_data: Bytes,
-    ciphertext: Bytes,
+    pub group_id: GroupID,
+    pub epoch: u64,
+    pub content_type: ContentType,
+    pub authenticated_data: Bytes,
+    pub encrypted_sender_data: Bytes,
+    pub ciphertext: Bytes,
 }
 
 impl Deserializer for PrivateMessage {
@@ -1165,8 +1165,8 @@ impl PrivateMessage {
 /// encrypted is encoded in a PrivateMessageContent structure.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PrivateMessageContent {
-    pub(crate) content: Content,
-    auth: FramedContentAuthData,
+    pub content: Content,
+    pub auth: FramedContentAuthData,
 }
 
 impl PrivateMessageContent {
@@ -1214,10 +1214,10 @@ impl Serializer for PrivateMessageContent {
 /// with the values used to identify the key and nonce
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct PrivateContentAAD {
-    group_id: GroupID,
-    epoch: u64,
-    content_type: ContentType,
-    authenticated_data: Bytes,
+    pub group_id: GroupID,
+    pub epoch: u64,
+    pub content_type: ContentType,
+    pub authenticated_data: Bytes,
 }
 
 impl Deserializer for PrivateContentAAD {
@@ -1262,9 +1262,9 @@ impl Serializer for PrivateContentAAD {
 /// Before being encrypted, the sender data is encoded as an object of the following form
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct SenderData {
-    leaf_index: LeafIndex,
-    pub(crate) generation: u32,
-    pub(crate) reuse_guard: [u8; 4],
+    pub leaf_index: LeafIndex,
+    pub generation: u32,
+    pub reuse_guard: [u8; 4],
 }
 
 impl SenderData {
@@ -1319,9 +1319,9 @@ impl Serializer for SenderData {
 /// SenderData ciphertext is the first three fields of PrivateMessage.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SenderDataAAD {
-    group_id: GroupID,
-    epoch: u64,
-    content_type: ContentType,
+    pub group_id: GroupID,
+    pub epoch: u64,
+    pub content_type: ContentType,
 }
 
 impl Serializer for SenderDataAAD {

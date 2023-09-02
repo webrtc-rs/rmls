@@ -169,11 +169,11 @@ impl Serializer for LeafNodeSource {
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Capabilities
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Capabilities {
-    versions: Vec<ProtocolVersion>,
-    cipher_suites: Vec<CipherSuiteCapability>,
-    extensions: Vec<ExtensionType>,
-    proposals: Vec<ProposalTypeCapability>,
-    pub(crate) credentials: Vec<CredentialType>,
+    pub versions: Vec<ProtocolVersion>,
+    pub cipher_suites: Vec<CipherSuiteCapability>,
+    pub extensions: Vec<ExtensionType>,
+    pub proposals: Vec<ProposalTypeCapability>,
+    pub credentials: Vec<CredentialType>,
 }
 
 impl Deserializer for Capabilities {
@@ -303,8 +303,8 @@ const MAX_LEAF_NODE_LIFETIME: Duration = Duration::from_secs(3 * 30 * 24);
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Lifetime
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Lifetime {
-    not_before: u64,
-    not_after: u64,
+    pub not_before: u64,
+    pub not_after: u64,
 }
 
 impl Deserializer for Lifetime {
@@ -408,8 +408,8 @@ impl From<ExtensionType> for u16 {
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Extension
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Extension {
-    extension_type: ExtensionType,
-    extension_data: Bytes,
+    pub extension_type: ExtensionType,
+    pub extension_data: Bytes,
 }
 
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) Extensions
@@ -462,14 +462,13 @@ impl Extensions {
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNode
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct LeafNode {
-    pub(crate) encryption_key: HPKEPublicKey,
-    pub(crate) signature_key: SignaturePublicKey,
-    credential: Credential,
-    pub(crate) capabilities: Capabilities,
-    pub(crate) leaf_node_source: LeafNodeSource,
-    extensions: Extensions,
-
-    signature: Bytes,
+    pub encryption_key: HPKEPublicKey,
+    pub signature_key: SignaturePublicKey,
+    pub credential: Credential,
+    pub capabilities: Capabilities,
+    pub leaf_node_source: LeafNodeSource,
+    pub extensions: Extensions,
+    pub signature: Bytes,
 }
 
 impl LeafNode {
@@ -741,8 +740,8 @@ impl Serializer for UpdatePathNode {
 /// as the filtered direct path.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct UpdatePath {
-    pub(crate) leaf_node: LeafNode,
-    pub(crate) nodes: Vec<UpdatePathNode>,
+    pub leaf_node: LeafNode,
+    pub nodes: Vec<UpdatePathNode>,
 }
 
 impl Deserializer for UpdatePath {

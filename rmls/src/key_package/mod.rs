@@ -1,4 +1,11 @@
 //! [RFC9420 Sec.10](https://www.rfc-editor.org/rfc/rfc9420.html#section-10) Key Packages
+//!
+//! In order to facilitate the asynchronous addition of clients to a group, clients can pre-publish
+//! KeyPackage objects that provide some public information about a user. A KeyPackage object specifies:
+//!
+//! 1. a protocol version and cipher suite that the client supports,
+//! 2. a public key that others can use to encrypt a Welcome message to this client (an "init key"), and
+//! 3. the content of the leaf node that should be added to the tree to represent this client.
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -8,16 +15,18 @@ use crate::key_schedule::*;
 use crate::ratchet_tree::*;
 use crate::utilities::{error::*, serde::*};
 
+/// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) KeyPackageRef
 pub type KeyPackageRef = Bytes;
 
+/// [RFC9420 Sec.10](https://www.rfc-editor.org/rfc/rfc9420.html#section-10) KeyPackage
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct KeyPackage {
-    pub(crate) version: ProtocolVersion,
-    pub(crate) cipher_suite: CipherSuite,
-    pub(crate) init_key: HPKEPublicKey,
-    pub(crate) leaf_node: LeafNode,
-    extensions: Extensions,
-    signature: Bytes,
+    pub version: ProtocolVersion,
+    pub cipher_suite: CipherSuite,
+    pub init_key: HPKEPublicKey,
+    pub leaf_node: LeafNode,
+    pub extensions: Extensions,
+    pub signature: Bytes,
 }
 
 impl Deserializer for KeyPackage {
@@ -85,12 +94,8 @@ impl KeyPackage {
         )
     }
 
-    // verify performs KeyPackage verification as described in RFC 9420 section 10.1.
-    pub(crate) fn verify(
-        &self,
-        crypto_provider: &impl CryptoProvider,
-        ctx: &GroupContext,
-    ) -> Result<()> {
+    /// [RFC9420 Sec.10.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-10.1) KeyPackage Validation
+    pub fn verify(&self, crypto_provider: &impl CryptoProvider, ctx: &GroupContext) -> Result<()> {
         if self.version != ctx.version {
             return Err(Error::KeyPackageVersionNotMatchGroupContext);
         }
@@ -110,10 +115,10 @@ impl KeyPackage {
         Ok(())
     }
 
-    pub(crate) fn generate_ref(
-        &self,
-        crypto_provider: &impl CryptoProvider,
-    ) -> Result<KeyPackageRef> {
+    /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) Generate a KeyPackageRef
+    /// with the value input is the encoded KeyPackage, and the cipher suite specified in
+    /// the KeyPackage determines the KDF used
+    pub fn generate_ref(&self, crypto_provider: &impl CryptoProvider) -> Result<KeyPackageRef> {
         let mut buf = BytesMut::new();
         self.serialize(&mut buf)?;
         let raw = buf.freeze();

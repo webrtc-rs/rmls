@@ -555,7 +555,7 @@ impl LeafNode {
     ///
     /// group_id and li can be left unspecified if the leaf node source is neither
     /// update nor commit.
-    pub fn verify_signature(
+    pub(crate) fn verify_signature(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,

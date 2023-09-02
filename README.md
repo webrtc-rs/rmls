@@ -38,7 +38,7 @@
 
 - [Overview](#overview)
 - [Supported CipherSuites](#supported-ciphersuites)
-- [Cryptography Dependecies](#cryptography-dependencies)
+- [Cryptography Dependencies](#cryptography-dependencies)
 - [Open Source License](#open-source-license)
 - [Contributing](#contributing)
 

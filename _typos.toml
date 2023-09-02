@@ -2,4 +2,7 @@
 extend-glob = ["*.csr"]
 check-file = false
 
+[files]
+extend-exclude = ["rmls/test-vectors/*.json"]
+
 [default.extend-words]

@@ -21,7 +21,7 @@ use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;
 
-/// [RFC9420 Sec.7.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.1) Parent Node
+/// [RFC9420 Sec.7.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.1) ParentNode
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct ParentNode {
     /// The encryption_key field contains an HPKE public key whose private key is held only
@@ -651,8 +651,9 @@ pub struct LeafNodeVerifyOptions<'a> {
     pub now: &'a dyn Fn() -> SystemTime,
 }
 
-/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) HPKECiphertext is used to
-/// keep encrypted path secret in Update Path.
+/// [RFC9420 Sec.7.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.6) HPKECiphertext
+///
+/// it is used to keep encrypted path secret in Update Path.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct HPKECiphertext {
     pub kem_output: Bytes,
@@ -777,7 +778,7 @@ impl Serializer for UpdatePath {
     }
 }
 
-/// [RFC9420 Sec.7.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.8) Node Type
+/// [RFC9420 Sec.7.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.8) NodeType
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum NodeType {
@@ -878,7 +879,7 @@ impl Node {
     }
 }
 
-/// [RFC9420 Sec.7](https://www.rfc-editor.org/rfc/rfc9420.html#section-7) Ratchet Tree
+/// [RFC9420 Sec.7](https://www.rfc-editor.org/rfc/rfc9420.html#section-7) RatchetTree
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct RatchetTree(pub(crate) Vec<Option<Node>>);
 

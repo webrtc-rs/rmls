@@ -110,7 +110,7 @@ fn passive_client_test(
 
     let mut psks: Vec<Bytes> = vec![];
     for psk_id in &group_secrets.psk_ids {
-        if let Psk::External(epsk_id) = &psk_id.psk {
+        if let PSK::External(epsk_id) = &psk_id.psk {
             let mut found = false;
             for epsk in &tc.external_psks {
                 if &epsk.psk_id == epsk_id.as_ref() {

@@ -10,7 +10,7 @@ use crate::key_schedule::*;
 use crate::utilities::serde::{serde_test::load_test_vector, Deserializer, Serializer};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-struct PSK {
+struct PSKTest {
     #[serde(with = "hex")]
     psk_id: Vec<u8>,
     #[serde(with = "hex")]
@@ -22,7 +22,7 @@ struct PSK {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 struct PskSecretTest {
     cipher_suite: u16,
-    psks: Vec<PSK>,
+    psks: Vec<PSKTest>,
     #[serde(with = "hex")]
     psk_secret: Vec<u8>,
 }
@@ -37,7 +37,7 @@ fn psk_secret_test(
 
     for psk in &tc.psks {
         psk_ids.push(PreSharedKeyID {
-            psk: Psk::External(psk.psk_id.clone().into()),
+            psk: PSK::External(psk.psk_id.clone().into()),
             psk_nonce: psk.psk_nonce.clone().into(),
         });
         psks.push(psk.psk.clone().into());

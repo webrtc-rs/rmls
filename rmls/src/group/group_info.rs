@@ -173,7 +173,7 @@ impl GroupSecrets {
     pub(crate) fn verify_single_reinit_or_branch_psk(&self) -> bool {
         let mut n = 0;
         for psk in &self.psk_ids {
-            if let Psk::Resumption(resumption) = &psk.psk {
+            if let PSK::Resumption(resumption) = &psk.psk {
                 match resumption.usage {
                     ResumptionPSKUsage::Reinit | ResumptionPSKUsage::Branch => n += 1,
                     _ => {}

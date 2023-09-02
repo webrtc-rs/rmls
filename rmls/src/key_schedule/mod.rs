@@ -1,4 +1,38 @@
 //! [RFC9420 Sec.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-8) Key Schedule
+//!
+//! Given these inputs, the derivation of secrets for an epoch proceeds as shown in the following diagram:
+//! ```text
+//!                     init_secret_[n-1]
+//!                           |
+//!                           |
+//!                           V
+//!     commit_secret --> KDF.Extract
+//!                           |
+//!                           |
+//!                           V
+//!                   ExpandWithLabel(., "joiner", GroupContext_[n], KDF.Nh)
+//!                           |
+//!                           |
+//!                           V
+//!                      joiner_secret
+//!                           |
+//!                           |
+//!                           V
+//!      pks_secret(or 0)-->KDF.Extract
+//!                           |
+//!                           |
+//!                           +--> DeriveSecret(., "welcome")
+//!                           |    = welcome_secret
+//!                           |
+//!                           V
+//!                   ExpandWithLabel(., "epoch", GroupContext_[n], KDF.Nh)
+//!                           |
+//!                           |
+//!                           V
+//!                      epoch_secret
+//!   
+//!                  The MLS Key Schedule
+//! ```
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
@@ -11,15 +45,26 @@ use crate::utilities::serde::*;
 #[cfg(test)]
 mod key_schedule_test;
 
+/// [RFC9420 Sec.8.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.1) Group Context
+/// Each member of the group maintains a GroupContext object that summarizes the state of the group:
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct GroupContext {
-    pub(crate) version: ProtocolVersion,
-    pub(crate) cipher_suite: CipherSuite,
-    pub(crate) group_id: GroupID,
-    pub(crate) epoch: u64,
-    pub(crate) tree_hash: Bytes,
-    pub(crate) confirmed_transcript_hash: Bytes,
-    pub(crate) extensions: Extensions,
+    /// The version is the protocol version
+    pub version: ProtocolVersion,
+    /// The cipher_suite is the cipher suite used by the group
+    pub cipher_suite: CipherSuite,
+    /// The group_id field is an application-defined identifier for the group
+    pub group_id: GroupID,
+    /// The epoch field represents the current version of the group
+    pub epoch: u64,
+    /// The tree_hash field contains a commitment to the contents of the group's ratchet tree and
+    /// the credentials for the members of the group, as described in
+    /// [RFC9420 Sec.7.8](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.8)
+    pub tree_hash: Bytes,
+    /// The confirmed_transcript_hash field contains a running hash over the messages that led to this state
+    pub confirmed_transcript_hash: Bytes,
+    /// The extensions field contains the details of any protocol extensions that apply to the group
+    pub extensions: Extensions,
 }
 
 impl Deserializer for GroupContext {
@@ -152,21 +197,23 @@ pub(crate) fn extract_welcome_secret(
     crypto_provider.derive_secret(cipher_suite, &extracted, b"welcome")
 }
 
-pub const SECRET_LABEL_INIT: &[u8] = b"init";
-pub const SECRET_LABEL_SENDER_DATA: &[u8] = b"sender data";
-pub const SECRET_LABEL_ENCRYPTION: &[u8] = b"encryption";
-pub const SECRET_LABEL_EXPORTER: &[u8] = b"exporter";
-pub const SECRET_LABEL_EXTERNAL: &[u8] = b"external";
-pub const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
-pub const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
-pub const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
-pub const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
+pub(crate) const SECRET_LABEL_INIT: &[u8] = b"init";
+pub(crate) const SECRET_LABEL_SENDER_DATA: &[u8] = b"sender data";
+pub(crate) const SECRET_LABEL_ENCRYPTION: &[u8] = b"encryption";
+pub(crate) const SECRET_LABEL_EXPORTER: &[u8] = b"exporter";
+pub(crate) const SECRET_LABEL_EXTERNAL: &[u8] = b"external";
+pub(crate) const SECRET_LABEL_CONFIRM: &[u8] = b"confirm";
+pub(crate) const SECRET_LABEL_MEMBERSHIP: &[u8] = b"membership";
+pub(crate) const SECRET_LABEL_RESUMPTION: &[u8] = b"resumption";
+pub(crate) const SECRET_LABEL_AUTHENTICATION: &[u8] = b"authentication";
 
+/// [RFC9420 Sec.8.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.2) The AuthenticatedContent
+/// struct is split into ConfirmedTranscriptHashInput and InterimTranscriptHashInput.
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct ConfirmedTranscriptHashInput {
-    pub(crate) wire_format: WireFormat,
-    pub(crate) content: FramedContent,
-    pub(crate) signature: Bytes,
+pub struct ConfirmedTranscriptHashInput {
+    pub wire_format: WireFormat,
+    pub content: FramedContent,
+    pub signature: Bytes,
 }
 
 impl Deserializer for ConfirmedTranscriptHashInput {
@@ -213,7 +260,16 @@ impl Serializer for ConfirmedTranscriptHashInput {
 }
 
 impl ConfirmedTranscriptHashInput {
-    pub(crate) fn hash(
+    /// [RFC9420 Sec.8.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.2) update the confirmed transcript hash
+    ///
+    /// ```text
+    /// confirmed_transcript_hash_[0] = ""; /* zero-length octet string */
+    /// interim_transcript_hash_[0] = ""; /* zero-length octet string */
+    /// confirmed_transcript_hash_[epoch] =
+    ///     Hash(interim_transcript_hash_[epoch - 1] ||
+    ///         ConfirmedTranscriptHashInput_[epoch]);
+    /// ```
+    pub fn hash(
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
@@ -229,7 +285,23 @@ impl ConfirmedTranscriptHashInput {
     }
 }
 
-pub(crate) fn next_interim_transcript_hash(
+/// [RFC9420 Sec.8.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.2) The AuthenticatedContent
+/// struct is split into ConfirmedTranscriptHashInput and InterimTranscriptHashInput.
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct InterimTranscriptHashInput {
+    pub confirmation_tag: Bytes,
+}
+
+/// [RFC9420 Sec.8.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.2) update the interim transcript hash
+///
+/// ```text
+/// confirmed_transcript_hash_[0] = ""; /* zero-length octet string */
+/// interim_transcript_hash_[0] = ""; /* zero-length octet string */
+/// interim_transcript_hash_[epoch] =
+///     Hash(confirmed_transcript_hash_[epoch] ||
+///         InterimTranscriptHashInput_[epoch]);
+/// ```
+pub fn next_interim_transcript_hash(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     confirmed_transcript_hash: &[u8],
@@ -246,6 +318,105 @@ pub(crate) fn next_interim_transcript_hash(
     Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
 }
 
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) PSKType
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u8)]
+pub enum PSKType {
+    #[default]
+    External = 1,
+    Resumption = 2,
+}
+
+impl TryFrom<u8> for PSKType {
+    type Error = Error;
+
+    fn try_from(v: u8) -> std::result::Result<Self, Self::Error> {
+        match v {
+            1 => Ok(PSKType::External),
+            2 => Ok(PSKType::Resumption),
+            _ => Err(Error::InvalidPskTypeValue(v)),
+        }
+    }
+}
+
+impl Deserializer for PSKType {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if !buf.has_remaining() {
+            return Err(Error::BufferTooSmall);
+        }
+        buf.get_u8().try_into()
+    }
+}
+impl Serializer for PSKType {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u8(*self as u8);
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) PSK
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum PSK {
+    External(Bytes),        //  = 1,
+    Resumption(Resumption), //  = 2,
+}
+
+impl Default for PSK {
+    fn default() -> Self {
+        PSK::External(Bytes::new())
+    }
+}
+
+impl Deserializer for PSK {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 2 {
+            return Err(Error::BufferTooSmall);
+        }
+        let psk_type = PSKType::deserialize(buf)?;
+
+        match psk_type {
+            PSKType::External => Ok(PSK::External(deserialize_opaque_vec(buf)?)),
+            PSKType::Resumption => Ok(PSK::Resumption(Resumption::deserialize(buf)?)),
+        }
+    }
+}
+
+impl Serializer for PSK {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.psk_type().serialize(buf)?;
+        match self {
+            PSK::External(identity) => serialize_opaque_vec(identity, buf),
+            PSK::Resumption(resumption) => resumption.serialize(buf),
+        }
+    }
+}
+
+impl PSK {
+    pub fn psk_type(&self) -> PSKType {
+        match self {
+            PSK::External(_) => PSKType::External,
+            PSK::Resumption(_) => PSKType::Resumption,
+        }
+    }
+}
+
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) ResumptionPSKUsage
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
 pub enum ResumptionPSKUsage {
@@ -292,29 +463,52 @@ impl Serializer for ResumptionPSKUsage {
     }
 }
 
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) Resumption
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Resumption {
-    pub(crate) usage: ResumptionPSKUsage,
-    psk_group_id: GroupID,
-    psk_epoch: u64,
+    pub usage: ResumptionPSKUsage,
+    pub psk_group_id: GroupID,
+    pub psk_epoch: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Psk {
-    External(Bytes),        //  = 1,
-    Resumption(Resumption), //  = 2,
-}
-
-impl Default for Psk {
-    fn default() -> Self {
-        Psk::External(Bytes::new())
+impl Deserializer for Resumption {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let usage = ResumptionPSKUsage::deserialize(buf)?;
+        let psk_group_id = deserialize_opaque_vec(buf)?;
+        if buf.remaining() < 8 {
+            return Err(Error::BufferTooSmall);
+        }
+        let psk_epoch = buf.get_u64();
+        Ok(Self {
+            usage,
+            psk_group_id,
+            psk_epoch,
+        })
     }
 }
 
+impl Serializer for Resumption {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.usage.serialize(buf)?;
+        serialize_opaque_vec(&self.psk_group_id, buf)?;
+        buf.put_u64(self.psk_epoch);
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) PreSharedKeyID
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(crate) struct PreSharedKeyID {
-    pub(crate) psk: Psk,
-    pub(crate) psk_nonce: Bytes,
+pub struct PreSharedKeyID {
+    pub psk: PSK,
+    pub psk_nonce: Bytes,
 }
 
 impl Deserializer for PreSharedKeyID {
@@ -326,25 +520,7 @@ impl Deserializer for PreSharedKeyID {
         if !buf.has_remaining() {
             return Err(Error::BufferTooSmall);
         }
-        let v = buf.get_u8();
-        let psk = match v {
-            1 => Psk::External(deserialize_opaque_vec(buf)?),
-            2 => {
-                let usage = ResumptionPSKUsage::deserialize(buf)?;
-                let psk_group_id = deserialize_opaque_vec(buf)?;
-                if buf.remaining() < 8 {
-                    return Err(Error::BufferTooSmall);
-                }
-                let psk_epoch = buf.get_u64();
-                Psk::Resumption(Resumption {
-                    usage,
-                    psk_group_id,
-                    psk_epoch,
-                })
-            }
-            _ => return Err(Error::InvalidPskTypeValue(v)),
-        };
-
+        let psk = PSK::deserialize(buf)?;
         let psk_nonce = deserialize_opaque_vec(buf)?;
 
         Ok(Self { psk, psk_nonce })
@@ -356,25 +532,52 @@ impl Serializer for PreSharedKeyID {
         Self: Sized,
         B: BufMut,
     {
-        match &self.psk {
-            Psk::External(psk_id) => {
-                buf.put_u8(1);
-                serialize_opaque_vec(psk_id, buf)?;
-            }
-            Psk::Resumption(resumption) => {
-                buf.put_u8(2);
-
-                resumption.usage.serialize(buf)?;
-                serialize_opaque_vec(&resumption.psk_group_id, buf)?;
-                buf.put_u64(resumption.psk_epoch);
-            }
-        }
-
+        self.psk.serialize(buf)?;
         serialize_opaque_vec(&self.psk_nonce, buf)
     }
 }
 
-pub(crate) fn extract_psk_secret(
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) PSKLabel
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct PSKLabel {
+    pub id: PreSharedKeyID,
+    pub index: u16,
+    pub count: u16,
+}
+
+impl Deserializer for PSKLabel {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let id = PreSharedKeyID::deserialize(buf)?;
+        if buf.remaining() < 4 {
+            return Err(Error::BufferTooSmall);
+        }
+        let index = buf.get_u16();
+        let count = buf.get_u16();
+
+        Ok(Self { id, index, count })
+    }
+}
+
+impl Serializer for PSKLabel {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        self.id.serialize(buf)?;
+        buf.put_u16(self.index);
+        buf.put_u16(self.count);
+        Ok(())
+    }
+}
+
+/// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4)
+/// Computation of a PSK Secret from a Set of PSKs
+pub fn extract_psk_secret(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     psk_ids: &[PreSharedKeyID],
@@ -393,7 +596,7 @@ pub(crate) fn extract_psk_secret(
             .hpke(cipher_suite)
             .kdf_extract(&psks[i], &zero)?;
 
-        let psk_label = PskLabel {
+        let psk_label = PSKLabel {
             id: psk_ids[i].clone(),
             index: i as u16,
             count: psk_ids.len() as u16,
@@ -414,41 +617,4 @@ pub(crate) fn extract_psk_secret(
     }
 
     Ok(psk_secret)
-}
-
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-struct PskLabel {
-    id: PreSharedKeyID,
-    index: u16,
-    count: u16,
-}
-
-impl Deserializer for PskLabel {
-    fn deserialize<B>(buf: &mut B) -> Result<Self>
-    where
-        Self: Sized,
-        B: Buf,
-    {
-        let id = PreSharedKeyID::deserialize(buf)?;
-        if buf.remaining() < 4 {
-            return Err(Error::BufferTooSmall);
-        }
-        let index = buf.get_u16();
-        let count = buf.get_u16();
-
-        Ok(Self { id, index, count })
-    }
-}
-
-impl Serializer for PskLabel {
-    fn serialize<B>(&self, buf: &mut B) -> Result<()>
-    where
-        Self: Sized,
-        B: BufMut,
-    {
-        self.id.serialize(buf)?;
-        buf.put_u16(self.index);
-        buf.put_u16(self.count);
-        Ok(())
-    }
 }

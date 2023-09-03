@@ -10,8 +10,8 @@ homepage = "https://rmls.io"
 repository = "https://github.com/webrtc-rs/rmls"
 
 [features]
-default = ["RustCryptoProvider"] # "RingCryptoProvider",
-RingCryptoProvider = ["ring", "signature", "ecdsa", "p256", "p384" ] #TODO: use "ring" only for RingCryptoProvider
+default = ["RustCryptoProvider"] #"RingCryptoProvider"
+RingCryptoProvider = ["ring", "signature", "ecdsa", "p256", "p384"] #TODO: use "ring" only for RingCryptoProvider
 RustCryptoProvider = ["sha2", "hmac", "hkdf", "ed25519-dalek", "ecdsa", "sec1", "signature", "aead", "aes-gcm", "chacha20poly1305", "p256", "p384"]
 
 [dependencies]
@@ -19,11 +19,12 @@ thiserror = "1"
 bytes = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-rand = "0.8.5"
 
 ####CryptoProvider#####
 # Common
 hpke = "0.10.0"
+rand_core = "0.6.4"
+rand_chacha = "0.3.1"
 
 # RingCryptoProvider feature
 ring = { version = "0.16.20", optional = true }

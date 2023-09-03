@@ -387,9 +387,9 @@ fn test_passive_client() -> Result<()> {
         let tests: Vec<PassiveClientTest> = load_test_vector(path)?;
 
         #[cfg(feature = "RingCryptoProvider")]
-        test_passive_client_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+        test_passive_client_with_crypto_provider(&tests, &RingCryptoProvider::default())?;
         #[cfg(feature = "RustCryptoProvider")]
-        test_passive_client_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+        test_passive_client_with_crypto_provider(&tests, &RustCryptoProvider::default())?;
     }
 
     Ok(())

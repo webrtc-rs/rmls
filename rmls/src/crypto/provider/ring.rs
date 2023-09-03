@@ -1,9 +1,11 @@
 mod hash;
 mod hpke;
+mod rand;
 mod signature;
 
 use self::hash::HashScheme;
 use self::hpke::HpkeSuite;
+use self::rand::RandChacha;
 use self::signature::SignatureScheme;
 use super::*;
 use crate::crypto::*;
@@ -88,7 +90,10 @@ static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_
 ];
 
 /// [ring](https://github.com/briansmith/ring) based crypto provider
-pub struct RingCryptoProvider;
+#[derive(Default, Debug)]
+pub struct RingCryptoProvider {
+    rand: RandChacha,
+}
 
 impl CryptoProvider for RingCryptoProvider {
     fn supports(&self, cipher_suite: CipherSuite) -> bool {
@@ -106,6 +111,10 @@ impl CryptoProvider for RingCryptoProvider {
             CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
         ]
+    }
+
+    fn rand(&self) -> &dyn Rand {
+        &self.rand
     }
 
     fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash {

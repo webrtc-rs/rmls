@@ -91,9 +91,9 @@ fn test_welcome() -> Result<()> {
     let tests: Vec<WelcomeTest> = load_test_vector("test-vectors/welcome.json")?;
 
     #[cfg(feature = "RingCryptoProvider")]
-    test_welcome_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_welcome_with_crypto_provider(&tests, &RingCryptoProvider::default())?;
     #[cfg(feature = "RustCryptoProvider")]
-    test_welcome_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_welcome_with_crypto_provider(&tests, &RustCryptoProvider::default())?;
 
     Ok(())
 }
@@ -235,7 +235,7 @@ fn test_message_protection_priv(
     )?;
 
     // TODO: set generation > 0
-    let sender_data = SenderData::new(li, 0);
+    let sender_data = SenderData::new(crypto_provider, li, 0)?;
     let framed_content = FramedContent {
         group_id: tc.group_id.clone().into(),
         epoch: tc.epoch,
@@ -377,9 +377,9 @@ fn test_message_protection() -> Result<()> {
         load_test_vector("test-vectors/message-protection.json")?;
 
     #[cfg(feature = "RingCryptoProvider")]
-    test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_message_protection_with_crypto_provider(&tests, &RingCryptoProvider::default())?;
     #[cfg(feature = "RustCryptoProvider")]
-    test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_message_protection_with_crypto_provider(&tests, &RustCryptoProvider::default())?;
 
     Ok(())
 }

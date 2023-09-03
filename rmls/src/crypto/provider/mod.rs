@@ -16,10 +16,14 @@ use crate::utilities::serde::*;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};
-use rand::{rngs::StdRng, SeedableRng};
+use rand_core::SeedableRng;
 
 /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) MLS prefix string - "MLS 1.0 "
 const MLS_PREFIX: &str = "MLS 1.0 ";
+
+pub trait Rand: Send + Sync {
+    fn fill(&self, buf: &mut [u8]) -> Result<()>;
+}
 
 /// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Hash trait provides
 /// hash algorithm and Message Authentication Code (MAC) algorithm
@@ -90,6 +94,9 @@ pub trait CryptoProvider {
 
     /// Return supported cipher suites
     fn supported(&self) -> Vec<CipherSuite>;
+
+    ///
+    fn rand(&self) -> &dyn Rand;
 
     /// Derive Hash trait object based on the given cipher suite
     fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash;
@@ -209,7 +216,7 @@ pub trait CryptoProvider {
                     &hpke::OpModeS::Base,
                     &public_key,
                     &info,
-                    &mut StdRng::from_entropy(),
+                    &mut rand_chacha::ChaCha20Rng::from_entropy(),
                 )
                 .map_err(|err| Error::HpkeError(err.to_string()))?;
 
@@ -235,7 +242,7 @@ pub trait CryptoProvider {
                     &hpke::OpModeS::Base,
                     &public_key,
                     &info,
-                    &mut StdRng::from_entropy(),
+                    &mut rand_chacha::ChaCha20Rng::from_entropy(),
                 )
                 .map_err(|err| Error::HpkeError(err.to_string()))?;
 
@@ -261,7 +268,7 @@ pub trait CryptoProvider {
                     &hpke::OpModeS::Base,
                     &public_key,
                     &info,
-                    &mut StdRng::from_entropy(),
+                    &mut rand_chacha::ChaCha20Rng::from_entropy(),
                 )
                 .map_err(|err| Error::HpkeError(err.to_string()))?;
 

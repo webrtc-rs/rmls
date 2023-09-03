@@ -4,7 +4,6 @@
 mod framing_test;
 
 use bytes::{Buf, BufMut, Bytes};
-use rand::Rng;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::group::{group_info::*, proposal::*, *};
@@ -1273,14 +1272,18 @@ pub struct SenderData {
 
 impl SenderData {
     /// Create a new SenderData
-    pub fn new(leaf_index: LeafIndex, generation: u32) -> Self {
+    pub fn new(
+        crypto_provider: &impl CryptoProvider,
+        leaf_index: LeafIndex,
+        generation: u32,
+    ) -> Result<Self> {
         let mut reuse_guard: [u8; 4] = [0u8; 4];
-        rand::thread_rng().fill(&mut reuse_guard[..]);
-        Self {
+        crypto_provider.rand().fill(&mut reuse_guard[..])?;
+        Ok(Self {
             leaf_index,
             generation,
             reuse_guard,
-        }
+        })
     }
 }
 

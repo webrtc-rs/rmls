@@ -147,9 +147,9 @@ fn test_secret_tree() -> Result<()> {
     let tests: Vec<SecretTreeTest> = load_test_vector("test-vectors/secret-tree.json")?;
 
     #[cfg(feature = "RingCryptoProvider")]
-    test_secret_tree_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_secret_tree_with_crypto_provider(&tests, &RingCryptoProvider::default())?;
     #[cfg(feature = "RustCryptoProvider")]
-    test_secret_tree_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_secret_tree_with_crypto_provider(&tests, &RustCryptoProvider::default())?;
 
     Ok(())
 }

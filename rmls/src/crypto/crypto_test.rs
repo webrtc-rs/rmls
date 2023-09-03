@@ -253,9 +253,9 @@ fn test_crypto_basics() -> Result<()> {
     let tests: Vec<CryptoBasicsTest> = load_test_vector("test-vectors/crypto-basics.json")?;
 
     #[cfg(feature = "RingCryptoProvider")]
-    test_crypto_basics_with_crypto_provider(&tests, &RingCryptoProvider {})?;
+    test_crypto_basics_with_crypto_provider(&tests, &RingCryptoProvider::default())?;
     #[cfg(feature = "RustCryptoProvider")]
-    test_crypto_basics_with_crypto_provider(&tests, &RustCryptoProvider {})?;
+    test_crypto_basics_with_crypto_provider(&tests, &RustCryptoProvider::default())?;
 
     Ok(())
 }

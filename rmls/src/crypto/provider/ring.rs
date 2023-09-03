@@ -3,88 +3,88 @@ mod hpke;
 mod rand;
 mod signature;
 
-use self::hash::HashScheme;
-use self::hpke::HpkeSuite;
+use self::hash::HashSchemeWrapper;
+use self::hpke::HpkeSuiteWrapper;
 use self::rand::RandChacha;
 use self::signature::SignatureSchemeWrapper;
 use super::*;
 use crate::crypto::*;
 
 struct CipherSuiteDescription {
-    hash: HashScheme,
-    hpke: HpkeSuite,
+    hash: HashSchemeWrapper,
+    hpke: HpkeSuiteWrapper,
     signature: SignatureSchemeWrapper,
 }
 
 static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384*/] = [
     //1: CipherSuite::MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519,
     CipherSuiteDescription {
-        hash: HashScheme::SHA256,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA256),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_X25519_HKDF_SHA256,
             kdf: Kdf::KDF_HKDF_SHA256,
             aead: Aead::AEAD_AES128GCM,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ED25519),
     },
     //2: CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
     CipherSuiteDescription {
-        hash: HashScheme::SHA256,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA256),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_P256_HKDF_SHA256,
             kdf: Kdf::KDF_HKDF_SHA256,
             aead: Aead::AEAD_AES128GCM,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ECDSA_SECP256R1_SHA256),
     },
     //3: CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
     CipherSuiteDescription {
-        hash: HashScheme::SHA256,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA256),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_X25519_HKDF_SHA256,
             kdf: Kdf::KDF_HKDF_SHA256,
             aead: Aead::AEAD_ChaCha20Poly1305,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ED25519),
     },
     //4: CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448,
     CipherSuiteDescription {
-        hash: HashScheme::SHA512,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA512),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_X448_HKDF_SHA512,
             kdf: Kdf::KDF_HKDF_SHA512,
             aead: Aead::AEAD_AES256GCM,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ED448),
     },
     //5: CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521,
     CipherSuiteDescription {
-        hash: HashScheme::SHA512,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA512),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_P521_HKDF_SHA512,
             kdf: Kdf::KDF_HKDF_SHA512,
             aead: Aead::AEAD_AES256GCM,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ECDSA_SECP521R1_SHA512),
     },
     //6: CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448,
     CipherSuiteDescription {
-        hash: HashScheme::SHA512,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA512),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_X448_HKDF_SHA512,
             kdf: Kdf::KDF_HKDF_SHA512,
             aead: Aead::AEAD_ChaCha20Poly1305,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ED448),
     },
     //7: CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384,
     CipherSuiteDescription {
-        hash: HashScheme::SHA384,
-        hpke: HpkeSuite {
+        hash: HashSchemeWrapper(HashScheme::SHA384),
+        hpke: HpkeSuiteWrapper(HpkeSuite {
             kem: Kem::KEM_P384_HKDF_SHA384,
             kdf: Kdf::KDF_HKDF_SHA384,
             aead: Aead::AEAD_AES256GCM,
-        },
+        }),
         signature: SignatureSchemeWrapper(SignatureScheme::ECDSA_SECP384R1_SHA384),
     },
 ];

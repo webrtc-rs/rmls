@@ -4,17 +4,14 @@ use ring::{
     hmac,
 };
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(super) enum HashScheme {
-    #[default]
-    SHA256,
-    SHA384,
-    SHA512,
-}
+use crate::crypto::provider::HashScheme;
 
-impl crate::crypto::provider::Hash for HashScheme {
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub(super) struct HashSchemeWrapper(pub(super) HashScheme);
+
+impl crate::crypto::provider::Hash for HashSchemeWrapper {
     fn digest(&self, data: &[u8]) -> Bytes {
-        let d = match *self {
+        let d = match self.0 {
             HashScheme::SHA256 => digest(&SHA256, data),
             HashScheme::SHA384 => digest(&SHA384, data),
             HashScheme::SHA512 => digest(&SHA512, data),
@@ -23,7 +20,7 @@ impl crate::crypto::provider::Hash for HashScheme {
     }
 
     fn mac(&self, key: &[u8], message: &[u8]) -> Bytes {
-        let hmac_key = match *self {
+        let hmac_key = match self.0 {
             HashScheme::SHA256 => hmac::Key::new(hmac::HMAC_SHA256, key),
             HashScheme::SHA384 => hmac::Key::new(hmac::HMAC_SHA384, key),
             HashScheme::SHA512 => hmac::Key::new(hmac::HMAC_SHA512, key),

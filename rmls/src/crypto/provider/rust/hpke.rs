@@ -8,27 +8,17 @@ use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use sha2::{Sha256, Sha384, Sha512};
 
+use crate::crypto::provider::HpkeSuite;
 use crate::crypto::*;
 
-// Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub(super) struct HpkeSuite {
-    pub(super) kem: Kem,
-    pub(super) kdf: Kdf,
-    pub(super) aead: Aead,
-}
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub(super) struct HpkeSuiteWrapper(pub(super) HpkeSuite);
 
-impl HpkeSuite {
-    pub(super) fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
-        HpkeSuite { kem, kdf, aead }
-    }
-}
-
-impl provider::Hpke for HpkeSuite {
+impl provider::Hpke for HpkeSuiteWrapper {
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
         let mut out = vec![0u8; length as usize];
 
-        match self.kdf {
+        match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => {
                 let hkdf = Hkdf::<Sha256>::from_prk(secret)
                     .map_err(|err| Error::RustCryptoError(err.to_string()))?;
@@ -53,7 +43,7 @@ impl provider::Hpke for HpkeSuite {
     }
 
     fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes> {
-        match self.kdf {
+        match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => {
                 let mut m = Hmac::<Sha256>::new_from_slice(salt)?;
                 m.update(secret);
@@ -73,7 +63,7 @@ impl provider::Hpke for HpkeSuite {
     }
 
     fn kdf_extract_size(&self) -> usize {
-        match self.kdf {
+        match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => 32,
             Kdf::KDF_HKDF_SHA384 => 48,
             Kdf::KDF_HKDF_SHA512 => 64,
@@ -82,7 +72,7 @@ impl provider::Hpke for HpkeSuite {
 
     // key_size returns the size in bytes of the keys used by the AEAD cipher.
     fn aead_key_size(&self) -> usize {
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM => 16,
             Aead::AEAD_AES256GCM => 32,
             Aead::AEAD_ChaCha20Poly1305 => 32,
@@ -91,7 +81,7 @@ impl provider::Hpke for HpkeSuite {
 
     // nonce_size returns the size in bytes of the nonce used by the AEAD cipher.
     fn aead_nonce_size(&self) -> usize {
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM | Aead::AEAD_AES256GCM | Aead::AEAD_ChaCha20Poly1305 => 12,
         }
     }
@@ -104,7 +94,7 @@ impl provider::Hpke for HpkeSuite {
         additional_data: &[u8],
     ) -> Result<Bytes> {
         use aes_gcm::KeyInit;
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM => {
                 let key: &Key<Aes128Gcm> = key.try_into().map_err(|_| {
                     Error::RustCryptoError("key error due to try into Key<Aes128Gcm>".to_string())
@@ -164,7 +154,7 @@ impl provider::Hpke for HpkeSuite {
         additional_data: &[u8],
     ) -> Result<Bytes> {
         use aes_gcm::KeyInit;
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM => {
                 let key: &Key<Aes128Gcm> = key.try_into().map_err(|_| {
                     Error::RustCryptoError("key error due to try into Key<Aes128Gcm>".to_string())

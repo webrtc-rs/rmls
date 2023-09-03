@@ -4,21 +4,11 @@ use ring::digest::{SHA256_OUTPUT_LEN, SHA384_OUTPUT_LEN, SHA512_OUTPUT_LEN};
 use ring::hkdf::{KeyType, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
 use ring::hmac;
 
+use crate::crypto::provider::HpkeSuite;
 use crate::crypto::*;
 
-// Suite is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(super) struct HpkeSuite {
-    pub(super) kem: Kem,
-    pub(super) kdf: Kdf,
-    pub(super) aead: Aead,
-}
-
-impl HpkeSuite {
-    pub(super) fn new(kem: Kem, kdf: Kdf, aead: Aead) -> Self {
-        HpkeSuite { kem, kdf, aead }
-    }
-}
+pub(super) struct HpkeSuiteWrapper(pub(super) HpkeSuite);
 
 /// Generic newtype wrapper that lets us implement traits for externally-defined
 /// types.
@@ -31,9 +21,9 @@ impl KeyType for MyKeyType<u16> {
     }
 }
 
-impl provider::Hpke for HpkeSuite {
+impl provider::Hpke for HpkeSuiteWrapper {
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
-        let prk = match self.kdf {
+        let prk = match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => Prk::new_less_safe(HKDF_SHA256, secret),
             Kdf::KDF_HKDF_SHA384 => Prk::new_less_safe(HKDF_SHA384, secret),
             Kdf::KDF_HKDF_SHA512 => Prk::new_less_safe(HKDF_SHA512, secret),
@@ -52,7 +42,7 @@ impl provider::Hpke for HpkeSuite {
     }
 
     fn kdf_extract(&self, secret: &[u8], salt: &[u8]) -> Result<Bytes> {
-        let salt = match self.kdf {
+        let salt = match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => hmac::Key::new(hmac::HMAC_SHA256, salt),
             Kdf::KDF_HKDF_SHA384 => hmac::Key::new(hmac::HMAC_SHA384, salt),
             Kdf::KDF_HKDF_SHA512 => hmac::Key::new(hmac::HMAC_SHA512, salt),
@@ -61,7 +51,7 @@ impl provider::Hpke for HpkeSuite {
     }
 
     fn kdf_extract_size(&self) -> usize {
-        match self.kdf {
+        match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => SHA256_OUTPUT_LEN,
             Kdf::KDF_HKDF_SHA384 => SHA384_OUTPUT_LEN,
             Kdf::KDF_HKDF_SHA512 => SHA512_OUTPUT_LEN,
@@ -70,7 +60,7 @@ impl provider::Hpke for HpkeSuite {
 
     // key_size returns the size in bytes of the keys used by the AEAD cipher.
     fn aead_key_size(&self) -> usize {
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM => 16,
             Aead::AEAD_AES256GCM => 32,
             Aead::AEAD_ChaCha20Poly1305 => 32,
@@ -79,7 +69,7 @@ impl provider::Hpke for HpkeSuite {
 
     // nonce_size returns the size in bytes of the nonce used by the AEAD cipher.
     fn aead_nonce_size(&self) -> usize {
-        match self.aead {
+        match self.0.aead {
             Aead::AEAD_AES128GCM | Aead::AEAD_AES256GCM | Aead::AEAD_ChaCha20Poly1305 => 12,
         }
     }
@@ -91,7 +81,7 @@ impl provider::Hpke for HpkeSuite {
         ciphertext: &[u8],
         additional_data: &[u8],
     ) -> Result<Bytes> {
-        let key = match self.aead {
+        let key = match self.0.aead {
             Aead::AEAD_AES128GCM => {
                 let key = aead::UnboundKey::new(&AES_128_GCM, key)
                     .map_err(|err| Error::RingCryptoError(err.to_string()))?;
@@ -127,7 +117,7 @@ impl provider::Hpke for HpkeSuite {
         plaintext: &[u8],
         additional_data: &[u8],
     ) -> Result<Bytes> {
-        let key = match self.aead {
+        let key = match self.0.aead {
             Aead::AEAD_AES128GCM => {
                 let key = aead::UnboundKey::new(&AES_128_GCM, key)
                     .map_err(|err| Error::RingCryptoError(err.to_string()))?;

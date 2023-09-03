@@ -2,17 +2,14 @@ use bytes::Bytes;
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256, Sha384, Sha512};
 
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
-pub(super) enum HashScheme {
-    #[default]
-    SHA256,
-    SHA384,
-    SHA512,
-}
+use crate::crypto::provider::HashScheme;
 
-impl crate::crypto::provider::Hash for HashScheme {
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub(super) struct HashSchemeWrapper(pub(super) HashScheme);
+
+impl crate::crypto::provider::Hash for HashSchemeWrapper {
     fn digest(&self, data: &[u8]) -> Bytes {
-        match *self {
+        match self.0 {
             HashScheme::SHA256 => {
                 let mut h = Sha256::new();
                 h.update(data);
@@ -32,7 +29,7 @@ impl crate::crypto::provider::Hash for HashScheme {
     }
 
     fn mac(&self, key: &[u8], message: &[u8]) -> Bytes {
-        match *self {
+        match self.0 {
             HashScheme::SHA256 => {
                 let mut m = Hmac::<Sha256>::new_from_slice(key).unwrap();
                 m.update(message);

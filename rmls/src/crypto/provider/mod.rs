@@ -10,9 +10,7 @@ mod rust;
 #[cfg(feature = "RustCryptoProvider")]
 pub use self::rust::RustCryptoProvider;
 
-use crate::crypto::cipher_suite::CipherSuite;
-use crate::utilities::error::*;
-use crate::utilities::serde::*;
+use crate::crypto::{cipher_suite::CipherSuite, *};
 
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};
@@ -20,6 +18,25 @@ use rand_core::SeedableRng;
 
 /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) MLS prefix string - "MLS 1.0 "
 const MLS_PREFIX: &str = "MLS 1.0 ";
+
+/// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) HashScheme
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum HashScheme {
+    #[default]
+    SHA256,
+    SHA384,
+    SHA512,
+}
+
+/// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) HpkeSuite
+///
+/// It is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct HpkeSuite {
+    pub(super) kem: Kem,
+    pub(super) kdf: Kdf,
+    pub(super) aead: Aead,
+}
 
 /// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) SignatureScheme
 #[allow(non_camel_case_types)]
@@ -39,6 +56,7 @@ pub enum SignatureScheme {
     ED448 = 0x0808,
 }
 
+/// Rand trait provides randomness
 pub trait Rand: Send + Sync {
     fn fill(&self, buf: &mut [u8]) -> Result<()>;
 }

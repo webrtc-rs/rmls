@@ -38,6 +38,7 @@
 
 - [Overview](#overview)
 - [Supported CipherSuites](#supported-ciphersuites)
+- [Supported Platforms](#supported-platforms)
 - [Cryptography Dependencies](#cryptography-dependencies)
 - [Open Source License](#open-source-license)
 - [Contributing](#contributing)
@@ -56,6 +57,28 @@ post-compromise security (PCS) for groups in size ranging from two to thousands.
 - MLS_128_HPKEX25519_AES128GCM_SHA256_Ed25519
 - MLS_128_DHKEMP256_AES128GCM_SHA256_P256
 - MLS_128_HPKEX25519_CHACHA20POLY1305_SHA256_Ed25519
+
+## Supported Platforms
+
+*RMLS* is built and tested on the Github CI for the following rust targets:
+
+- x86_64-unknown-linux-gnu 
+- i686-unknown-linux-gnu
+- x86_64-pc-windows-msvc
+- i686-pc-windows-msvc
+- x86_64-apple-darwin
+
+The Github CI also builds (but doesn't test) the following rust targets:
+
+- aarch64-apple-darwin
+- aarch64-unknown-linux-gnu
+- aarch64-linux-android
+- aarch64-apple-ios
+- aarch64-apple-ios-sim
+- wasm32-unknown-unknown
+- armv7-linux-androideabi
+- x86_64-linux-android
+- i686-linux-android
 
 ## Cryptography Dependencies
 

@@ -23,7 +23,7 @@ serde_json = "1"
 ####CryptoProvider#####
 # Common
 hpke = "0.10.0"
-getrandom = { version = "0.2.10", features = ["js"] }
+getrandom = { version = "0.2.10", features = ["js"] } # enable "js" feature to pass wasm32 build
 rand_core = "0.6.4"
 rand_chacha = "0.3.1"
 

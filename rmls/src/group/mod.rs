@@ -96,6 +96,7 @@ pub fn verify_proposal_list(
         return Err(Error::ProposalsLenNotMatchSendersLen);
     }
 
+    #[allow(clippy::mutable_key_type)]
     let mut add_proposals = HashSet::new();
     let mut update_or_remove_proposals = HashSet::new();
     let mut psk_proposals = HashSet::new();

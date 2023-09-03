@@ -3,6 +3,7 @@
 //! with the member's signing key.
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::ops::Deref;
 
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
@@ -47,6 +48,14 @@ impl Identity {
     /// Creates a new Identity
     pub fn new(identify: Bytes) -> Self {
         Self(identify)
+    }
+}
+
+impl Deref for Identity {
+    type Target = Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

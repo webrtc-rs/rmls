@@ -44,7 +44,7 @@ impl Deserializer for ParentNode {
         Self: Sized,
         B: Buf,
     {
-        let encryption_key = deserialize_opaque_vec(buf)?;
+        let encryption_key = HPKEPublicKey::deserialize(buf)?;
         let parent_hash = deserialize_opaque_vec(buf)?;
 
         let mut unmerged_leaves = vec![];
@@ -488,8 +488,8 @@ impl Deserializer for LeafNode {
         Self: Sized,
         B: Buf,
     {
-        let encryption_key = deserialize_opaque_vec(buf)?;
-        let signature_key = deserialize_opaque_vec(buf)?;
+        let encryption_key = HPKEPublicKey::deserialize(buf)?;
+        let signature_key = SignaturePublicKey::deserialize(buf)?;
 
         let credential = Credential::deserialize(buf)?;
         let capabilities = Capabilities::deserialize(buf)?;
@@ -646,8 +646,8 @@ pub struct LeafNodeVerifyOptions<'a> {
     pub group_id: &'a GroupID,
     pub leaf_index: LeafIndex,
     pub supported_creds: &'a HashSet<CredentialType>,
-    pub signature_keys: &'a HashSet<Bytes>,
-    pub encryption_keys: &'a HashSet<Bytes>,
+    pub signature_keys: &'a HashSet<SignaturePublicKey>,
+    pub encryption_keys: &'a HashSet<HPKEPublicKey>,
     pub now: &'a dyn Fn() -> SystemTime,
 }
 
@@ -701,7 +701,7 @@ impl Deserializer for UpdatePathNode {
         Self: Sized,
         B: Buf,
     {
-        let encryption_key = deserialize_opaque_vec(buf)?;
+        let encryption_key = HPKEPublicKey::deserialize(buf)?;
 
         let mut encrypted_path_secret = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
@@ -1017,8 +1017,10 @@ impl RatchetTree {
     }
 
     /// Return signature keys and encryption keys
-    pub fn keys(&self) -> (HashSet<Bytes>, HashSet<Bytes>) {
+    pub fn keys(&self) -> (HashSet<SignaturePublicKey>, HashSet<HPKEPublicKey>) {
+        #[allow(clippy::mutable_key_type)]
         let mut signature_keys = HashSet::new();
+        #[allow(clippy::mutable_key_type)]
         let mut encryption_keys = HashSet::new();
         for li in 0..self.num_leaves().0 {
             if let Some(node) = self.get_leaf(LeafIndex(li)) {
@@ -1056,8 +1058,10 @@ impl RatchetTree {
         }
 
         let supported_creds = self.supported_creds();
-        let mut signature_keys = HashSet::new();
-        let mut encryption_keys = HashSet::new();
+        #[allow(clippy::mutable_key_type)]
+        let mut signature_keys: HashSet<SignaturePublicKey> = HashSet::new();
+        #[allow(clippy::mutable_key_type)]
+        let mut encryption_keys: HashSet<HPKEPublicKey> = HashSet::new();
         for li in 0..num_leaves.0 {
             if let Some(node) = self.get_leaf(LeafIndex(li)) {
                 node.verify(

@@ -41,7 +41,7 @@ impl Deserializer for KeyPackage {
 
         let version = buf.get_u16().into();
         let cipher_suite = buf.get_u16().try_into()?;
-        let init_key = deserialize_opaque_vec(buf)?;
+        let init_key = HPKEPublicKey::deserialize(buf)?;
         let leaf_node = LeafNode::deserialize(buf)?;
         let extensions = Extensions::deserialize(buf)?;
         let signature = deserialize_opaque_vec(buf)?;

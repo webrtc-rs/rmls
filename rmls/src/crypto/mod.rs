@@ -2,9 +2,10 @@
 #[cfg(test)]
 mod crypto_test;
 
-use bytes::Bytes;
+use bytes::{Buf, BufMut, Bytes};
+use std::ops::Deref;
 
-use crate::utilities::error::*;
+use crate::utilities::{error::*, serde::*};
 
 pub mod cipher_suite;
 pub mod credential;
@@ -13,11 +14,69 @@ pub mod provider;
 /// [RFC9420 Sec.5.1.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.1) HPKE public keys are
 /// opaque values in a format defined by the underlying protocol (see Section 4 of
 /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html) for more information).
-pub type HPKEPublicKey = Bytes;
+#[derive(Default, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct HPKEPublicKey(Bytes);
+
+impl Deref for HPKEPublicKey {
+    type Target = Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deserializer for HPKEPublicKey {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        Ok(HPKEPublicKey(deserialize_opaque_vec(buf)?))
+    }
+}
+
+impl Serializer for HPKEPublicKey {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.0, buf)
+    }
+}
 
 /// [RFC9420 Sec.5.1.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.1) Signature public keys
 /// are likewise represented as opaque values in a format defined by the cipher suite's signature scheme.
-pub type SignaturePublicKey = Bytes;
+#[derive(Default, Debug, Clone, Eq, PartialEq, Hash)]
+pub struct SignaturePublicKey(Bytes);
+
+impl Deref for SignaturePublicKey {
+    type Target = Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deserializer for SignaturePublicKey {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        Ok(SignaturePublicKey(deserialize_opaque_vec(buf)?))
+    }
+}
+
+impl Serializer for SignaturePublicKey {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.0, buf)
+    }
+}
 
 /// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Key Encapsulation
 /// Mechanism (KEM) of HPKE parameters

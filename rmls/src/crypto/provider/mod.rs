@@ -21,6 +21,24 @@ use rand_core::SeedableRng;
 /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) MLS prefix string - "MLS 1.0 "
 const MLS_PREFIX: &str = "MLS 1.0 ";
 
+/// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) SignatureScheme
+#[allow(non_camel_case_types)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u16)]
+pub enum SignatureScheme {
+    /// ECDSA_SECP256R1_SHA256
+    #[default]
+    ECDSA_SECP256R1_SHA256 = 0x0403,
+    /// ECDSA_SECP384R1_SHA384
+    ECDSA_SECP384R1_SHA384 = 0x0503,
+    /// ECDSA_SECP521R1_SHA512
+    ECDSA_SECP521R1_SHA512 = 0x0603,
+    /// ED25519
+    ED25519 = 0x0807,
+    /// ED448
+    ED448 = 0x0808,
+}
+
 pub trait Rand: Send + Sync {
     fn fill(&self, buf: &mut [u8]) -> Result<()>;
 }

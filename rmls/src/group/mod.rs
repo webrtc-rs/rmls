@@ -10,12 +10,12 @@
 #[cfg(test)]
 mod group_test;
 
+pub mod group_info;
+pub mod proposal;
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::collections::HashSet;
 use std::iter::zip;
-
-pub mod group_info;
-pub mod proposal;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::group::{group_info::*, proposal::*};

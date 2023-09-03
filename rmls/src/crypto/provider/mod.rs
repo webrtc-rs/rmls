@@ -56,6 +56,31 @@ pub enum SignatureScheme {
     ED448 = 0x0808,
 }
 
+/// SignatureKeyPair is a wrapper CryptoProvider's signature key pair
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct SignatureKeyPair {
+    private_key: Bytes,
+    public_key: Bytes,
+    signature_scheme: SignatureScheme,
+}
+
+impl SignatureKeyPair {
+    /// Returns private key
+    pub fn private_key(&self) -> &[u8] {
+        self.private_key.as_ref()
+    }
+
+    /// Returns public key
+    pub fn public_key(&self) -> &[u8] {
+        self.public_key.as_ref()
+    }
+
+    /// Returns signature scheme
+    pub fn signature_scheme(&self) -> SignatureScheme {
+        self.signature_scheme
+    }
+}
+
 /// Rand trait provides randomness
 pub trait Rand: Send + Sync {
     fn fill(&self, buf: &mut [u8]) -> Result<()>;
@@ -115,6 +140,12 @@ pub trait Hpke: Send + Sync {
 /// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Signature trait provides
 /// signature algorithm
 pub trait Signature: Send + Sync {
+    /// Generate a new signature key pair
+    fn generate_key_pair(&self) -> Result<SignatureKeyPair>;
+
+    /// Returns signature scheme
+    fn signature_scheme(&self) -> SignatureScheme;
+
     /// Sign the message with the provided sign_key
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes>;
 

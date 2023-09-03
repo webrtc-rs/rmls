@@ -1,10 +1,12 @@
 use bytes::Bytes;
+use rand_core::{RngCore, SeedableRng};
 use ring::signature::{
-    Ed25519KeyPair, VerificationAlgorithm, ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1, ED25519,
+    Ed25519KeyPair, KeyPair, VerificationAlgorithm, ECDSA_P256_SHA256_ASN1, ECDSA_P384_SHA384_ASN1,
+    ED25519,
 };
 use signature::Signer;
 
-use crate::crypto::provider::SignatureScheme;
+use crate::crypto::provider::{SignatureKeyPair, SignatureScheme};
 use crate::utilities::error::*;
 
 #[allow(non_camel_case_types)]
@@ -12,6 +14,56 @@ use crate::utilities::error::*;
 pub(super) struct SignatureSchemeWrapper(pub(super) SignatureScheme);
 
 impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
+    fn generate_key_pair(&self) -> Result<SignatureKeyPair> {
+        match self.0 {
+            SignatureScheme::ED25519 => {
+                const SEED_LEN: usize = 32;
+                let mut seed = [0u8; SEED_LEN];
+                let mut rand = rand_chacha::ChaCha20Rng::from_entropy();
+                rand.fill_bytes(&mut seed);
+                let key_pair = Ed25519KeyPair::from_seed_unchecked(&seed)
+                    .map_err(|_| Error::InvalidEd25519PrivateKey)?;
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(seed.to_vec()),
+                    public_key: Bytes::from(key_pair.public_key().as_ref().to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP256R1_SHA256 => {
+                let signing_key: ecdsa::SigningKey<p256::NistP256> =
+                    ecdsa::SigningKey::random(&mut rand_chacha::ChaCha20Rng::from_entropy());
+                let (private_key, public_key) = (
+                    signing_key.to_bytes(),
+                    signing_key.verifying_key().to_sec1_bytes(),
+                );
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(private_key.to_vec()),
+                    public_key: Bytes::from(public_key.to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP384R1_SHA384 => {
+                let signing_key: ecdsa::SigningKey<p384::NistP384> =
+                    ecdsa::SigningKey::random(&mut rand_chacha::ChaCha20Rng::from_entropy());
+                let (private_key, public_key) = (
+                    signing_key.to_bytes(),
+                    signing_key.verifying_key().to_sec1_bytes(),
+                );
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(private_key.to_vec()),
+                    public_key: Bytes::from(public_key.to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP521R1_SHA512 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::ED448 => Err(Error::UnsupportedEd448),
+        }
+    }
+
+    fn signature_scheme(&self) -> SignatureScheme {
+        self.0
+    }
+
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes> {
         match self.0 {
             SignatureScheme::ED25519 => {

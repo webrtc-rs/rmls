@@ -1,7 +1,8 @@
 use bytes::Bytes;
+use rand_core::SeedableRng;
 use signature::{Signer, Verifier};
 
-use crate::crypto::provider::SignatureScheme;
+use crate::crypto::provider::{SignatureKeyPair, SignatureScheme};
 use crate::utilities::error::*;
 
 #[allow(non_camel_case_types)]
@@ -9,6 +10,56 @@ use crate::utilities::error::*;
 pub(super) struct SignatureSchemeWrapper(pub(super) SignatureScheme);
 
 impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
+    fn generate_key_pair(&self) -> Result<SignatureKeyPair> {
+        match self.0 {
+            SignatureScheme::ED25519 => {
+                let signing_key = ed25519_dalek::SigningKey::generate(
+                    &mut rand_chacha::ChaCha20Rng::from_entropy(),
+                )
+                .to_keypair_bytes();
+                let (private_key, public_key) =
+                    signing_key.split_at(ed25519_dalek::SECRET_KEY_LENGTH);
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(private_key.to_vec()),
+                    public_key: Bytes::from(public_key.to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP256R1_SHA256 => {
+                let signing_key: ecdsa::SigningKey<p256::NistP256> =
+                    ecdsa::SigningKey::random(&mut rand_chacha::ChaCha20Rng::from_entropy());
+                let (private_key, public_key) = (
+                    signing_key.to_bytes(),
+                    signing_key.verifying_key().to_sec1_bytes(),
+                );
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(private_key.to_vec()),
+                    public_key: Bytes::from(public_key.to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP384R1_SHA384 => {
+                let signing_key: ecdsa::SigningKey<p384::NistP384> =
+                    ecdsa::SigningKey::random(&mut rand_chacha::ChaCha20Rng::from_entropy());
+                let (private_key, public_key) = (
+                    signing_key.to_bytes(),
+                    signing_key.verifying_key().to_sec1_bytes(),
+                );
+                Ok(SignatureKeyPair {
+                    private_key: Bytes::from(private_key.to_vec()),
+                    public_key: Bytes::from(public_key.to_vec()),
+                    signature_scheme: self.0,
+                })
+            }
+            SignatureScheme::ECDSA_SECP521R1_SHA512 => Err(Error::UnsupportedEcdsa),
+            SignatureScheme::ED448 => Err(Error::UnsupportedEd448),
+        }
+    }
+
+    fn signature_scheme(&self) -> SignatureScheme {
+        self.0
+    }
+
     fn sign(&self, sign_key: &[u8], message: &[u8]) -> Result<Bytes> {
         match self.0 {
             SignatureScheme::ED25519 => {

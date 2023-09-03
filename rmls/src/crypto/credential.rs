@@ -5,8 +5,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::ops::Deref;
 
-use crate::utilities::error::*;
-use crate::utilities::serde::*;
+use crate::utilities::{error::*, serde::*};
 
 /// [RFC9420 Sec.5.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.3) Enum type of Credential
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]

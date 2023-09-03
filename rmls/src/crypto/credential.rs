@@ -39,21 +39,117 @@ impl From<CredentialType> for u16 {
     }
 }
 
+/// a bare assertion of an identity, without any additional information
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct Identity(Bytes);
+
+impl Identity {
+    /// Creates a new Identity
+    pub fn new(identify: Bytes) -> Self {
+        Self(identify)
+    }
+}
+
+impl Deserializer for Identity {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        Ok(Identity(deserialize_opaque_vec(buf)?))
+    }
+}
+
+impl Serializer for Identity {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.0, buf)
+    }
+}
+
+/// Certificate contains a X.509 certificate
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct Certificate {
+    cert_data: Bytes,
+}
+
+impl Certificate {
+    /// Creates a X.509 certificate
+    pub fn new(cert_data: Bytes) -> Self {
+        Self { cert_data }
+    }
+}
+
+impl Deserializer for Certificate {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        Ok(Self {
+            cert_data: deserialize_opaque_vec(buf)?,
+        })
+    }
+}
+
+impl Serializer for Certificate {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.cert_data, buf)
+    }
+}
+
 /// [RFC9420 Sec.5.3](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.3) Credential provides
 /// "presented identifiers"
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Credential {
     /// A "basic" credential is a bare assertion of an identity, without any additional information.
     /// The format of the encoded identity is defined by the application.
-    Basic(Bytes),
+    Basic(Identity),
     /// For an X.509 credential, each entry in the certificates field represents a single
     /// DER-encoded X.509 certificate.
-    X509(Vec<Bytes>),
+    X509(Vec<Certificate>),
 }
 
 impl Default for Credential {
     fn default() -> Self {
-        Self::Basic(Bytes::new())
+        Self::Basic(Identity::default())
+    }
+}
+
+impl Credential {
+    /// Create a Credential from identify
+    pub fn from_identity(identity: Identity) -> Self {
+        Self::Basic(identity)
+    }
+
+    /// Create a Credential from certificates
+    pub fn from_certificates(certificates: Vec<Certificate>) -> Self {
+        Self::X509(certificates)
+    }
+
+    /// Returns the identity of a given credential if it is basic type
+    pub fn identity(&self) -> Option<&Identity> {
+        if let Credential::Basic(identity) = self {
+            Some(identity)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the certificates of a given credential if it is X509 type
+    pub fn certificates(&self) -> Option<&[Certificate]> {
+        if let Credential::X509(certificates) = self {
+            Some(certificates)
+        } else {
+            None
+        }
     }
 }
 
@@ -70,10 +166,10 @@ impl Deserializer for Credential {
         let mut certificates = vec![];
 
         match credential_type {
-            CredentialType::Basic => Ok(Self::Basic(deserialize_opaque_vec(buf)?)),
+            CredentialType::Basic => Ok(Self::Basic(Identity::deserialize(buf)?)),
             CredentialType::X509 => {
                 deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
-                    let cert = deserialize_opaque_vec(b)?;
+                    let cert = Certificate::deserialize(b)?;
                     certificates.push(cert);
                     Ok(())
                 })?;
@@ -93,13 +189,11 @@ impl Serializer for Credential {
     {
         buf.put_u16(self.credential_type().into());
         match self {
-            Credential::Basic(identity) => serialize_opaque_vec(identity, buf),
+            Credential::Basic(identity) => identity.serialize(buf),
             Credential::X509(certificates) => serialize_vector(
                 certificates.len(),
                 buf,
-                |i: usize, b: &mut BytesMut| -> Result<()> {
-                    serialize_opaque_vec(&certificates[i], b)
-                },
+                |i: usize, b: &mut BytesMut| -> Result<()> { certificates[i].serialize(b) },
             ),
         }
     }

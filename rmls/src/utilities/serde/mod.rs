@@ -58,7 +58,7 @@ pub fn deserialize_opaque_vec<B: Buf>(buf: &mut B) -> Result<Bytes> {
 }
 
 pub fn serialize_opaque_vec<B: BufMut>(v: &[u8], buf: &mut B) -> Result<()> {
-    if v.len() >= 1 << 32 {
+    if v.len() >= u32::MAX as usize {
         return Err(Error::OpaqueSizeExceedsMaximumValueOfU32);
     }
 

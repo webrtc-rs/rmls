@@ -90,7 +90,7 @@ are two cryptography providers implemented right now:
 - [RustCrypto](https://github.com/RustCrypto) based crypto provider 
 
 Other cryptography providers, like [openssl](https://github.com/sfackler/rust-openssl) or
-[boring](https://github.com/cloudflare/boring), are also possible, see [CryptoProvider Trait](https://github.com/webrtc-rs/rmls/blob/bca90809d1f7b1db2b8dbab2b6df3125df8f3cfc/src/crypto/provider/mod.rs#L51) for more
+[boring](https://github.com/cloudflare/boring), are also possible, see [CryptoProvider Trait](https://docs.rs/rmls/latest/rmls/crypto/provider/trait.CryptoProvider.html) for more
 details.
 
 ## Open Source License

@@ -86,19 +86,19 @@ fn passive_client_test(
     check_encryption_key_pair(
         crypto_provider,
         cipher_suite,
-        &key_pkg.init_key,
+        &key_pkg.payload.init_key,
         &tc.init_priv,
     )?;
     check_encryption_key_pair(
         crypto_provider,
         cipher_suite,
-        &key_pkg.leaf_node.encryption_key,
+        &key_pkg.payload.leaf_node.encryption_key,
         &tc.encryption_priv,
     )?;
     check_signature_key_pair(
         crypto_provider,
         cipher_suite,
-        &key_pkg.leaf_node.signature_key,
+        &key_pkg.payload.leaf_node.signature_key,
         &tc.signature_priv,
     )?;
 
@@ -152,7 +152,10 @@ fn passive_client_test(
     assert!(group_info
         .verify_confirmation_tag(crypto_provider, &group_secrets.joiner_secret, &psk_secret)
         .is_ok());
-    assert_eq!(group_info.group_context.cipher_suite, key_pkg.cipher_suite);
+    assert_eq!(
+        group_info.group_context.cipher_suite,
+        key_pkg.payload.cipher_suite
+    );
 
     let disable_lifetime_check = || -> SystemTime { UNIX_EPOCH };
     tree.verify_integrity(
@@ -161,7 +164,7 @@ fn passive_client_test(
         disable_lifetime_check,
     )?;
 
-    let (_, ok) = tree.find_leaf(&key_pkg.leaf_node);
+    let (_, ok) = tree.find_leaf(&key_pkg.payload.leaf_node);
     assert!(ok);
 
     // TODO: perform other group info verification steps

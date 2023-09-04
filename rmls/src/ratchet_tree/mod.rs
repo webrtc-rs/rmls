@@ -1494,7 +1494,7 @@ impl RatchetTree {
         // Apply all add proposals
         for prop in proposals {
             if let Proposal::Add(add) = prop {
-                self.add(add.key_package.leaf_node.clone());
+                self.add(add.key_package.payload.leaf_node.clone());
             }
         }
     }

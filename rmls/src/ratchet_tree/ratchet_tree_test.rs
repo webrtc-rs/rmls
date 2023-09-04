@@ -236,12 +236,12 @@ fn tree_operations_test(
     match &prop {
         Proposal::Add(add) => {
             let ctx = GroupContext {
-                version: add.key_package.version,
-                cipher_suite: add.key_package.cipher_suite,
+                version: add.key_package.payload.version,
+                cipher_suite: add.key_package.payload.cipher_suite,
                 ..Default::default()
             };
             add.key_package.verify(crypto_provider, &ctx)?;
-            tree.add(add.key_package.leaf_node.clone());
+            tree.add(add.key_package.payload.leaf_node.clone());
         }
         Proposal::Update(update) => {
             let (signature_keys, encryption_keys) = tree.keys();

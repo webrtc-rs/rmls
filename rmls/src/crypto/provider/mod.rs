@@ -68,6 +68,9 @@ pub trait Rand: Send + Sync {
 /// [RFC9420 Sec.5.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1) Hash trait provides
 /// hash algorithm and Message Authentication Code (MAC) algorithm
 pub trait Hash: Send + Sync {
+    /// hash size
+    fn size(&self) -> usize;
+
     /// A hash algorithm
     fn digest(&self, data: &[u8]) -> Bytes;
 

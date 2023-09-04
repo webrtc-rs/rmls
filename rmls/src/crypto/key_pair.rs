@@ -46,3 +46,5 @@ impl HPKEKeyPair {
         &self.public_key
     }
 }
+
+pub(crate) type EncryptionKeyPair = HPKEKeyPair;

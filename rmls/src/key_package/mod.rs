@@ -145,7 +145,7 @@ impl KeyPackage {
     pub(crate) fn new(
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
-        _credential: Credential,
+        credential: Credential,
         signature_key_pair: &SignatureKeyPair,
     ) -> Result<Self> {
         if crypto_provider
@@ -156,6 +156,22 @@ impl KeyPackage {
             return Err(Error::CipherSuiteNotMatchSignatureScheme);
         }
 
+        // Create a new HPKE key pair
+        let mut ikm = vec![0u8; crypto_provider.hash(crypto_config.cipher_suite)?.size()];
+        crypto_provider.rand().fill(&mut ikm)?;
+        let init_key = crypto_provider
+            .hpke(crypto_config.cipher_suite)?
+            .kem_derive_key_pair(&ikm)?;
+
+        Ok(Self::default())
+    }
+
+    pub(crate) fn from_keys(
+        crypto_provider: &impl CryptoProvider,
+        crypto_config: CryptoConfig,
+        credential: Credential,
+        init_key: HPKEPublicKey,
+    ) -> Result<Self> {
         Ok(Self::default())
     }
 

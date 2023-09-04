@@ -10,6 +10,14 @@ use crate::crypto::provider::HashScheme;
 pub(super) struct HashSchemeWrapper(pub(super) HashScheme);
 
 impl crate::crypto::provider::Hash for HashSchemeWrapper {
+    fn size(&self) -> usize {
+        match self.0 {
+            HashScheme::SHA256 => 32,
+            HashScheme::SHA384 => 48,
+            HashScheme::SHA512 => 64,
+        }
+    }
+
     fn digest(&self, data: &[u8]) -> Bytes {
         let d = match self.0 {
             HashScheme::SHA256 => digest(&SHA256, data),

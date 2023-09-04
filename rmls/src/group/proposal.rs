@@ -3,7 +3,7 @@ use crate::extensibility::Extensions;
 use crate::framing::{GroupID, ProtocolVersion};
 use crate::key_package::KeyPackage;
 use crate::key_schedule::PreSharedKeyID;
-use crate::ratchet_tree::*;
+use crate::ratchet_tree::leaf_node::LeafNode;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;

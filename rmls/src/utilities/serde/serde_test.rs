@@ -13,7 +13,7 @@ use crate::framing::*;
 use crate::group::proposal::*;
 use crate::group::*;
 use crate::key_schedule::*;
-use crate::ratchet_tree::*;
+use crate::ratchet_tree::{leaf_node::*, *};
 use crate::utilities::error::*;
 use crate::utilities::serde::Deserializer;
 

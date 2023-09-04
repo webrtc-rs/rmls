@@ -20,7 +20,7 @@ use crate::extensibility::Extensions;
 use crate::framing::*;
 use crate::key_package::builder::KeyPackageBuilder;
 use crate::key_schedule::*;
-use crate::ratchet_tree::*;
+use crate::ratchet_tree::leaf_node::*;
 use crate::utilities::{error::*, serde::*};
 
 /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) KeyPackageRef
@@ -145,7 +145,7 @@ impl KeyPackage {
     pub(crate) fn new(
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
-        credential: Credential,
+        _credential: Credential,
         signature_key_pair: &SignatureKeyPair,
     ) -> Result<Self> {
         if crypto_provider
@@ -159,7 +159,7 @@ impl KeyPackage {
         // Create a new HPKE key pair
         let mut ikm = vec![0u8; crypto_provider.hash(crypto_config.cipher_suite)?.size()];
         crypto_provider.rand().fill(&mut ikm)?;
-        let init_key = crypto_provider
+        let _init_key = crypto_provider
             .hpke(crypto_config.cipher_suite)?
             .kem_derive_key_pair(&ikm)?;
 
@@ -167,10 +167,10 @@ impl KeyPackage {
     }
 
     pub(crate) fn from_keys(
-        crypto_provider: &impl CryptoProvider,
-        crypto_config: CryptoConfig,
-        credential: Credential,
-        init_key: HPKEPublicKey,
+        _crypto_provider: &impl CryptoProvider,
+        _crypto_config: CryptoConfig,
+        _credential: Credential,
+        _init_key: HPKEPublicKey,
     ) -> Result<Self> {
         Ok(Self::default())
     }

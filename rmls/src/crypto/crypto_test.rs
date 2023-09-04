@@ -227,18 +227,18 @@ fn test_crypto_basics_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!("test_crypto_basics {}", cipher_suite);
 
-        test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
-
-        test_expand_with_label(crypto_provider, cipher_suite, &tc.expand_with_label)?;
-
-        test_derive_secret(crypto_provider, cipher_suite, &tc.derive_secret)?;
-
-        test_derive_tree_secret(crypto_provider, cipher_suite, &tc.derive_tree_secret)?;
-
         if crypto_provider.supports(cipher_suite) {
+            test_ref_hash(crypto_provider, cipher_suite, &tc.ref_hash)?;
+
+            test_expand_with_label(crypto_provider, cipher_suite, &tc.expand_with_label)?;
+
+            test_derive_secret(crypto_provider, cipher_suite, &tc.derive_secret)?;
+
+            test_derive_tree_secret(crypto_provider, cipher_suite, &tc.derive_tree_secret)?;
+
             test_sign_with_label(crypto_provider, cipher_suite, &tc.sign_with_label)?;
 
             test_encrypt_with_label(crypto_provider, cipher_suite, &tc.encrypt_with_label)?;

@@ -75,8 +75,8 @@ fn test_welcome_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_welcome {}:{}", cipher_suite, cipher_suite as u16);
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
+        println!("test_welcome {}:{}", cipher_suite, tc.cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
             welcome_test(crypto_provider, cipher_suite, tc)?;
@@ -185,7 +185,9 @@ fn verify_public_message(
     assert!(auth_content
         .verify_signature(crypto_provider, cipher_suite, &tc.signature_pub, ctx)
         .is_ok());
-    assert!(pub_msg.verify_membership_tag(crypto_provider, cipher_suite, &tc.membership_key, ctx));
+    assert!(pub_msg
+        .verify_membership_tag(crypto_provider, cipher_suite, &tc.membership_key, ctx)
+        .is_ok());
 
     let raw = match &pub_msg.content.content {
         Content::Application(application) => application.clone(),
@@ -357,10 +359,10 @@ fn test_message_protection_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!(
             "test_message_protection {}:{}",
-            cipher_suite, cipher_suite as u16
+            cipher_suite, tc.cipher_suite
         );
 
         if crypto_provider.supports(cipher_suite) {

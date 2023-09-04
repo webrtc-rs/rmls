@@ -71,7 +71,7 @@ impl Deserializer for KeyPackage {
         }
 
         let version = buf.get_u16().into();
-        let cipher_suite = buf.get_u16().try_into()?;
+        let cipher_suite = buf.get_u16().into();
         let init_key = HPKEPublicKey::deserialize(buf)?;
         let leaf_node = LeafNode::deserialize(buf)?;
         let extensions = Extensions::deserialize(buf)?;
@@ -106,7 +106,7 @@ impl KeyPackage {
         B: BufMut,
     {
         buf.put_u16(self.version.into());
-        buf.put_u16(self.cipher_suite as u16);
+        buf.put_u16(self.cipher_suite.into());
         serialize_opaque_vec(&self.init_key, buf)?;
         self.leaf_node.serialize(buf)?;
         self.extensions.serialize(buf)

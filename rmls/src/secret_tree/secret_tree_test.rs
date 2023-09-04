@@ -133,10 +133,11 @@ fn test_secret_tree_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!("test_secret_tree {}", cipher_suite);
-
-        secret_tree_test(crypto_provider, cipher_suite, tc)?;
+        if crypto_provider.supports(cipher_suite) {
+            secret_tree_test(crypto_provider, cipher_suite, tc)?;
+        }
     }
 
     Ok(())

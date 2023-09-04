@@ -117,15 +117,30 @@ impl CryptoProvider for RustCryptoProvider {
         &self.rand
     }
 
-    fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash {
-        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].hash
+    fn hash(&self, cipher_suite: CipherSuite) -> Result<&dyn Hash> {
+        if self.supports(cipher_suite) {
+            let index: u16 = cipher_suite.into();
+            Ok(&CIPHER_SUITE_DESCRIPTIONS[index as usize - 1].hash)
+        } else {
+            Err(Error::UnsupportedCipherSuite)
+        }
     }
 
-    fn hpke(&self, cipher_suite: CipherSuite) -> &dyn Hpke {
-        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].hpke
+    fn hpke(&self, cipher_suite: CipherSuite) -> Result<&dyn Hpke> {
+        if self.supports(cipher_suite) {
+            let index: u16 = cipher_suite.into();
+            Ok(&CIPHER_SUITE_DESCRIPTIONS[index as usize - 1].hpke)
+        } else {
+            Err(Error::UnsupportedCipherSuite)
+        }
     }
 
-    fn signature(&self, cipher_suite: CipherSuite) -> &dyn Signature {
-        &CIPHER_SUITE_DESCRIPTIONS[cipher_suite as usize - 1].signature
+    fn signature(&self, cipher_suite: CipherSuite) -> Result<&dyn Signature> {
+        if self.supports(cipher_suite) {
+            let index: u16 = cipher_suite.into();
+            Ok(&CIPHER_SUITE_DESCRIPTIONS[index as usize - 1].signature)
+        } else {
+            Err(Error::UnsupportedCipherSuite)
+        }
     }
 }

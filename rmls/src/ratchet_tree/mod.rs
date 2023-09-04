@@ -100,7 +100,7 @@ impl ParentNode {
             &self.parent_hash,
             original_sibling_tree_hash,
         )?;
-        let h = crypto_provider.hash(cipher_suite);
+        let h = crypto_provider.hash(cipher_suite)?;
         Ok(h.digest(&input))
     }
 
@@ -171,7 +171,7 @@ impl Serializer for LeafNodeSource {
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct Capabilities {
     pub versions: Vec<ProtocolVersion>,
-    pub cipher_suites: Vec<CipherSuiteCapability>,
+    pub cipher_suites: Vec<CipherSuite>,
     pub extensions: Vec<ExtensionType>,
     pub proposals: Vec<ProposalType>,
     pub credentials: Vec<CredentialType>,
@@ -199,7 +199,7 @@ impl Deserializer for Capabilities {
             if b.remaining() < 2 {
                 return Err(Error::BufferTooSmall);
             }
-            cipher_suites.push(CipherSuiteCapability(b.get_u16()));
+            cipher_suites.push(b.get_u16().into());
             Ok(())
         })?;
 
@@ -262,7 +262,7 @@ impl Serializer for Capabilities {
             self.cipher_suites.len(),
             buf,
             |i: usize, b: &mut BytesMut| -> Result<()> {
-                b.put_u16(self.cipher_suites[i].0);
+                b.put_u16(self.cipher_suites[i].into());
                 Ok(())
             },
         )?;
@@ -1119,7 +1119,7 @@ impl RatchetTree {
         }
 
         let input = buf.freeze();
-        let h = crypto_provider.hash(cipher_suite);
+        let h = crypto_provider.hash(cipher_suite)?;
         Ok(h.digest(&input))
     }
 

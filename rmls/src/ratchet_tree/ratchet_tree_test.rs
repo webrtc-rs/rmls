@@ -76,11 +76,8 @@ fn test_tree_validation_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!(
-            "test_tree_validation {}:{}",
-            cipher_suite, cipher_suite as u16
-        );
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
+        println!("test_tree_validation {}:{}", cipher_suite, tc.cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
             tree_validation_test(crypto_provider, cipher_suite, tc)?;
@@ -184,7 +181,7 @@ fn test_tree_kem_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for (i, tc) in tests.iter().enumerate() {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!("test_tree_kem {}:{}", i, cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
@@ -287,7 +284,7 @@ fn test_tree_operations_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for (i, tc) in tests.iter().enumerate() {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!("test_tree_operations {}:{}", i, cipher_suite);
 
         tree_operations_test(crypto_provider, cipher_suite, &tc)?;

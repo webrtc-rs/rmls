@@ -191,7 +191,7 @@ impl Deserializer for Welcome {
         if buf.remaining() < 2 {
             return Err(Error::BufferTooSmall);
         }
-        let cipher_suite = buf.get_u16().try_into()?;
+        let cipher_suite = buf.get_u16().into();
 
         let mut secrets = vec![];
         deserialize_vector(buf, |b: &mut Bytes| -> Result<()> {
@@ -215,7 +215,7 @@ impl Serializer for Welcome {
         Self: Sized,
         B: BufMut,
     {
-        buf.put_u16(self.cipher_suite as u16);
+        buf.put_u16(self.cipher_suite.into());
         serialize_vector(
             self.secrets.len(),
             buf,
@@ -270,7 +270,7 @@ impl Welcome {
             psk_secret,
         )?;
 
-        let aead_nonce_size = crypto_provider.hpke(self.cipher_suite).aead_nonce_size() as u16;
+        let aead_nonce_size = crypto_provider.hpke(self.cipher_suite)?.aead_nonce_size() as u16;
         let welcome_nonce = crypto_provider.expand_with_label(
             self.cipher_suite,
             &welcome_secret,
@@ -279,7 +279,7 @@ impl Welcome {
             aead_nonce_size,
         )?;
 
-        let aead_key_size = crypto_provider.hpke(self.cipher_suite).aead_key_size() as u16;
+        let aead_key_size = crypto_provider.hpke(self.cipher_suite)?.aead_key_size() as u16;
         let welcome_key = crypto_provider.expand_with_label(
             self.cipher_suite,
             &welcome_secret,
@@ -288,7 +288,7 @@ impl Welcome {
             aead_key_size,
         )?;
 
-        let raw_group_info = crypto_provider.hpke(self.cipher_suite).aead_open(
+        let raw_group_info = crypto_provider.hpke(self.cipher_suite)?.aead_open(
             &welcome_key,
             &welcome_nonce,
             &self.encrypted_group_info,

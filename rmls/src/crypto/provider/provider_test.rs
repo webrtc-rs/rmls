@@ -6,9 +6,9 @@ fn test_signature_key_pair_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for c in 1..=7u16 {
-        let cipher_suite: CipherSuite = c.try_into()?;
+        let cipher_suite: CipherSuite = c.into();
         if crypto_provider.supports(cipher_suite) {
-            let signature = crypto_provider.signature(cipher_suite);
+            let signature = crypto_provider.signature(cipher_suite)?;
             let key_pair = signature.generate_key_pair()?;
             let out = signature.sign(key_pair.private_key(), PLAINTEXT)?;
             assert!(signature

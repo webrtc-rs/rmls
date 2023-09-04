@@ -78,7 +78,7 @@ impl Deserializer for GroupContext {
         }
 
         let version: ProtocolVersion = buf.get_u16().into();
-        let cipher_suite = buf.get_u16().try_into()?;
+        let cipher_suite = buf.get_u16().into();
         let group_id = deserialize_opaque_vec(buf)?;
         if buf.remaining() < 8 {
             return Err(Error::BufferTooSmall);
@@ -111,7 +111,7 @@ impl Serializer for GroupContext {
         B: BufMut,
     {
         buf.put_u16(self.version.into());
-        buf.put_u16(self.cipher_suite as u16);
+        buf.put_u16(self.cipher_suite.into());
         serialize_opaque_vec(&self.group_id, buf)?;
         buf.put_u64(self.epoch);
         serialize_opaque_vec(&self.tree_hash, buf)?;
@@ -129,11 +129,11 @@ impl GroupContext {
     ) -> Result<Bytes> {
         let cipher_suite = self.cipher_suite;
         let extracted = crypto_provider
-            .hpke(cipher_suite)
+            .hpke(cipher_suite)?
             .kdf_extract(commit_secret, prev_init_secret)?;
 
         let raw_group_context = self.serialize_detached()?;
-        let extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let extract_size = crypto_provider.hpke(cipher_suite)?.kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
             cipher_suite,
@@ -150,12 +150,12 @@ impl GroupContext {
         joiner_secret: &[u8],
         psk_secret: &[u8],
     ) -> Result<Bytes> {
-        let kdf_extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size();
+        let kdf_extract_size = crypto_provider.hpke(self.cipher_suite)?.kdf_extract_size();
         let zero = vec![0u8; kdf_extract_size];
 
         // TODO de-duplicate with extract_welcome_secret
 
-        let extracted = crypto_provider.hpke(self.cipher_suite).kdf_extract(
+        let extracted = crypto_provider.hpke(self.cipher_suite)?.kdf_extract(
             if psk_secret.is_empty() {
                 &zero
             } else {
@@ -165,7 +165,7 @@ impl GroupContext {
         )?;
 
         let raw_group_context = self.serialize_detached()?;
-        let extract_size = crypto_provider.hpke(self.cipher_suite).kdf_extract_size() as u16;
+        let extract_size = crypto_provider.hpke(self.cipher_suite)?.kdf_extract_size() as u16;
 
         crypto_provider.expand_with_label(
             self.cipher_suite,
@@ -183,9 +183,9 @@ pub(crate) fn extract_welcome_secret(
     joiner_secret: &[u8],
     psk_secret: &[u8],
 ) -> Result<Bytes> {
-    let kdf_extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+    let kdf_extract_size = crypto_provider.hpke(cipher_suite)?.kdf_extract_size();
     let zero = vec![0u8; kdf_extract_size];
-    let extracted = crypto_provider.hpke(cipher_suite).kdf_extract(
+    let extracted = crypto_provider.hpke(cipher_suite)?.kdf_extract(
         if psk_secret.is_empty() {
             &zero
         } else {
@@ -281,7 +281,7 @@ impl ConfirmedTranscriptHashInput {
         buf.extend_from_slice(interim_transcript_hash_before);
         buf.put(raw_input);
 
-        Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
+        Ok(crypto_provider.hash(cipher_suite)?.digest(&buf.freeze()))
     }
 }
 
@@ -315,7 +315,7 @@ pub fn next_interim_transcript_hash(
     buf.extend_from_slice(confirmed_transcript_hash);
     buf.put(raw_input);
 
-    Ok(crypto_provider.hash(cipher_suite).digest(&buf.freeze()))
+    Ok(crypto_provider.hash(cipher_suite)?.digest(&buf.freeze()))
 }
 
 /// [RFC9420 Sec.8.4](https://www.rfc-editor.org/rfc/rfc9420.html#section-8.4) PSKType
@@ -587,13 +587,13 @@ pub fn extract_psk_secret(
         return Err(Error::PskIDsAndPskLenNotMatch);
     }
 
-    let kdf_extract_size = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+    let kdf_extract_size = crypto_provider.hpke(cipher_suite)?.kdf_extract_size();
     let zero = vec![0u8; kdf_extract_size];
 
     let mut psk_secret = Bytes::from(zero.clone());
     for i in 0..psk_ids.len() {
         let psk_extracted = crypto_provider
-            .hpke(cipher_suite)
+            .hpke(cipher_suite)?
             .kdf_extract(&psks[i], &zero)?;
 
         let psk_label = PSKLabel {
@@ -612,7 +612,7 @@ pub fn extract_psk_secret(
         )?;
 
         psk_secret = crypto_provider
-            .hpke(cipher_suite)
+            .hpke(cipher_suite)?
             .kdf_extract(&psk_secret, &psk_input)?;
     }
 

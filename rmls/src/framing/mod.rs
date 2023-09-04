@@ -782,9 +782,9 @@ impl FramedContentAuthData {
         cipher_suite: CipherSuite,
         confirmation_key: &[u8],
         confirmed_transcript_hash: &[u8],
-    ) -> bool {
+    ) -> Result<()> {
         if self.confirmation_tag.is_empty() {
-            false
+            Err(Error::VerifyConfirmationTagFailed)
         } else {
             crypto_provider.verify_mac(
                 cipher_suite,
@@ -906,7 +906,7 @@ impl PublicMessage {
         };
         let raw_auth_content_tbm = self.authenticated_content_tbm(ctx).serialize_detached()?;
         self.membership_tag =
-            Some(crypto_provider.sign_mac(cipher_suite, membership_key, &raw_auth_content_tbm));
+            Some(crypto_provider.sign_mac(cipher_suite, membership_key, &raw_auth_content_tbm)?);
         Ok(())
     }
 
@@ -919,10 +919,10 @@ impl PublicMessage {
         cipher_suite: CipherSuite,
         membership_key: &[u8],
         ctx: &GroupContext,
-    ) -> bool {
+    ) -> Result<()> {
         match self.content.sender {
             Sender::External(_) | Sender::NewMemberProposal | Sender::NewMemberCommit => {
-                return true;
+                return Ok(());
             }
             _ => {}
         };
@@ -931,7 +931,7 @@ impl PublicMessage {
                 if let Ok(raw) = self.authenticated_content_tbm(ctx).serialize_detached() {
                     raw
                 } else {
-                    return false;
+                    return Err(Error::VerifyConfirmationTagFailed);
                 };
             crypto_provider.verify_mac(
                 cipher_suite,
@@ -940,7 +940,7 @@ impl PublicMessage {
                 membership_tag,
             )
         } else {
-            true
+            Ok(())
         }
     }
 }
@@ -1098,7 +1098,7 @@ impl PrivateMessage {
         };
         let raw_aad = aad.serialize_detached()?;
 
-        let raw_sender_data = crypto_provider.hpke(cipher_suite).aead_open(
+        let raw_sender_data = crypto_provider.hpke(cipher_suite)?.aead_open(
             &key,
             &nonce,
             &self.encrypted_sender_data,
@@ -1130,7 +1130,7 @@ impl PrivateMessage {
         };
 
         let raw_aad = aad.serialize_detached()?;
-        let raw_content = crypto_provider.hpke(cipher_suite).aead_open(
+        let raw_content = crypto_provider.hpke(cipher_suite)?.aead_open(
             &key,
             &nonce,
             &self.ciphertext,
@@ -1399,7 +1399,7 @@ pub(crate) fn encrypt_private_message_content(
     let raw_aad = aad.serialize_detached()?;
 
     crypto_provider
-        .hpke(cipher_suite)
+        .hpke(cipher_suite)?
         .aead_seal(&key, &nonce, &plainttext, &raw_aad)
 }
 
@@ -1433,7 +1433,7 @@ fn encrypt_sender_data(
     let raw_sender_data = sender_data.serialize_detached()?;
 
     crypto_provider
-        .hpke(cipher_suite)
+        .hpke(cipher_suite)?
         .aead_seal(&key, &nonce, &raw_sender_data, &raw_aad)
 }
 
@@ -1443,8 +1443,8 @@ pub(crate) fn expand_sender_data_key(
     sender_data_secret: &[u8],
     ciphertext: &[u8],
 ) -> Result<Bytes> {
-    let nk = crypto_provider.hpke(cipher_suite).aead_key_size() as u16;
-    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext);
+    let nk = crypto_provider.hpke(cipher_suite)?.aead_key_size() as u16;
+    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext)?;
     crypto_provider.expand_with_label(
         cipher_suite,
         sender_data_secret,
@@ -1460,8 +1460,8 @@ pub(crate) fn expand_sender_data_nonce(
     sender_data_secret: &[u8],
     ciphertext: &[u8],
 ) -> Result<Bytes> {
-    let nn = crypto_provider.hpke(cipher_suite).aead_nonce_size() as u16;
-    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext);
+    let nn = crypto_provider.hpke(cipher_suite)?.aead_nonce_size() as u16;
+    let ciphertext_sample = sample_ciphertext(crypto_provider, cipher_suite, ciphertext)?;
     crypto_provider.expand_with_label(
         cipher_suite,
         sender_data_secret,
@@ -1475,11 +1475,11 @@ pub(crate) fn sample_ciphertext<'a>(
     crypto_provider: &impl CryptoProvider,
     cipher_suite: CipherSuite,
     ciphertext: &'a [u8],
-) -> &'a [u8] {
-    let n = crypto_provider.hpke(cipher_suite).kdf_extract_size();
+) -> Result<&'a [u8]> {
+    let n = crypto_provider.hpke(cipher_suite)?.kdf_extract_size();
     if ciphertext.len() < n {
-        ciphertext
+        Ok(ciphertext)
     } else {
-        &ciphertext[..n]
+        Ok(&ciphertext[..n])
     }
 }

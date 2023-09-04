@@ -59,7 +59,7 @@ pub enum SignatureScheme {
     ED448 = 0x0808,
 }
 
-/// SignatureKeyPair is a wrapper CryptoProvider's signature key pair
+/// SignatureKeyPair is a wrapper of CryptoProvider's signature key pair
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub struct SignatureKeyPair {
     private_key: Bytes,
@@ -169,18 +169,18 @@ pub trait CryptoProvider {
     fn rand(&self) -> &dyn Rand;
 
     /// Derive Hash trait object based on the given cipher suite
-    fn hash(&self, cipher_suite: CipherSuite) -> &dyn Hash;
+    fn hash(&self, cipher_suite: CipherSuite) -> Result<&dyn Hash>;
 
     /// Derive Hpke trait object based on the given cipher suite
-    fn hpke(&self, cipher_suite: CipherSuite) -> &dyn Hpke;
+    fn hpke(&self, cipher_suite: CipherSuite) -> Result<&dyn Hpke>;
 
     /// Derive Signature trait object based on the given cipher suite
-    fn signature(&self, cipher_suite: CipherSuite) -> &dyn Signature;
+    fn signature(&self, cipher_suite: CipherSuite) -> Result<&dyn Signature>;
 
     /// HMAC based sign based on the given cipher suite
-    fn sign_mac(&self, cipher_suite: CipherSuite, key: &[u8], message: &[u8]) -> Bytes {
+    fn sign_mac(&self, cipher_suite: CipherSuite, key: &[u8], message: &[u8]) -> Result<Bytes> {
         // All cipher suites use HMAC
-        self.hash(cipher_suite).mac(key, message)
+        Ok(self.hash(cipher_suite)?.mac(key, message))
     }
 
     /// HMAC based verify based on the given cipher suite
@@ -190,8 +190,12 @@ pub trait CryptoProvider {
         key: &[u8],
         message: &[u8],
         tag: &[u8],
-    ) -> bool {
-        tag == self.sign_mac(cipher_suite, key, message).as_ref()
+    ) -> Result<()> {
+        if tag == self.sign_mac(cipher_suite, key, message)?.as_ref() {
+            Ok(())
+        } else {
+            Err(Error::VerifyConfirmationTagFailed)
+        }
     }
 
     /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) Hash-Based Identifiers
@@ -200,7 +204,7 @@ pub trait CryptoProvider {
         serialize_opaque_vec(label, &mut buf)?;
         serialize_opaque_vec(value, &mut buf)?;
         let input = buf.freeze();
-        let h = self.hash(cipher_suite);
+        let h = self.hash(cipher_suite)?;
         Ok(h.digest(&input))
     }
 
@@ -221,7 +225,7 @@ pub trait CryptoProvider {
         serialize_opaque_vec(&mls_label, &mut buf)?;
         serialize_opaque_vec(context, &mut buf)?;
         let info = buf.freeze();
-        self.hpke(cipher_suite).kdf_expand(secret, &info, length)
+        self.hpke(cipher_suite)?.kdf_expand(secret, &info, length)
     }
 
     /// Derive secret with label
@@ -231,7 +235,7 @@ pub trait CryptoProvider {
         secret: &[u8],
         label: &[u8],
     ) -> Result<Bytes> {
-        let length = self.hpke(cipher_suite).kdf_extract_size();
+        let length = self.hpke(cipher_suite)?.kdf_extract_size();
         self.expand_with_label(cipher_suite, secret, label, &[], length as u16)
     }
 
@@ -244,7 +248,7 @@ pub trait CryptoProvider {
         content: &[u8],
     ) -> Result<Bytes> {
         let sign_content = mls_prefix_label_data(label, content)?;
-        self.signature(cipher_suite).sign(sign_key, &sign_content)
+        self.signature(cipher_suite)?.sign(sign_key, &sign_content)
     }
 
     /// [RFC9420 Sec.5.1.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.2) Verify message with label
@@ -257,7 +261,7 @@ pub trait CryptoProvider {
         sign_value: &[u8],
     ) -> Result<()> {
         let sign_content = mls_prefix_label_data(label, content)?;
-        self.signature(cipher_suite)
+        self.signature(cipher_suite)?
             .verify(verify_key, &sign_content, sign_value)
     }
 
@@ -353,9 +357,8 @@ pub trait CryptoProvider {
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
             | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
             | CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
-            | CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => {
-                Err(Error::UnsupportedCipherSuite)
-            }
+            | CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384
+            | CipherSuite::Unknown(_) => Err(Error::UnsupportedCipherSuite),
         }
     }
 
@@ -440,9 +443,8 @@ pub trait CryptoProvider {
             CipherSuite::MLS_256_DHKEMX448_AES256GCM_SHA512_Ed448
             | CipherSuite::MLS_256_DHKEMP521_AES256GCM_SHA512_P521
             | CipherSuite::MLS_256_DHKEMX448_CHACHA20POLY1305_SHA512_Ed448
-            | CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384 => {
-                Err(Error::UnsupportedCipherSuite)
-            }
+            | CipherSuite::MLS_256_DHKEMP384_AES256GCM_SHA384_P384
+            | CipherSuite::Unknown(_) => Err(Error::UnsupportedCipherSuite),
         }
     }
 }

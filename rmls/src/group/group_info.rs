@@ -97,16 +97,12 @@ impl GroupInfo {
         let confirmation_key =
             crypto_provider.derive_secret(cipher_suite, &epoch_secret, SECRET_LABEL_CONFIRM)?;
 
-        if crypto_provider.verify_mac(
+        crypto_provider.verify_mac(
             cipher_suite,
             &confirmation_key,
             &self.group_context.confirmed_transcript_hash,
             &self.confirmation_tag,
-        ) {
-            Ok(())
-        } else {
-            Err(Error::VerifyConfirmationTagFailed)
-        }
+        )
     }
 }
 

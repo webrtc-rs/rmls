@@ -55,8 +55,8 @@ fn test_psk_secret_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_psk_secret {}:{}", cipher_suite, cipher_suite as u16);
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
+        println!("test_psk_secret {}:{}", cipher_suite, tc.cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
             psk_secret_test(crypto_provider, cipher_suite, tc)?;
@@ -209,8 +209,8 @@ fn test_key_schedule_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!("test_key_schedule {}:{}", cipher_suite, cipher_suite as u16);
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
+        println!("test_key_schedule {}:{}", cipher_suite, tc.cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
             key_schedule_test(crypto_provider, cipher_suite, tc)?;
@@ -264,12 +264,15 @@ fn transcript_hashes_test(
         ),
     };
 
-    assert!(auth_content.auth.verify_confirmation_tag(
-        crypto_provider,
-        cipher_suite,
-        &tc.confirmation_key,
-        &tc.confirmed_transcript_hash_after
-    ));
+    assert!(auth_content
+        .auth
+        .verify_confirmation_tag(
+            crypto_provider,
+            cipher_suite,
+            &tc.confirmation_key,
+            &tc.confirmed_transcript_hash_after
+        )
+        .is_ok());
 
     let confirmed_transcript_hash_after = auth_content.confirmed_transcript_hash_input().hash(
         crypto_provider,
@@ -300,10 +303,10 @@ fn test_transcript_hashes_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
         println!(
             "test_transcript_hashes {}:{}",
-            cipher_suite, cipher_suite as u16
+            cipher_suite, tc.cipher_suite
         );
 
         if crypto_provider.supports(cipher_suite) {

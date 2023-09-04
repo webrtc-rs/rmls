@@ -85,7 +85,7 @@ impl SecretTree {
             .ok_or(Error::InvalidParentNode)?
             .as_ref()
             .ok_or(Error::InvalidParentNode)?;
-        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let nh = crypto_provider.hpke(cipher_suite)?.kdf_extract_size() as u16;
         let left_secret =
             crypto_provider.expand_with_label(cipher_suite, parent_secret, b"tree", b"left", nh)?;
         let right_secret = crypto_provider.expand_with_label(
@@ -128,7 +128,7 @@ impl SecretTree {
             .ok_or(Error::InvalidParentNode)?
             .as_ref()
             .ok_or(Error::InvalidParentNode)?;
-        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let nh = crypto_provider.hpke(cipher_suite)?.kdf_extract_size() as u16;
         let secret = crypto_provider.expand_with_label(
             cipher_suite,
             parent_secret,
@@ -157,7 +157,7 @@ impl RatchetSecret {
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
     ) -> Result<Bytes> {
-        let nn = crypto_provider.hpke(cipher_suite).aead_nonce_size() as u16;
+        let nn = crypto_provider.hpke(cipher_suite)?.aead_nonce_size() as u16;
         derive_tree_secret(
             crypto_provider,
             cipher_suite,
@@ -174,7 +174,7 @@ impl RatchetSecret {
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
     ) -> Result<Bytes> {
-        let nk = crypto_provider.hpke(cipher_suite).aead_key_size() as u16;
+        let nk = crypto_provider.hpke(cipher_suite)?.aead_key_size() as u16;
         derive_tree_secret(
             crypto_provider,
             cipher_suite,
@@ -191,7 +191,7 @@ impl RatchetSecret {
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
     ) -> Result<RatchetSecret> {
-        let nh = crypto_provider.hpke(cipher_suite).kdf_extract_size() as u16;
+        let nh = crypto_provider.hpke(cipher_suite)?.kdf_extract_size() as u16;
         let secret = derive_tree_secret(
             crypto_provider,
             cipher_suite,

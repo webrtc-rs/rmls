@@ -210,12 +210,14 @@ fn passive_client_test(
 
         let membership_key =
             crypto_provider.derive_secret(cipher_suite, &epoch_secret, SECRET_LABEL_MEMBERSHIP)?;
-        assert!(pub_msg.verify_membership_tag(
-            crypto_provider,
-            cipher_suite,
-            &membership_key,
-            &group_info.group_context
-        ));
+        assert!(pub_msg
+            .verify_membership_tag(
+                crypto_provider,
+                cipher_suite,
+                &membership_key,
+                &group_info.group_context
+            )
+            .is_ok());
 
         assert_eq!(
             auth_content.content.content.content_type(),
@@ -367,11 +369,8 @@ fn test_passive_client_with_crypto_provider(
     crypto_provider: &impl CryptoProvider,
 ) -> Result<()> {
     for tc in tests {
-        let cipher_suite: CipherSuite = tc.cipher_suite.try_into()?;
-        println!(
-            "test_passive_client {}:{}",
-            cipher_suite, cipher_suite as u16
-        );
+        let cipher_suite: CipherSuite = tc.cipher_suite.into();
+        println!("test_passive_client {}:{}", cipher_suite, tc.cipher_suite);
 
         if crypto_provider.supports(cipher_suite) {
             passive_client_test(crypto_provider, cipher_suite, tc)?;

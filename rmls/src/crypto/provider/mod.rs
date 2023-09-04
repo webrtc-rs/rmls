@@ -66,13 +66,13 @@ pub struct SignatureKeyPair {
 
 impl SignatureKeyPair {
     /// Returns private key
-    pub fn private_key(&self) -> &[u8] {
-        self.private_key.as_ref()
+    pub fn private_key(&self) -> &Bytes {
+        &self.private_key
     }
 
     /// Returns public key
-    pub fn public_key(&self) -> &[u8] {
-        self.public_key.as_ref()
+    pub fn public_key(&self) -> &Bytes {
+        &self.public_key
     }
 
     /// Returns signature scheme

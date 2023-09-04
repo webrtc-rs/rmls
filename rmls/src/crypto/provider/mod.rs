@@ -1,6 +1,9 @@
 //! [RFC9420 Sec.5](https://www.rfc-editor.org/rfc/rfc9420.html#section-5) CryptoProvider trait and
 //! implementations that provide the cryptographic primitives to be used in group key computations.
 
+#[cfg(test)]
+mod provider_test;
+
 #[cfg(feature = "RingCryptoProvider")]
 mod ring;
 #[cfg(feature = "RingCryptoProvider")]

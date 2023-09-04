@@ -12,6 +12,9 @@ pub mod builder;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::ops::Deref;
 
+use crate::crypto::config::CryptoConfig;
+use crate::crypto::credential::Credential;
+use crate::crypto::provider::SignatureKeyPair;
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::extensibility::Extensions;
 use crate::framing::*;
@@ -59,7 +62,7 @@ pub struct KeyPackageTBS {
     pub(crate) cipher_suite: CipherSuite,
     pub(crate) init_key: HPKEPublicKey,
     pub(crate) leaf_node: LeafNode,
-    extensions: Extensions,
+    pub(crate) extensions: Extensions,
 }
 
 impl Deserializer for KeyPackageTBS {
@@ -137,6 +140,23 @@ impl KeyPackage {
     /// Create a key package builder
     pub fn builder() -> KeyPackageBuilder {
         KeyPackageBuilder::new()
+    }
+
+    pub(crate) fn new(
+        crypto_provider: &impl CryptoProvider,
+        crypto_config: CryptoConfig,
+        _credential: Credential,
+        signature_key_pair: &SignatureKeyPair,
+    ) -> Result<Self> {
+        if crypto_provider
+            .signature(crypto_config.cipher_suite)?
+            .signature_scheme()
+            != signature_key_pair.signature_scheme()
+        {
+            return Err(Error::CipherSuiteNotMatchSignatureScheme);
+        }
+
+        Ok(Self::default())
     }
 
     fn verify_signature(&self, crypto_provider: &impl CryptoProvider) -> Result<()> {

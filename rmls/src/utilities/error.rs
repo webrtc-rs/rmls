@@ -101,6 +101,8 @@ pub enum Error {
     KeyPackageVersionNotMatchGroupContext,
     #[error("cipher suite doesn't match group context")]
     CipherSuiteNotMatchGroupContext,
+    #[error("cipher suite doesn't match signature scheme")]
+    CipherSuiteNotMatchSignatureScheme,
     #[error("key package contains a leaf node with an invalid source")]
     KeyPackageContainsLeafNodeWithInvalidSource,
     #[error("invalid key package signature")]

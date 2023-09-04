@@ -8,6 +8,7 @@ use std::ops::Deref;
 use crate::utilities::{error::*, serde::*};
 
 pub mod cipher_suite;
+pub mod config;
 pub mod credential;
 pub mod provider;
 

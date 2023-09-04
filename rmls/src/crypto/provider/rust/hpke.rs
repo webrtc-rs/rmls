@@ -6,8 +6,10 @@ use bytes::Bytes;
 use chacha20poly1305::ChaCha20Poly1305;
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
+use hpke::{Kem, Serializable};
 use sha2::{Sha256, Sha384, Sha512};
 
+use crate::crypto::key_pair::HPKEKeyPair;
 use crate::crypto::provider::HpkeSuite;
 use crate::crypto::*;
 
@@ -15,6 +17,30 @@ use crate::crypto::*;
 pub(super) struct HpkeSuiteWrapper(pub(super) HpkeSuite);
 
 impl provider::Hpke for HpkeSuiteWrapper {
+    fn hpke_suite(&self) -> HpkeSuite {
+        self.0
+    }
+
+    fn kem_derive_key_pair(&self, ikm: &[u8]) -> Result<HPKEKeyPair> {
+        match self.0.kem {
+            provider::Kem::KEM_X25519_HKDF_SHA256 => {
+                let (private_key, public_key) = hpke::kem::X25519HkdfSha256::derive_keypair(ikm);
+                Ok(HPKEKeyPair {
+                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
+                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                })
+            }
+            provider::Kem::KEM_P256_HKDF_SHA256 => {
+                let (private_key, public_key) = hpke::kem::DhP256HkdfSha256::derive_keypair(ikm);
+                Ok(HPKEKeyPair {
+                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
+                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                })
+            }
+            _ => Err(Error::UnsupportedKem),
+        }
+    }
+
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
         let mut out = vec![0u8; length as usize];
 

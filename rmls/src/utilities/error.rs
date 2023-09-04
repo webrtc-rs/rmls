@@ -83,6 +83,8 @@ pub enum Error {
     InvalidEd25519PrivateKey,
     #[error("invalid ECDSA private key")]
     InvalidECDSAPrivateKey,
+    #[error("unsupported Kem")]
+    UnsupportedKem,
     #[error("unsupported Ecdsa")]
     UnsupportedEcdsa,
     #[error("unsupported Ed448")]

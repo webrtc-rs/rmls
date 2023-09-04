@@ -6,7 +6,7 @@ use ring::signature::{
 };
 use signature::Signer;
 
-use crate::crypto::provider::{SignatureKeyPair, SignatureScheme};
+use crate::crypto::{key_pair::SignatureKeyPair, provider::SignatureScheme, SignaturePublicKey};
 use crate::utilities::error::*;
 
 #[allow(non_camel_case_types)]
@@ -14,7 +14,7 @@ use crate::utilities::error::*;
 pub(super) struct SignatureSchemeWrapper(pub(super) SignatureScheme);
 
 impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
-    fn generate_key_pair(&self) -> Result<SignatureKeyPair> {
+    fn signature_key_pair(&self) -> Result<SignatureKeyPair> {
         match self.0 {
             SignatureScheme::ED25519 => {
                 const SEED_LEN: usize = 32;
@@ -25,7 +25,9 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                     .map_err(|_| Error::InvalidEd25519PrivateKey)?;
                 Ok(SignatureKeyPair {
                     private_key: Bytes::from(seed.to_vec()),
-                    public_key: Bytes::from(key_pair.public_key().as_ref().to_vec()),
+                    public_key: SignaturePublicKey(Bytes::from(
+                        key_pair.public_key().as_ref().to_vec(),
+                    )),
                     signature_scheme: self.0,
                 })
             }
@@ -38,7 +40,7 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                 );
                 Ok(SignatureKeyPair {
                     private_key: Bytes::from(private_key.to_vec()),
-                    public_key: Bytes::from(public_key.to_vec()),
+                    public_key: SignaturePublicKey(Bytes::from(public_key.to_vec())),
                     signature_scheme: self.0,
                 })
             }
@@ -51,7 +53,7 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                 );
                 Ok(SignatureKeyPair {
                     private_key: Bytes::from(private_key.to_vec()),
-                    public_key: Bytes::from(public_key.to_vec()),
+                    public_key: SignaturePublicKey(Bytes::from(public_key.to_vec())),
                     signature_scheme: self.0,
                 })
             }

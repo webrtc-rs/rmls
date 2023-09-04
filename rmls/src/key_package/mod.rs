@@ -12,10 +12,10 @@ pub mod builder;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::ops::Deref;
 
-use crate::crypto::config::CryptoConfig;
-use crate::crypto::credential::Credential;
-use crate::crypto::provider::SignatureKeyPair;
-use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
+use crate::crypto::{
+    cipher_suite::*, config::CryptoConfig, credential::Credential, key_pair::SignatureKeyPair,
+    provider::CryptoProvider, *,
+};
 use crate::extensibility::Extensions;
 use crate::framing::*;
 use crate::key_package::builder::KeyPackageBuilder;

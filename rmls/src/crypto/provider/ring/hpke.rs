@@ -1,9 +1,11 @@
 use bytes::Bytes;
+use hpke::{Kem, Serializable};
 use ring::aead::{self, AES_128_GCM, AES_256_GCM, CHACHA20_POLY1305};
 use ring::digest::{SHA256_OUTPUT_LEN, SHA384_OUTPUT_LEN, SHA512_OUTPUT_LEN};
 use ring::hkdf::{KeyType, Prk, HKDF_SHA256, HKDF_SHA384, HKDF_SHA512};
 use ring::hmac;
 
+use crate::crypto::key_pair::HPKEKeyPair;
 use crate::crypto::provider::HpkeSuite;
 use crate::crypto::*;
 
@@ -22,6 +24,30 @@ impl KeyType for MyKeyType<u16> {
 }
 
 impl provider::Hpke for HpkeSuiteWrapper {
+    fn hpke_suite(&self) -> HpkeSuite {
+        self.0
+    }
+
+    fn kem_derive_key_pair(&self, ikm: &[u8]) -> Result<HPKEKeyPair> {
+        match self.0.kem {
+            provider::Kem::KEM_X25519_HKDF_SHA256 => {
+                let (private_key, public_key) = hpke::kem::X25519HkdfSha256::derive_keypair(ikm);
+                Ok(HPKEKeyPair {
+                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
+                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                })
+            }
+            provider::Kem::KEM_P256_HKDF_SHA256 => {
+                let (private_key, public_key) = hpke::kem::DhP256HkdfSha256::derive_keypair(ikm);
+                Ok(HPKEKeyPair {
+                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
+                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                })
+            }
+            _ => Err(Error::UnsupportedKem),
+        }
+    }
+
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes> {
         let prk = match self.0.kdf {
             Kdf::KDF_HKDF_SHA256 => Prk::new_less_safe(HKDF_SHA256, secret),

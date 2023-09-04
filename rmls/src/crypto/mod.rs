@@ -10,6 +10,7 @@ use crate::utilities::{error::*, serde::*};
 pub mod cipher_suite;
 pub mod config;
 pub mod credential;
+pub mod key_pair;
 pub mod provider;
 
 /// [RFC9420 Sec.5.1.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.1.1) HPKE public keys are

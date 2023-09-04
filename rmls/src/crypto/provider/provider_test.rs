@@ -9,7 +9,7 @@ fn test_signature_key_pair_with_crypto_provider(
         let cipher_suite: CipherSuite = c.into();
         if crypto_provider.supports(cipher_suite) {
             let signature = crypto_provider.signature(cipher_suite)?;
-            let key_pair = signature.generate_key_pair()?;
+            let key_pair = signature.signature_key_pair()?;
             let out = signature.sign(key_pair.private_key(), PLAINTEXT)?;
             assert!(signature
                 .verify(key_pair.public_key(), PLAINTEXT, &out)

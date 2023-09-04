@@ -15,6 +15,7 @@ pub use self::rust::RustCryptoProvider;
 
 use crate::crypto::{cipher_suite::CipherSuite, *};
 
+use crate::crypto::key_pair::{HPKEKeyPair, SignatureKeyPair};
 use bytes::{BufMut, Bytes, BytesMut};
 use hpke::{Deserializable, Serializable};
 use rand_core::SeedableRng;
@@ -36,9 +37,9 @@ pub enum HashScheme {
 /// It is an HPKE cipher suite consisting of a KEM, KDF, and AEAD algorithm.
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct HpkeSuite {
-    pub(super) kem: Kem,
-    pub(super) kdf: Kdf,
-    pub(super) aead: Aead,
+    pub kem: Kem,
+    pub kdf: Kdf,
+    pub aead: Aead,
 }
 
 /// [RFC9420 Sec.17.1](https://www.rfc-editor.org/rfc/rfc9420.html#section-17.1) SignatureScheme
@@ -57,31 +58,6 @@ pub enum SignatureScheme {
     ED25519 = 0x0807,
     /// ED448
     ED448 = 0x0808,
-}
-
-/// SignatureKeyPair is a wrapper of CryptoProvider's signature key pair
-#[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct SignatureKeyPair {
-    private_key: Bytes,
-    public_key: Bytes,
-    signature_scheme: SignatureScheme,
-}
-
-impl SignatureKeyPair {
-    /// Returns private key
-    pub fn private_key(&self) -> &Bytes {
-        &self.private_key
-    }
-
-    /// Returns public key
-    pub fn public_key(&self) -> &Bytes {
-        &self.public_key
-    }
-
-    /// Returns signature scheme
-    pub fn signature_scheme(&self) -> SignatureScheme {
-        self.signature_scheme
-    }
 }
 
 /// Rand trait provides randomness
@@ -103,6 +79,12 @@ pub trait Hash: Send + Sync {
 /// Key Derivation Function (KDF) algorithm and Authenticated Encryption with Associated Data (AEAD)
 /// algorithm
 pub trait Hpke: Send + Sync {
+    /// Returns HPKE suite
+    fn hpke_suite(&self) -> HpkeSuite;
+
+    /// Generate a new HPKE key pair
+    fn kem_derive_key_pair(&self, ikm: &[u8]) -> Result<HPKEKeyPair>;
+
     /// [RFC9180](https://www.rfc-editor.org/rfc/rfc9180.html#section-4) Expand a pseudorandom key
     /// using optional string info into length bytes of output keying material.
     fn kdf_expand(&self, secret: &[u8], info: &[u8], length: u16) -> Result<Bytes>;
@@ -144,7 +126,7 @@ pub trait Hpke: Send + Sync {
 /// signature algorithm
 pub trait Signature: Send + Sync {
     /// Generate a new signature key pair
-    fn generate_key_pair(&self) -> Result<SignatureKeyPair>;
+    fn signature_key_pair(&self) -> Result<SignatureKeyPair>;
 
     /// Returns signature scheme
     fn signature_scheme(&self) -> SignatureScheme;

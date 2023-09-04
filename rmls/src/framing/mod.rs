@@ -95,16 +95,16 @@ impl Serializer for ContentType {
     }
 }
 
-/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Content Container
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Content
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Content {
-    /// Application Content Container
+    /// Application Content
     Application(Bytes),
 
-    /// Proposal Content Container
+    /// Proposal Content
     Proposal(Proposal),
 
-    /// Commit Content Container
+    /// Commit Content
     Commit(Commit),
 }
 
@@ -153,7 +153,7 @@ impl Serializer for Content {
 }
 
 impl Content {
-    /// Return ContentType of Content Container
+    /// Return ContentType of Content
     pub fn content_type(&self) -> ContentType {
         match self {
             Content::Application(_) => ContentType::Application,
@@ -218,19 +218,19 @@ impl Serializer for SenderType {
     }
 }
 
-/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Sender Container
+/// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Sender
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Sender {
-    /// Member Sender Container
+    /// Member Sender
     Member(LeafIndex),
 
-    /// External Sender Container
+    /// External Sender
     External(u32),
 
-    /// New Member Proposal Sender Container
+    /// New Member Proposal Sender
     NewMemberProposal,
 
-    /// New Member Commit Sender Container
+    /// New Member Commit Sender
     #[default]
     NewMemberCommit,
 }
@@ -360,19 +360,19 @@ impl Serializer for WireFormat {
 /// [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Wire Message
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum WireMessage {
-    /// Public Message Wire Format Container
+    /// Public Message Wire Format
     PublicMessage(PublicMessage),
 
-    /// Private Message Wire Format Container
+    /// Private Message Wire Format
     PrivateMessage(PrivateMessage),
 
-    /// Welcome Wire Format Container
+    /// Welcome Wire Format
     Welcome(Welcome),
 
-    /// Group Info Wire Format Container
+    /// Group Info Wire Format
     GroupInfo(GroupInfo),
 
-    /// Key Package Wire Format Container
+    /// Key Package Wire Format
     KeyPackage(KeyPackage),
 }
 

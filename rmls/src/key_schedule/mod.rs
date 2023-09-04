@@ -37,8 +37,8 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
+use crate::extensibility::Extensions;
 use crate::framing::*;
-use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
 

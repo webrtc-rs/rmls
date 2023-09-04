@@ -1,4 +1,4 @@
-//! [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#name-message-framing) Message Framing
+//! [RFC9420 Sec.6](https://www.rfc-editor.org/rfc/rfc9420.html#section-6) Message Framing
 
 #[cfg(test)]
 mod framing_test;

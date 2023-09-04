@@ -1,8 +1,8 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::provider::CryptoProvider;
+use crate::extensibility::*;
 use crate::key_schedule::*;
-use crate::ratchet_tree::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;

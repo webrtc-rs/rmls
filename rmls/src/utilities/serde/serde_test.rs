@@ -8,6 +8,7 @@ use crate::crypto::provider::RingCryptoProvider;
 #[cfg(feature = "RustCryptoProvider")]
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
+use crate::extensibility::*;
 use crate::framing::*;
 use crate::group::proposal::*;
 use crate::group::*;

@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 pub mod crypto;
+pub mod extensibility;
 pub mod framing;
 pub mod group;
 pub mod key_package;

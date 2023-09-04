@@ -1,4 +1,5 @@
 use crate::crypto::cipher_suite::CipherSuite;
+use crate::extensibility::Extensions;
 use crate::framing::{GroupID, ProtocolVersion};
 use crate::key_package::KeyPackage;
 use crate::key_schedule::PreSharedKeyID;
@@ -12,7 +13,7 @@ use bytes::{Buf, BufMut, Bytes};
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 #[repr(u16)]
-pub enum ProposalTypeCapability {
+pub enum ProposalType {
     #[default]
     Add = 0x0001,
     Update = 0x0002,
@@ -24,37 +25,37 @@ pub enum ProposalTypeCapability {
     Unknown(u16),
 }
 
-impl From<u16> for ProposalTypeCapability {
+impl From<u16> for ProposalType {
     fn from(v: u16) -> Self {
         match v {
-            0x0001 => ProposalTypeCapability::Add,
-            0x0002 => ProposalTypeCapability::Update,
-            0x0003 => ProposalTypeCapability::Remove,
-            0x0004 => ProposalTypeCapability::PreSharedKey,
-            0x0005 => ProposalTypeCapability::ReInit,
-            0x0006 => ProposalTypeCapability::ExternalInit,
-            0x0007 => ProposalTypeCapability::GroupContextExtensions,
-            _ => ProposalTypeCapability::Unknown(v),
+            0x0001 => ProposalType::Add,
+            0x0002 => ProposalType::Update,
+            0x0003 => ProposalType::Remove,
+            0x0004 => ProposalType::PreSharedKey,
+            0x0005 => ProposalType::ReInit,
+            0x0006 => ProposalType::ExternalInit,
+            0x0007 => ProposalType::GroupContextExtensions,
+            _ => ProposalType::Unknown(v),
         }
     }
 }
 
-impl From<ProposalTypeCapability> for u16 {
-    fn from(val: ProposalTypeCapability) -> Self {
+impl From<ProposalType> for u16 {
+    fn from(val: ProposalType) -> Self {
         match val {
-            ProposalTypeCapability::Add => 0x0001,
-            ProposalTypeCapability::Update => 0x0002,
-            ProposalTypeCapability::Remove => 0x0003,
-            ProposalTypeCapability::PreSharedKey => 0x0004,
-            ProposalTypeCapability::ReInit => 0x0005,
-            ProposalTypeCapability::ExternalInit => 0x0006,
-            ProposalTypeCapability::GroupContextExtensions => 0x0007,
-            ProposalTypeCapability::Unknown(v) => v,
+            ProposalType::Add => 0x0001,
+            ProposalType::Update => 0x0002,
+            ProposalType::Remove => 0x0003,
+            ProposalType::PreSharedKey => 0x0004,
+            ProposalType::ReInit => 0x0005,
+            ProposalType::ExternalInit => 0x0006,
+            ProposalType::GroupContextExtensions => 0x0007,
+            ProposalType::Unknown(v) => v,
         }
     }
 }
 
-impl Deserializer for ProposalTypeCapability {
+impl Deserializer for ProposalType {
     fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
@@ -67,7 +68,7 @@ impl Deserializer for ProposalTypeCapability {
     }
 }
 
-impl Serializer for ProposalTypeCapability {
+impl Serializer for ProposalType {
     fn serialize<B>(&self, buf: &mut B) -> Result<()>
     where
         Self: Sized,
@@ -107,26 +108,20 @@ impl Deserializer for Proposal {
         let proposal = buf.get_u16().into();
 
         match proposal {
-            ProposalTypeCapability::Add => Ok(Proposal::Add(AddProposal::deserialize(buf)?)),
-            ProposalTypeCapability::Update => {
-                Ok(Proposal::Update(UpdateProposal::deserialize(buf)?))
-            }
-            ProposalTypeCapability::Remove => {
-                Ok(Proposal::Remove(RemoveProposal::deserialize(buf)?))
-            }
-            ProposalTypeCapability::PreSharedKey => Ok(Proposal::PreSharedKey(
+            ProposalType::Add => Ok(Proposal::Add(AddProposal::deserialize(buf)?)),
+            ProposalType::Update => Ok(Proposal::Update(UpdateProposal::deserialize(buf)?)),
+            ProposalType::Remove => Ok(Proposal::Remove(RemoveProposal::deserialize(buf)?)),
+            ProposalType::PreSharedKey => Ok(Proposal::PreSharedKey(
                 PreSharedKeyProposal::deserialize(buf)?,
             )),
-            ProposalTypeCapability::ReInit => {
-                Ok(Proposal::ReInit(ReInitProposal::deserialize(buf)?))
-            }
-            ProposalTypeCapability::ExternalInit => Ok(Proposal::ExternalInit(
+            ProposalType::ReInit => Ok(Proposal::ReInit(ReInitProposal::deserialize(buf)?)),
+            ProposalType::ExternalInit => Ok(Proposal::ExternalInit(
                 ExternalInitProposal::deserialize(buf)?,
             )),
-            ProposalTypeCapability::GroupContextExtensions => Ok(Proposal::GroupContextExtensions(
+            ProposalType::GroupContextExtensions => Ok(Proposal::GroupContextExtensions(
                 GroupContextExtensionsProposal::deserialize(buf)?,
             )),
-            ProposalTypeCapability::Unknown(v) => Err(Error::InvalidProposalTypeValue(v)),
+            ProposalType::Unknown(v) => Err(Error::InvalidProposalTypeValue(v)),
         }
     }
 }
@@ -139,31 +134,31 @@ impl Serializer for Proposal {
     {
         match self {
             Proposal::Add(proposal) => {
-                buf.put_u16(ProposalTypeCapability::Add.into());
+                buf.put_u16(ProposalType::Add.into());
                 proposal.serialize(buf)
             }
             Proposal::Update(proposal) => {
-                buf.put_u16(ProposalTypeCapability::Update.into());
+                buf.put_u16(ProposalType::Update.into());
                 proposal.serialize(buf)
             }
             Proposal::Remove(proposal) => {
-                buf.put_u16(ProposalTypeCapability::Remove.into());
+                buf.put_u16(ProposalType::Remove.into());
                 proposal.serialize(buf)
             }
             Proposal::PreSharedKey(proposal) => {
-                buf.put_u16(ProposalTypeCapability::PreSharedKey.into());
+                buf.put_u16(ProposalType::PreSharedKey.into());
                 proposal.serialize(buf)
             }
             Proposal::ReInit(proposal) => {
-                buf.put_u16(ProposalTypeCapability::ReInit.into());
+                buf.put_u16(ProposalType::ReInit.into());
                 proposal.serialize(buf)
             }
             Proposal::ExternalInit(proposal) => {
-                buf.put_u16(ProposalTypeCapability::ExternalInit.into());
+                buf.put_u16(ProposalType::ExternalInit.into());
                 proposal.serialize(buf)
             }
             Proposal::GroupContextExtensions(proposal) => {
-                buf.put_u16(ProposalTypeCapability::GroupContextExtensions.into());
+                buf.put_u16(ProposalType::GroupContextExtensions.into());
                 proposal.serialize(buf)
             }
         }

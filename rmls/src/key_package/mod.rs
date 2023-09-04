@@ -10,6 +10,7 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
+use crate::extensibility::Extensions;
 use crate::framing::*;
 use crate::key_schedule::*;
 use crate::ratchet_tree::*;

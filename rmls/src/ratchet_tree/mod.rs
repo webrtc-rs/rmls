@@ -526,11 +526,11 @@ impl LeafNode {
         for et in &self.capabilities.extensions {
             supported_exts.insert(*et);
         }
-        for ext in &self.extensions.0 {
-            if !supported_exts.contains(&ext.extension_type) {
+        for ext in self.extensions.extensions() {
+            if !supported_exts.contains(&ext.extension_type()) {
                 return Err(
                     Error::ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(
-                        ext.extension_type.into(),
+                        ext.extension_type().into(),
                     ),
                 );
             }

@@ -228,7 +228,7 @@ impl Serializer for Welcome {
 impl Welcome {
     fn find_secret(&self, r: &KeyPackageRef) -> Option<&EncryptedGroupSecrets> {
         for (i, sec) in self.secrets.iter().enumerate() {
-            if sec.new_member == r {
+            if &sec.new_member == r {
                 return Some(&self.secrets[i]);
             }
         }
@@ -311,7 +311,7 @@ impl Deserializer for EncryptedGroupSecrets {
         Self: Sized,
         B: Buf,
     {
-        let new_member = deserialize_opaque_vec(buf)?;
+        let new_member = KeyPackageRef::deserialize(buf)?;
         let encrypted_group_secrets = HPKECiphertext::deserialize(buf)?;
 
         Ok(Self {
@@ -327,7 +327,7 @@ impl Serializer for EncryptedGroupSecrets {
         Self: Sized,
         B: BufMut,
     {
-        serialize_opaque_vec(&self.new_member, buf)?;
+        self.new_member.serialize(buf)?;
         self.encrypted_group_secrets.serialize(buf)
     }
 }

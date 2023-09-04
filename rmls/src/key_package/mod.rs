@@ -8,6 +8,7 @@
 //! 3. the content of the leaf node that should be added to the tree to represent this client.
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::ops::Deref;
 
 use crate::crypto::{cipher_suite::*, provider::CryptoProvider, *};
 use crate::extensibility::Extensions;
@@ -17,7 +18,36 @@ use crate::ratchet_tree::*;
 use crate::utilities::{error::*, serde::*};
 
 /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) KeyPackageRef
-pub type KeyPackageRef = Bytes;
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct KeyPackageRef(Bytes);
+
+impl Deref for KeyPackageRef {
+    type Target = Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Deserializer for KeyPackageRef {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        Ok(KeyPackageRef(deserialize_opaque_vec(buf)?))
+    }
+}
+
+impl Serializer for KeyPackageRef {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.0, buf)
+    }
+}
 
 /// [RFC9420 Sec.10](https://www.rfc-editor.org/rfc/rfc9420.html#section-10) KeyPackage
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -124,6 +154,10 @@ impl KeyPackage {
         self.serialize(&mut buf)?;
         let raw = buf.freeze();
 
-        crypto_provider.ref_hash(self.cipher_suite, b"MLS 1.0 KeyPackage Reference", &raw)
+        Ok(KeyPackageRef(crypto_provider.ref_hash(
+            self.cipher_suite,
+            b"MLS 1.0 KeyPackage Reference",
+            &raw,
+        )?))
     }
 }

@@ -5,8 +5,12 @@ use crate::framing::welcome::Welcome;
 use crate::framing::GroupID;
 use crate::group::config::GroupConfig;
 use crate::group::*;
+use crate::key_package::KeyPackage;
 use crate::ratchet_tree::RatchetTree;
 use crate::utilities::error::*;
+use crate::utilities::serde::*;
+
+use crate::crypto::{HPKEPrivateKey, SecretKey};
 use bytes::Bytes;
 
 impl Group {
@@ -34,11 +38,32 @@ impl Group {
     }
 
     pub fn from_welcome(
-        _crypto_provider: &impl CryptoProvider,
+        crypto_provider: &impl CryptoProvider,
         _group_config: GroupConfig,
-        _welcome: Welcome,
+        welcome: Welcome,
         _ratchet_tree: Option<RatchetTree>,
     ) -> Result<Self> {
+        let key_package = KeyPackage::deserialize_exact(
+            &welcome
+                .secrets()
+                .iter()
+                .find_map(|egs| crypto_provider.key_store().retrieve(egs.new_member()))
+                .ok_or(Error::NoMatchingKeyPackage)?,
+        )?;
+        crypto_provider
+            .key_store()
+            .delete(&*key_package.generate_ref(crypto_provider)?);
+
+        let _private_key: HPKEPrivateKey = SecretKey::deserialize_exact(
+            &crypto_provider
+                .key_store()
+                .retrieve(&key_package.payload.init_key)
+                .ok_or(Error::NoMatchingKeyPackage)?,
+        )?;
+        crypto_provider
+            .key_store()
+            .delete(&key_package.payload.init_key);
+
         Ok(Self::default())
     }
 }

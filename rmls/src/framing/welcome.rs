@@ -59,6 +59,11 @@ impl Serializer for Welcome {
 }
 
 impl Welcome {
+    /// Return the encrypted group secrets in this Welcome message.
+    pub fn secrets(&self) -> &[EncryptedGroupSecrets] {
+        self.secrets.as_ref()
+    }
+
     /// Find EncryptedGroupSecrets based on a KeyPackageRef
     pub fn find_secret(&self, r: &KeyPackageRef) -> Option<&EncryptedGroupSecrets> {
         for (i, sec) in self.secrets.iter().enumerate() {

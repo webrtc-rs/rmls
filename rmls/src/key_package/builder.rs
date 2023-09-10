@@ -59,7 +59,7 @@ impl KeyPackageBuilder {
         )?;
 
         crypto_provider.key_store().store(
-            &*(key_package.generate_ref(crypto_provider)?),
+            &*key_package.generate_ref(crypto_provider)?,
             &key_package.serialize_detached()?,
         )?;
 
@@ -68,9 +68,10 @@ impl KeyPackageBuilder {
             &encryption_key_pair.serialize_detached()?,
         )?;
 
-        crypto_provider
-            .key_store()
-            .store(&key_package.payload.init_key, &init_private_key)?;
+        crypto_provider.key_store().store(
+            &key_package.payload.init_key,
+            &init_private_key.serialize_detached()?,
+        )?;
 
         Ok(key_package)
     }

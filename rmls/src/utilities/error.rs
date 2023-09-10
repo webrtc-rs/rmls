@@ -145,6 +145,8 @@ pub enum Error {
     PaddingContainsNonZeroBytes,
     #[error("invalid protocol version {0}")]
     InvalidProtocolVersion(u16),
+    #[error("no matching key package")]
+    NoMatchingKeyPackage,
 
     #[error("serde_json error: {0}")]
     SerdeJson(#[from] serde_json::Error),

@@ -2,7 +2,7 @@ use bytes::Bytes;
 use rand_core::SeedableRng;
 use signature::{Signer, Verifier};
 
-use crate::crypto::{key_pair::SignatureKeyPair, provider::SignatureScheme, SignaturePublicKey};
+use crate::crypto::{key_pair::SignatureKeyPair, provider::SignatureScheme, SecretKey};
 use crate::utilities::error::*;
 
 #[allow(non_camel_case_types)]
@@ -20,8 +20,8 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                 let (private_key, public_key) =
                     signing_key.split_at(ed25519_dalek::SECRET_KEY_LENGTH);
                 Ok(SignatureKeyPair {
-                    private_key: Bytes::from(private_key.to_vec()),
-                    public_key: SignaturePublicKey(Bytes::from(public_key.to_vec())),
+                    private_key: SecretKey(Bytes::from(private_key.to_vec())),
+                    public_key: SecretKey(Bytes::from(public_key.to_vec())),
                     signature_scheme: self.0,
                 })
             }
@@ -33,8 +33,8 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                     signing_key.verifying_key().to_sec1_bytes(),
                 );
                 Ok(SignatureKeyPair {
-                    private_key: Bytes::from(private_key.to_vec()),
-                    public_key: SignaturePublicKey(Bytes::from(public_key.to_vec())),
+                    private_key: SecretKey(Bytes::from(private_key.to_vec())),
+                    public_key: SecretKey(Bytes::from(public_key.to_vec())),
                     signature_scheme: self.0,
                 })
             }
@@ -46,8 +46,8 @@ impl crate::crypto::provider::Signature for SignatureSchemeWrapper {
                     signing_key.verifying_key().to_sec1_bytes(),
                 );
                 Ok(SignatureKeyPair {
-                    private_key: Bytes::from(private_key.to_vec()),
-                    public_key: SignaturePublicKey(Bytes::from(public_key.to_vec())),
+                    private_key: SecretKey(Bytes::from(private_key.to_vec())),
+                    public_key: SecretKey(Bytes::from(public_key.to_vec())),
                     signature_scheme: self.0,
                 })
             }

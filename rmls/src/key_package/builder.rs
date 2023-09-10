@@ -39,7 +39,23 @@ impl KeyPackageBuilder {
         self
     }
 
-    /*TODO(yngrtc): pub fn build(self) -> Result<KeyPackage> {
-
-    }*/
+    /// Finalize and build the key package
+    pub fn build(
+        self,
+        crypto_provider: &impl CryptoProvider,
+        crypto_config: CryptoConfig,
+        credential: Credential,
+        signature_key_pair: &SignatureKeyPair,
+    ) -> Result<(KeyPackage, EncryptionKeyPair, HPKEPrivateKey)> {
+        KeyPackage::new(
+            crypto_provider,
+            crypto_config,
+            credential,
+            signature_key_pair,
+            self.key_package_lifetime.unwrap_or_default(),
+            self.key_package_extensions.unwrap_or_default(),
+            self.leaf_node_capabilities.unwrap_or_default(),
+            self.leaf_node_extensions.unwrap_or_default(),
+        )
+    }
 }

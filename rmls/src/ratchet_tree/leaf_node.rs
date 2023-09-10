@@ -4,7 +4,7 @@ use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::crypto::config::CryptoConfig;
-use crate::crypto::key_pair::SignatureKeyPair;
+use crate::crypto::key_pair::{EncryptionKeyPair, SignatureKeyPair};
 use crate::crypto::{cipher_suite::*, credential::*, provider::CryptoProvider, *};
 use crate::extensibility::*;
 use crate::framing::*;
@@ -399,7 +399,7 @@ impl LeafNode {
         capabilities: Capabilities,
         extensions: Extensions,
         tree_info_tbs: TreeInfoTBS,
-    ) -> Result<Self> {
+    ) -> Result<(Self, EncryptionKeyPair)> {
         let mut ikm = vec![0u8; crypto_provider.hash(crypto_config.cipher_suite)?.size()];
         crypto_provider.rand().fill(&mut ikm)?;
         let encryption_key_pair = crypto_provider
@@ -427,7 +427,7 @@ impl LeafNode {
             &leaf_node_tbs.serialize_detached()?,
         )?;
 
-        Ok(Self { payload, signature })
+        Ok((Self { payload, signature }, encryption_key_pair))
     }
 
     /// Verify the signature of the leaf node.

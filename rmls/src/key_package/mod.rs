@@ -12,6 +12,7 @@ pub mod builder;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::ops::Deref;
 
+use crate::crypto::key_pair::EncryptionKeyPair;
 use crate::crypto::{
     cipher_suite::*, config::CryptoConfig, credential::Credential, key_pair::SignatureKeyPair,
     provider::CryptoProvider, *,
@@ -22,6 +23,8 @@ use crate::key_package::builder::KeyPackageBuilder;
 use crate::key_schedule::*;
 use crate::ratchet_tree::leaf_node::*;
 use crate::utilities::{error::*, serde::*};
+
+const KEY_PACKAGE_SIGNATURE_LABEL: &str = "KeyPackageTBS";
 
 /// [RFC9420 Sec.5.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-5.2) KeyPackageRef
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -146,13 +149,13 @@ impl KeyPackage {
     pub(crate) fn new(
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
-        _credential: Credential,
+        credential: Credential,
         signature_key_pair: &SignatureKeyPair,
         key_package_lifetime: Lifetime,
         key_package_extensions: Extensions,
         leaf_node_capabilities: Capabilities,
         leaf_node_extensions: Extensions,
-    ) -> Result<Self> {
+    ) -> Result<(Self, EncryptionKeyPair, HPKEPrivateKey)> {
         if crypto_provider
             .signature(crypto_config.cipher_suite)?
             .signature_scheme()
@@ -164,25 +167,64 @@ impl KeyPackage {
         // Create a new HPKE key pair
         let mut ikm = vec![0u8; crypto_provider.hash(crypto_config.cipher_suite)?.size()];
         crypto_provider.rand().fill(&mut ikm)?;
-        let _init_key = crypto_provider
+        let init_key = crypto_provider
             .hpke(crypto_config.cipher_suite)?
             .kem_derive_key_pair(&ikm)?;
 
-        Ok(Self::default())
+        let (key_package, encryption_key_pair) = Self::from_keys(
+            crypto_provider,
+            crypto_config,
+            credential,
+            signature_key_pair,
+            key_package_lifetime,
+            key_package_extensions,
+            leaf_node_capabilities,
+            leaf_node_extensions,
+            init_key.public_key,
+        )?;
+
+        Ok((key_package, encryption_key_pair, init_key.private_key))
     }
 
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_keys(
-        _crypto_provider: &impl CryptoProvider,
-        _crypto_config: CryptoConfig,
-        _credential: Credential,
-        _init_key: HPKEPublicKey,
+        crypto_provider: &impl CryptoProvider,
+        crypto_config: CryptoConfig,
+        credential: Credential,
+        signature_key_pair: &SignatureKeyPair,
         key_package_lifetime: Lifetime,
         key_package_extensions: Extensions,
         leaf_node_capabilities: Capabilities,
         leaf_node_extensions: Extensions,
-    ) -> Result<Self> {
-        Ok(Self::default())
+        init_key: HPKEPublicKey,
+    ) -> Result<(Self, EncryptionKeyPair)> {
+        let (leaf_node, encryption_key_pair) = LeafNode::new(
+            crypto_provider,
+            crypto_config,
+            credential,
+            signature_key_pair,
+            LeafNodeSource::KeyPackage(key_package_lifetime),
+            leaf_node_capabilities,
+            leaf_node_extensions,
+            TreeInfoTBS::KeyPackage,
+        )?;
+
+        let payload = KeyPackageTBS {
+            version: crypto_config.version,
+            cipher_suite: crypto_config.cipher_suite,
+            init_key,
+            leaf_node,
+            extensions: key_package_extensions,
+        };
+
+        let signature = crypto_provider.sign_with_label(
+            crypto_config.cipher_suite,
+            &signature_key_pair.public_key,
+            KEY_PACKAGE_SIGNATURE_LABEL.as_bytes(),
+            &payload.serialize_detached()?,
+        )?;
+
+        Ok((Self { payload, signature }, encryption_key_pair))
     }
 
     fn verify_signature(&self, crypto_provider: &impl CryptoProvider) -> Result<()> {
@@ -192,7 +234,7 @@ impl KeyPackage {
         crypto_provider.verify_with_label(
             self.payload.cipher_suite,
             &self.payload.leaf_node.payload.signature_key,
-            b"KeyPackageTBS",
+            KEY_PACKAGE_SIGNATURE_LABEL.as_bytes(),
             &raw,
             &self.signature,
         )

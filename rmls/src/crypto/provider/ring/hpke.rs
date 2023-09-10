@@ -33,15 +33,15 @@ impl provider::Hpke for HpkeSuiteWrapper {
             provider::Kem::KEM_X25519_HKDF_SHA256 => {
                 let (private_key, public_key) = hpke::kem::X25519HkdfSha256::derive_keypair(ikm);
                 Ok(HPKEKeyPair {
-                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
-                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                    private_key: SecretKey(Bytes::from(private_key.to_bytes().to_vec())),
+                    public_key: SecretKey(Bytes::from(public_key.to_bytes().to_vec())),
                 })
             }
             provider::Kem::KEM_P256_HKDF_SHA256 => {
                 let (private_key, public_key) = hpke::kem::DhP256HkdfSha256::derive_keypair(ikm);
                 Ok(HPKEKeyPair {
-                    private_key: Bytes::from(private_key.to_bytes().to_vec()),
-                    public_key: HPKEPublicKey(Bytes::from(public_key.to_bytes().to_vec())),
+                    private_key: SecretKey(Bytes::from(private_key.to_bytes().to_vec())),
+                    public_key: SecretKey(Bytes::from(public_key.to_bytes().to_vec())),
                 })
             }
             _ => Err(Error::UnsupportedKem),

@@ -10,7 +10,7 @@ use std::ops::Deref;
 
 use crate::crypto::credential::{Credential, CredentialType};
 use crate::crypto::{HPKEPublicKey, SignaturePublicKey};
-use crate::group::proposal::ProposalType;
+use crate::framing::proposal::ProposalType;
 use crate::ratchet_tree::RatchetTree;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;

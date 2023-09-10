@@ -9,6 +9,8 @@ use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;
 
 use bytes::{Buf, BufMut, Bytes};
+use std::collections::HashSet;
+use std::iter::zip;
 
 // http://www.iana.org/assignments/mls/mls.xhtml#mls-proposal-types
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
@@ -417,4 +419,114 @@ impl Serializer for ProposalOrRef {
             }
         }
     }
+}
+
+// verifyProposalList ensures that a list of proposals passes the checks for a
+// regular commit described in section 12.2.
+//
+// It does not perform all checks:
+//
+//   - It does not check the validity of individual proposals (section 12.1).
+//   - It does not check whether members in add proposals are already part of
+//     the group.
+//   - It does not check whether non-default proposal types are supported by
+//     all members of the group who will process the commit.
+//   - It does not check whether the ratchet tree is valid after processing the
+//     commit.
+pub fn verify_proposal_list(
+    proposals: &[Proposal],
+    senders: &[LeafIndex],
+    committer: LeafIndex,
+) -> Result<()> {
+    if proposals.len() != senders.len() {
+        return Err(Error::ProposalsLenNotMatchSendersLen);
+    }
+
+    #[allow(clippy::mutable_key_type)]
+    let mut add_proposals = HashSet::new();
+    let mut update_or_remove_proposals = HashSet::new();
+    let mut psk_proposals = HashSet::new();
+
+    let mut group_context_extensions = false;
+    for (prop, sender) in zip(proposals, senders) {
+        match prop {
+            Proposal::Add(proposal) => {
+                if add_proposals
+                    .contains(&proposal.key_package.payload.leaf_node.payload.signature_key)
+                {
+                    return Err(Error::MultipleAddProposalsHaveTheSameSignatureKey);
+                }
+                add_proposals.insert(
+                    proposal
+                        .key_package
+                        .payload
+                        .leaf_node
+                        .payload
+                        .signature_key
+                        .clone(),
+                );
+            }
+
+            Proposal::Update(_) => {
+                if sender == &committer {
+                    return Err(Error::UpdateProposalGeneratedByTheCommitter);
+                }
+                if update_or_remove_proposals.contains(sender) {
+                    return Err(Error::MultipleUpdateRemoveProposalsApplyToTheSameLeaf);
+                }
+                update_or_remove_proposals.insert(*sender);
+            }
+            Proposal::Remove(proposal) => {
+                if proposal.removed == committer {
+                    return Err(Error::RemoveProposalRemovesTheCommitter);
+                }
+                if update_or_remove_proposals.contains(&proposal.removed) {
+                    return Err(Error::MultipleUpdateRemoveProposalsApplyToTheSameLeaf);
+                }
+                update_or_remove_proposals.insert(proposal.removed);
+            }
+            Proposal::PreSharedKey(proposal) => {
+                let psk = proposal.psk.serialize_detached()?;
+                if psk_proposals.contains(&psk) {
+                    return Err(Error::MultiplePSKProposalsReferenceTheSamePSKId);
+                }
+                psk_proposals.insert(psk);
+            }
+            Proposal::GroupContextExtensions(_) => {
+                if group_context_extensions {
+                    return Err(Error::MultipleGroupContextExtensionsProposals);
+                }
+                group_context_extensions = true;
+            }
+            Proposal::ReInit(_) => {
+                if proposals.len() > 1 {
+                    return Err(Error::ReinitProposalTogetherWithAnyOtherProposal);
+                }
+            }
+            Proposal::ExternalInit(_) => {
+                return Err(Error::ExternalInitProposalNotAllowed);
+            }
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn proposal_list_needs_path(proposals: &[Proposal]) -> bool {
+    if proposals.is_empty() {
+        return true;
+    }
+
+    for prop in proposals {
+        match prop {
+            Proposal::Update(_)
+            | Proposal::Remove(_)
+            | Proposal::ExternalInit(_)
+            | Proposal::GroupContextExtensions(_) => {
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    false
 }

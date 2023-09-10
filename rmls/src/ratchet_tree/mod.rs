@@ -16,7 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
 use crate::crypto::{cipher_suite::*, credential::*, provider::CryptoProvider, *};
-use crate::group::proposal::*;
+use crate::framing::proposal::*;
 use crate::key_schedule::*;
 use crate::ratchet_tree::leaf_node::*;
 use crate::ratchet_tree::parent_node::*;

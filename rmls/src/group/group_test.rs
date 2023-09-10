@@ -7,7 +7,7 @@ use crate::crypto::provider::RingCryptoProvider;
 use crate::crypto::provider::RustCryptoProvider;
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
 use crate::extensibility::Extensions;
-use crate::framing::*;
+use crate::framing::{private_message::*, public_message::*, *};
 use crate::key_schedule::GroupContext;
 use crate::secret_tree::*;
 use crate::utilities::error::*;

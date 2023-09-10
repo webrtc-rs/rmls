@@ -39,14 +39,14 @@ impl KeyPackageBuilder {
         self
     }
 
-    /// Finalize and build the key package
+    /// Finalize and build the key package with Encryption and HPKE Key Pairs
     pub fn build(
         self,
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
         credential: Credential,
         signature_key_pair: &SignatureKeyPair,
-    ) -> Result<(KeyPackage, EncryptionKeyPair, HPKEPrivateKey)> {
+    ) -> Result<(KeyPackage, EncryptionKeyPair, HPKEKeyPair)> {
         KeyPackage::new(
             crypto_provider,
             crypto_config,

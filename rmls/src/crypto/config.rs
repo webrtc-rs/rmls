@@ -16,8 +16,7 @@ impl CryptoConfig {
 
 #[derive(Default, Debug, Copy, Clone)]
 pub struct CryptoConfigBuilder {
-    version: ProtocolVersion,
-    cipher_suite: CipherSuite,
+    crypto_config: CryptoConfig,
 }
 
 impl CryptoConfigBuilder {
@@ -28,21 +27,18 @@ impl CryptoConfigBuilder {
 
     /// Build with version
     pub fn with_version(mut self, version: ProtocolVersion) -> Self {
-        self.version = version;
+        self.crypto_config.version = version;
         self
     }
 
     /// Build with cipher suite
     pub fn with_cipher_suite(mut self, cipher_suite: CipherSuite) -> Self {
-        self.cipher_suite = cipher_suite;
+        self.crypto_config.cipher_suite = cipher_suite;
         self
     }
 
     /// Finalize and build the crypto config
     pub fn build(self) -> CryptoConfig {
-        CryptoConfig {
-            version: self.version,
-            cipher_suite: self.cipher_suite,
-        }
+        self.crypto_config
     }
 }

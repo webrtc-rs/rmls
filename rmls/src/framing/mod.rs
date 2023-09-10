@@ -6,7 +6,7 @@ mod framing_test;
 use bytes::{Buf, BufMut, Bytes};
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::group::{group_info::*, proposal::*, *};
+use crate::group::{info::*, proposal::*, *};
 use crate::key_package::KeyPackage;
 use crate::key_schedule::*;
 use crate::secret_tree::*;

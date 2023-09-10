@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::framing::MLSMessage;
-use crate::group::{group_info::*, proposal::*, Commit};
+use crate::group::{info::*, proposal::*, Commit};
 use crate::ratchet_tree::RatchetTree;
 use crate::utilities::error::*;
 use crate::utilities::serde::{serde_test::load_test_vector, *};

@@ -10,7 +10,8 @@
 #[cfg(test)]
 mod group_test;
 
-pub mod group_info;
+pub mod config;
+pub mod info;
 pub mod proposal;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -18,7 +19,7 @@ use std::collections::HashSet;
 use std::iter::zip;
 
 use crate::crypto::{cipher_suite::CipherSuite, provider::CryptoProvider};
-use crate::group::{group_info::*, proposal::*};
+use crate::group::{info::*, proposal::*};
 use crate::key_package::KeyPackageRef;
 use crate::key_schedule::extract_welcome_secret;
 use crate::ratchet_tree::*;

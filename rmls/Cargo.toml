@@ -10,7 +10,7 @@ homepage = "https://rmls.io"
 repository = "https://github.com/webrtc-rs/rmls"
 
 [features]
-default = ["RustCryptoProvider"]#, "RingCryptoProvider"]
+default = ["RustCryptoProvider", "RingCryptoProvider"]
 RingCryptoProvider = ["ring", "signature", "ecdsa", "p256", "p384"] #TODO: use "ring" only for RingCryptoProvider
 RustCryptoProvider = ["sha2", "hmac", "hkdf", "ed25519-dalek", "ecdsa", "sec1", "signature", "aead", "aes-gcm", "chacha20poly1305", "p256", "p384"]
 

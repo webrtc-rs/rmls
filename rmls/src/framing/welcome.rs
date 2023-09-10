@@ -59,7 +59,8 @@ impl Serializer for Welcome {
 }
 
 impl Welcome {
-    fn find_secret(&self, r: &KeyPackageRef) -> Option<&EncryptedGroupSecrets> {
+    /// Find EncryptedGroupSecrets based on a KeyPackageRef
+    pub fn find_secret(&self, r: &KeyPackageRef) -> Option<&EncryptedGroupSecrets> {
         for (i, sec) in self.secrets.iter().enumerate() {
             if &sec.new_member == r {
                 return Some(&self.secrets[i]);
@@ -162,5 +163,25 @@ impl Serializer for EncryptedGroupSecrets {
     {
         self.new_member.serialize(buf)?;
         self.encrypted_group_secrets.serialize(buf)
+    }
+}
+
+impl EncryptedGroupSecrets {
+    /// Create a new EncryptedGroupSecrets
+    pub fn new(new_member: KeyPackageRef, encrypted_group_secrets: HPKECiphertext) -> Self {
+        Self {
+            new_member,
+            encrypted_group_secrets,
+        }
+    }
+
+    /// Return KeyPackageRef of encrypted group secrets
+    pub fn new_member(&self) -> &KeyPackageRef {
+        &self.new_member
+    }
+
+    /// Return encrypted group secrets
+    pub fn encrypted_group_secrets(&self) -> &HPKECiphertext {
+        &self.encrypted_group_secrets
     }
 }

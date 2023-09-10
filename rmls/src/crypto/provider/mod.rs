@@ -8,8 +8,11 @@ mod provider_test;
 mod ring;
 #[cfg(feature = "RingCryptoProvider")]
 pub use self::ring::RingCryptoProvider;
+mod key_store;
+mod rand;
 #[cfg(feature = "RustCryptoProvider")]
 mod rust;
+
 #[cfg(feature = "RustCryptoProvider")]
 pub use self::rust::RustCryptoProvider;
 
@@ -58,6 +61,13 @@ pub enum SignatureScheme {
     ED25519 = 0x0807,
     /// ED448
     ED448 = 0x0808,
+}
+
+/// KeyStore trait provides the CRUD operations of Key
+pub trait KeyStore: Send + Sync {
+    fn store(&self, key: &Bytes, val: &Bytes) -> Result<()>;
+    fn retrieve(&self, key: &Bytes) -> Option<Bytes>;
+    fn delete(&self, key: &Bytes) -> Option<Bytes>;
 }
 
 /// Rand trait provides randomness
@@ -150,7 +160,10 @@ pub trait CryptoProvider {
     /// Return supported cipher suites
     fn supported(&self) -> Vec<CipherSuite>;
 
-    ///
+    /// Derive KeyStore trait object
+    fn key_store(&self) -> &dyn KeyStore;
+
+    /// Derive Rand trait object
     fn rand(&self) -> &dyn Rand;
 
     /// Derive Hash trait object based on the given cipher suite

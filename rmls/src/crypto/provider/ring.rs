@@ -1,13 +1,11 @@
 mod hash;
 mod hpke;
-mod rand;
 mod signature;
 
 use self::hash::HashSchemeWrapper;
 use self::hpke::HpkeSuiteWrapper;
-use self::rand::RandChacha;
 use self::signature::SignatureSchemeWrapper;
-use super::*;
+use super::{key_store::MemoryKeyStore, rand::RandChacha, *};
 use crate::crypto::*;
 
 struct CipherSuiteDescription {
@@ -93,6 +91,7 @@ static CIPHER_SUITE_DESCRIPTIONS: [CipherSuiteDescription; 7 /*CipherSuite::MLS_
 #[derive(Default, Debug)]
 pub struct RingCryptoProvider {
     rand: RandChacha,
+    key_store: MemoryKeyStore,
 }
 
 impl CryptoProvider for RingCryptoProvider {
@@ -111,6 +110,10 @@ impl CryptoProvider for RingCryptoProvider {
             CipherSuite::MLS_128_DHKEMX25519_CHACHA20POLY1305_SHA256_Ed25519,
             CipherSuite::MLS_128_DHKEMP256_AES128GCM_SHA256_P256,
         ]
+    }
+
+    fn key_store(&self) -> &dyn KeyStore {
+        &self.key_store
     }
 
     fn rand(&self) -> &dyn Rand {

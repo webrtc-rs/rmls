@@ -63,6 +63,38 @@ pub enum SignatureScheme {
     ED448 = 0x0808,
 }
 
+impl Deserializer for SignatureScheme {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        if buf.remaining() < 2 {
+            return Err(Error::BufferTooSmall);
+        }
+        let v = buf.get_u16();
+        match v {
+            0x0403 => Ok(SignatureScheme::ECDSA_SECP256R1_SHA256),
+            0x0503 => Ok(SignatureScheme::ECDSA_SECP384R1_SHA384),
+            0x0603 => Ok(SignatureScheme::ECDSA_SECP521R1_SHA512),
+            0x0807 => Ok(SignatureScheme::ED25519),
+            0x0808 => Ok(SignatureScheme::ED448),
+            _ => Err(Error::InvalidSignatureSchemeValue(v)),
+        }
+    }
+}
+
+impl Serializer for SignatureScheme {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        buf.put_u16(*self as u16);
+        Ok(())
+    }
+}
+
 /// KeyStore trait provides the CRUD operations of Key
 pub trait KeyStore: Send + Sync {
     fn store(&self, key: &Bytes, val: &Bytes) -> Result<()>;

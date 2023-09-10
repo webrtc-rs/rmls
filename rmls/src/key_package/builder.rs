@@ -39,15 +39,15 @@ impl KeyPackageBuilder {
         self
     }
 
-    /// Finalize and build the key package with Encryption and HPKE Key Pairs
+    /// Finalize, build the key package, and store keys in KeyStore
     pub fn build(
         self,
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
         credential: Credential,
         signature_key_pair: &SignatureKeyPair,
-    ) -> Result<(KeyPackage, EncryptionKeyPair, HPKEKeyPair)> {
-        KeyPackage::new(
+    ) -> Result<KeyPackage> {
+        let (key_package, encryption_key_pair, init_private_key) = KeyPackage::new(
             crypto_provider,
             crypto_config,
             credential,
@@ -56,6 +56,22 @@ impl KeyPackageBuilder {
             self.key_package_extensions.unwrap_or_default(),
             self.leaf_node_capabilities.unwrap_or_default(),
             self.leaf_node_extensions.unwrap_or_default(),
-        )
+        )?;
+
+        crypto_provider.key_store().store(
+            &*(key_package.generate_ref(crypto_provider)?),
+            &key_package.serialize_detached()?,
+        )?;
+
+        crypto_provider.key_store().store(
+            &encryption_key_pair.public_key,
+            &encryption_key_pair.serialize_detached()?,
+        )?;
+
+        crypto_provider
+            .key_store()
+            .store(&key_package.payload.init_key, &init_private_key)?;
+
+        Ok(key_package)
     }
 }

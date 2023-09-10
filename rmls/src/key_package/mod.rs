@@ -12,7 +12,7 @@ pub mod builder;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::ops::Deref;
 
-use crate::crypto::key_pair::{EncryptionKeyPair, HPKEKeyPair};
+use crate::crypto::key_pair::EncryptionKeyPair;
 use crate::crypto::{
     cipher_suite::*, config::CryptoConfig, credential::Credential, key_pair::SignatureKeyPair,
     provider::CryptoProvider, *,
@@ -155,7 +155,7 @@ impl KeyPackage {
         key_package_extensions: Extensions,
         leaf_node_capabilities: Capabilities,
         leaf_node_extensions: Extensions,
-    ) -> Result<(Self, EncryptionKeyPair, HPKEKeyPair)> {
+    ) -> Result<(Self, EncryptionKeyPair, HPKEPrivateKey)> {
         if crypto_provider
             .signature(crypto_config.cipher_suite)?
             .signature_scheme()
@@ -180,10 +180,10 @@ impl KeyPackage {
             key_package_extensions,
             leaf_node_capabilities,
             leaf_node_extensions,
-            init_key.public_key.clone(),
+            init_key.public_key,
         )?;
 
-        Ok((key_package, encryption_key_pair, init_key))
+        Ok((key_package, encryption_key_pair, init_key.private_key))
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -23,6 +23,8 @@ pub enum Error {
     InputContainsExcessBytes(usize),
     #[error("invalid sibling")]
     InvalidSibling,
+    #[error("invalid signature scheme value {0}")]
+    InvalidSignatureSchemeValue(u16),
     #[error("invalid leaf node source value {0}")]
     InvalidLeafNodeSourceValue(u8),
     #[error("invalid extension type value {0}")]

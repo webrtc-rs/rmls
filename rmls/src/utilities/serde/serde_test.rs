@@ -92,13 +92,13 @@ fn passive_client_test(
     check_encryption_key_pair(
         crypto_provider,
         cipher_suite,
-        &key_pkg.payload.leaf_node.encryption_key,
+        &key_pkg.payload.leaf_node.payload.encryption_key,
         &tc.encryption_priv,
     )?;
     check_signature_key_pair(
         crypto_provider,
         cipher_suite,
-        &key_pkg.payload.leaf_node.signature_key,
+        &key_pkg.payload.leaf_node.payload.signature_key,
         &tc.signature_priv,
     )?;
 
@@ -147,7 +147,7 @@ fn passive_client_test(
         .get_leaf(group_info.signer)
         .ok_or(Error::Other("signer node is blank".to_string()))?;
     assert!(group_info
-        .verify_signature(crypto_provider, &signer_node.signature_key)
+        .verify_signature(crypto_provider, &signer_node.payload.signature_key)
         .is_ok());
     assert!(group_info
         .verify_confirmation_tag(crypto_provider, &group_secrets.joiner_secret, &psk_secret)
@@ -206,7 +206,7 @@ fn passive_client_test(
             .verify_signature(
                 crypto_provider,
                 cipher_suite,
-                &sender_node.signature_key,
+                &sender_node.payload.signature_key,
                 &group_info.group_context
             )
             .is_ok());
@@ -266,7 +266,7 @@ fn passive_client_test(
         }
 
         if let Some(path) = &commit.path {
-            match path.leaf_node.leaf_node_source {
+            match path.leaf_node.payload.leaf_node_source {
                 LeafNodeSource::Commit(_) => {}
                 _ => assert!(false, "commit path leaf node source must be commit"),
             }
@@ -274,7 +274,7 @@ fn passive_client_test(
             // The same signature key can be re-used, but the encryption key
             // must change
             let (mut signature_keys, encryption_keys) = tree.keys();
-            signature_keys.remove(&sender_node.signature_key);
+            signature_keys.remove(&sender_node.payload.signature_key);
             assert!(path
                 .leaf_node
                 .verify(

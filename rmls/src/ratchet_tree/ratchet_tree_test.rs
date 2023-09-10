@@ -58,12 +58,17 @@ fn tree_validation_test(
     let group_id: GroupID = tc.group_id.clone().into();
     for (i, node) in tree.0.iter().enumerate() {
         if let Some(Node::Leaf(leaf_node)) = node {
-            let (li, ok) = NodeIndex(i as u32).leaf_index();
+            let (leaf_index, ok) = NodeIndex(i as u32).leaf_index();
             assert!(ok, "leafIndex({:?}) = false", i);
+
+            let tree_info_tbs = TreeInfoTBS::UpdateOrCommit(TreePosition {
+                group_id: group_id.clone(),
+                leaf_index,
+            });
             assert!(
-                leaf_node.verify_signature(crypto_provider, cipher_suite, &group_id, li),
+                leaf_node.verify_signature(crypto_provider, cipher_suite, tree_info_tbs),
                 "verify({:?}) = false",
-                li
+                leaf_index
             );
         }
     }

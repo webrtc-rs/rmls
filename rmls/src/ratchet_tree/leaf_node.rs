@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::ops::Add;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::crypto::config::CryptoConfig;
+use crate::crypto::key_pair::SignatureKeyPair;
 use crate::crypto::{cipher_suite::*, credential::*, provider::CryptoProvider, *};
 use crate::extensibility::*;
 use crate::framing::*;
@@ -10,6 +12,8 @@ use crate::group::proposal::*;
 use crate::utilities::error::*;
 use crate::utilities::serde::*;
 use crate::utilities::tree_math::*;
+
+const LEAF_NODE_SIGNATURE_LABEL: &str = "LeafNodeTBS";
 
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNodeSource
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
@@ -260,30 +264,18 @@ impl Lifetime {
     }
 }
 
-/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNode
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNodePayload
 #[derive(Default, Debug, Clone, Eq, PartialEq)]
-pub struct LeafNode {
+pub struct LeafNodePayload {
     pub encryption_key: HPKEPublicKey,
     pub signature_key: SignaturePublicKey,
     pub credential: Credential,
     pub capabilities: Capabilities,
     pub leaf_node_source: LeafNodeSource,
     pub extensions: Extensions,
-    pub signature: Bytes,
 }
 
-impl LeafNode {
-    fn serialize_base<B: BufMut>(&self, buf: &mut B) -> Result<()> {
-        serialize_opaque_vec(&self.encryption_key, buf)?;
-        serialize_opaque_vec(&self.signature_key, buf)?;
-        self.credential.serialize(buf)?;
-        self.capabilities.serialize(buf)?;
-        self.leaf_node_source.serialize(buf)?;
-        self.extensions.serialize(buf)
-    }
-}
-
-impl Deserializer for LeafNode {
+impl Deserializer for LeafNodePayload {
     fn deserialize<B>(buf: &mut B) -> Result<Self>
     where
         Self: Sized,
@@ -297,7 +289,6 @@ impl Deserializer for LeafNode {
         let leaf_node_source = LeafNodeSource::deserialize(buf)?;
 
         let extensions = Extensions::deserialize(buf)?;
-        let signature = deserialize_opaque_vec(buf)?;
 
         Ok(Self {
             encryption_key,
@@ -306,8 +297,42 @@ impl Deserializer for LeafNode {
             capabilities,
             leaf_node_source,
             extensions,
-            signature,
         })
+    }
+}
+
+impl Serializer for LeafNodePayload {
+    fn serialize<B>(&self, buf: &mut B) -> Result<()>
+    where
+        Self: Sized,
+        B: BufMut,
+    {
+        serialize_opaque_vec(&self.encryption_key, buf)?;
+        serialize_opaque_vec(&self.signature_key, buf)?;
+        self.credential.serialize(buf)?;
+        self.capabilities.serialize(buf)?;
+        self.leaf_node_source.serialize(buf)?;
+        self.extensions.serialize(buf)
+    }
+}
+
+/// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNode
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
+pub struct LeafNode {
+    pub payload: LeafNodePayload,
+    pub signature: Bytes,
+}
+
+impl Deserializer for LeafNode {
+    fn deserialize<B>(buf: &mut B) -> Result<Self>
+    where
+        Self: Sized,
+        B: Buf,
+    {
+        let payload = LeafNodePayload::deserialize(buf)?;
+        let signature = deserialize_opaque_vec(buf)?;
+
+        Ok(Self { payload, signature })
     }
 }
 
@@ -317,19 +342,28 @@ impl Serializer for LeafNode {
         Self: Sized,
         B: BufMut,
     {
-        self.serialize_base(buf)?;
+        self.payload.serialize(buf)?;
         serialize_opaque_vec(&self.signature, buf)
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) struct TreePosition {
+    pub(crate) group_id: GroupID,
+    pub(crate) leaf_index: LeafIndex,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum TreeInfoTBS {
+    KeyPackage,
+    UpdateOrCommit(TreePosition),
 }
 
 /// [RFC9420 Sec.7.2](https://www.rfc-editor.org/rfc/rfc9420.html#section-7.2) LeafNodeTBS
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LeafNodeTBS<'a> {
-    leaf_node: &'a LeafNode,
-
-    // for LEAF_NODE_SOURCE_UPDATE and LEAF_NODE_SOURCE_COMMIT
-    group_id: &'a GroupID,
-    leaf_index: LeafIndex,
+    payload: &'a LeafNodePayload,
+    tree_info_tbs: TreeInfoTBS,
 }
 
 impl<'a> Serializer for LeafNodeTBS<'a> {
@@ -338,20 +372,64 @@ impl<'a> Serializer for LeafNodeTBS<'a> {
         Self: Sized,
         B: BufMut,
     {
-        self.leaf_node.serialize_base(buf)?;
+        self.payload.serialize(buf)?;
 
-        match &self.leaf_node.leaf_node_source {
+        match &self.payload.leaf_node_source {
             LeafNodeSource::Update | LeafNodeSource::Commit(_) => {
-                serialize_opaque_vec(self.group_id, buf)?;
-                buf.put_u32(self.leaf_index.0);
+                if let TreeInfoTBS::UpdateOrCommit(tree_position) = &self.tree_info_tbs {
+                    serialize_opaque_vec(&tree_position.group_id, buf)?;
+                    buf.put_u32(tree_position.leaf_index.0);
+                }
             }
             _ => {}
         }
+
         Ok(())
     }
 }
 
 impl LeafNode {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn new(
+        crypto_provider: &impl CryptoProvider,
+        crypto_config: CryptoConfig,
+        credential: Credential,
+        signature_key_pair: &SignatureKeyPair,
+        leaf_node_source: LeafNodeSource,
+        capabilities: Capabilities,
+        extensions: Extensions,
+        tree_info_tbs: TreeInfoTBS,
+    ) -> Result<Self> {
+        let mut ikm = vec![0u8; crypto_provider.hash(crypto_config.cipher_suite)?.size()];
+        crypto_provider.rand().fill(&mut ikm)?;
+        let encryption_key_pair = crypto_provider
+            .hpke(crypto_config.cipher_suite)?
+            .kem_derive_key_pair(&ikm)?;
+
+        let payload = LeafNodePayload {
+            encryption_key: encryption_key_pair.public_key.clone(),
+            signature_key: signature_key_pair.public_key.clone(),
+            credential,
+            capabilities,
+            leaf_node_source,
+            extensions,
+        };
+
+        let leaf_node_tbs = LeafNodeTBS {
+            payload: &payload,
+            tree_info_tbs,
+        };
+
+        let signature = crypto_provider.sign_with_label(
+            crypto_config.cipher_suite,
+            &signature_key_pair.public_key,
+            LEAF_NODE_SIGNATURE_LABEL.as_bytes(),
+            &leaf_node_tbs.serialize_detached()?,
+        )?;
+
+        Ok(Self { payload, signature })
+    }
+
     /// Verify the signature of the leaf node.
     ///
     /// group_id and li can be left unspecified if the leaf node source is neither
@@ -360,13 +438,11 @@ impl LeafNode {
         &self,
         crypto_provider: &impl CryptoProvider,
         cipher_suite: CipherSuite,
-        group_id: &GroupID,
-        leaf_index: LeafIndex,
+        tree_info_tbs: TreeInfoTBS,
     ) -> bool {
         let tbs = LeafNodeTBS {
-            leaf_node: self,
-            group_id,
-            leaf_index,
+            payload: &self.payload,
+            tree_info_tbs,
         };
         let leaf_node_tbs = if let Ok(leaf_node_tbs) = tbs.serialize_detached() {
             leaf_node_tbs
@@ -376,8 +452,8 @@ impl LeafNode {
         crypto_provider
             .verify_with_label(
                 cipher_suite,
-                &self.signature_key,
-                "LeafNodeTBS".as_bytes(),
+                &self.payload.signature_key,
+                LEAF_NODE_SIGNATURE_LABEL.as_bytes(),
                 &leaf_node_tbs,
                 &self.signature,
             )
@@ -392,9 +468,12 @@ impl LeafNode {
         crypto_provider: &impl CryptoProvider,
         options: LeafNodeVerifyOptions<'_>,
     ) -> Result<()> {
-        let li = options.leaf_index;
-
-        if !self.verify_signature(crypto_provider, options.cipher_suite, options.group_id, li) {
+        let leaf_index = options.leaf_index;
+        let tree_info_tbs = TreeInfoTBS::UpdateOrCommit(TreePosition {
+            group_id: options.group_id.clone(),
+            leaf_index,
+        });
+        if !self.verify_signature(crypto_provider, options.cipher_suite, tree_info_tbs) {
             return Err(Error::LeafNodeSignatureVerificationFailed);
         }
 
@@ -402,14 +481,14 @@ impl LeafNode {
 
         if !options
             .supported_creds
-            .contains(&self.credential.credential_type())
+            .contains(&self.payload.credential.credential_type())
         {
             return Err(Error::CredentialTypeUsedByLeafNodeNotSupportedByAllMembers(
-                self.credential.credential_type().into(),
+                self.payload.credential.credential_type().into(),
             ));
         }
 
-        if let LeafNodeSource::KeyPackage(lifetime) = &self.leaf_node_source {
+        if let LeafNodeSource::KeyPackage(lifetime) = &self.payload.leaf_node_source {
             let t = (options.now)();
             if t > UNIX_EPOCH && !lifetime.verify(t) {
                 return Err(Error::LifetimeVerificationFailed);
@@ -417,10 +496,10 @@ impl LeafNode {
         }
 
         let mut supported_exts = HashSet::new();
-        for et in &self.capabilities.extensions {
+        for et in &self.payload.capabilities.extensions {
             supported_exts.insert(*et);
         }
-        for ext in self.extensions.extensions() {
+        for ext in self.payload.extensions.extensions() {
             if !supported_exts.contains(&ext.extension_type()) {
                 return Err(
                     Error::ExtensionTypeUsedByLeafNodeNotSupportedByThatLeafNode(
@@ -430,10 +509,13 @@ impl LeafNode {
             }
         }
 
-        if options.signature_keys.contains(&self.signature_key) {
+        if options.signature_keys.contains(&self.payload.signature_key) {
             return Err(Error::DuplicateSignatureKeyInRatchetTree);
         }
-        if options.encryption_keys.contains(&self.encryption_key) {
+        if options
+            .encryption_keys
+            .contains(&self.payload.encryption_key)
+        {
             return Err(Error::DuplicateEncryptionKeyInRatchetTree);
         }
 

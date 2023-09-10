@@ -369,7 +369,7 @@ impl RatchetTree {
         for li in 0..self.num_leaves().0 {
             if let Some(node) = self.get_leaf(LeafIndex(li)) {
                 num_members += 1;
-                for ct in &node.capabilities.credentials {
+                for ct in &node.payload.capabilities.credentials {
                     if let Some(count) = supported_creds_count.get_mut(ct) {
                         *count += 1;
                     } else {
@@ -397,8 +397,8 @@ impl RatchetTree {
         let mut encryption_keys = HashSet::new();
         for li in 0..self.num_leaves().0 {
             if let Some(node) = self.get_leaf(LeafIndex(li)) {
-                signature_keys.insert(node.signature_key.clone());
-                encryption_keys.insert(node.encryption_key.clone());
+                signature_keys.insert(node.payload.signature_key.clone());
+                encryption_keys.insert(node.payload.encryption_key.clone());
             }
         }
         (signature_keys, encryption_keys)
@@ -450,8 +450,8 @@ impl RatchetTree {
                     },
                 )?;
 
-                signature_keys.insert(node.signature_key.clone());
-                encryption_keys.insert(node.encryption_key.clone());
+                signature_keys.insert(node.payload.signature_key.clone());
+                encryption_keys.insert(node.payload.encryption_key.clone());
             }
         }
 
@@ -688,7 +688,7 @@ impl RatchetTree {
         for x in node_indices {
             if let Some(node) = self.get(*x) {
                 let h = match node {
-                    Node::Leaf(leaf_node) => match &leaf_node.leaf_node_source {
+                    Node::Leaf(leaf_node) => match &leaf_node.payload.leaf_node_source {
                         LeafNodeSource::Commit(parent_hash) => parent_hash,
                         _ => continue,
                     },
@@ -711,7 +711,7 @@ impl RatchetTree {
         for li in 0..self.num_leaves().0 {
             if let Some(n) = self.get_leaf(LeafIndex(li)) {
                 // Encryption keys are unique
-                if n.encryption_key != node.encryption_key {
+                if n.payload.encryption_key != node.payload.encryption_key {
                     continue;
                 }
 
@@ -927,7 +927,7 @@ impl RatchetTree {
         }
 
         if let (LeafNodeSource::Commit(parent_hash), Some(prev_parent_hash)) =
-            (&path.leaf_node.leaf_node_source, prev_parent_hash)
+            (&path.leaf_node.payload.leaf_node_source, prev_parent_hash)
         {
             if parent_hash != prev_parent_hash.as_ref() {
                 return Err(Error::ParentHashMismatchForUpdatePathLeafNode);

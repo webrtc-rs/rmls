@@ -105,10 +105,20 @@ pub fn verify_proposal_list(
     for (prop, sender) in zip(proposals, senders) {
         match prop {
             Proposal::Add(proposal) => {
-                if add_proposals.contains(&proposal.key_package.payload.leaf_node.signature_key) {
+                if add_proposals
+                    .contains(&proposal.key_package.payload.leaf_node.payload.signature_key)
+                {
                     return Err(Error::MultipleAddProposalsHaveTheSameSignatureKey);
                 }
-                add_proposals.insert(proposal.key_package.payload.leaf_node.signature_key.clone());
+                add_proposals.insert(
+                    proposal
+                        .key_package
+                        .payload
+                        .leaf_node
+                        .payload
+                        .signature_key
+                        .clone(),
+                );
             }
 
             Proposal::Update(_) => {

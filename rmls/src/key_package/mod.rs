@@ -142,11 +142,16 @@ impl KeyPackage {
         KeyPackageBuilder::new()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         crypto_provider: &impl CryptoProvider,
         crypto_config: CryptoConfig,
         _credential: Credential,
         signature_key_pair: &SignatureKeyPair,
+        key_package_lifetime: Lifetime,
+        key_package_extensions: Extensions,
+        leaf_node_capabilities: Capabilities,
+        leaf_node_extensions: Extensions,
     ) -> Result<Self> {
         if crypto_provider
             .signature(crypto_config.cipher_suite)?
@@ -166,11 +171,16 @@ impl KeyPackage {
         Ok(Self::default())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_keys(
         _crypto_provider: &impl CryptoProvider,
         _crypto_config: CryptoConfig,
         _credential: Credential,
         _init_key: HPKEPublicKey,
+        key_package_lifetime: Lifetime,
+        key_package_extensions: Extensions,
+        leaf_node_capabilities: Capabilities,
+        leaf_node_extensions: Extensions,
     ) -> Result<Self> {
         Ok(Self::default())
     }
@@ -181,7 +191,7 @@ impl KeyPackage {
         let raw = buf.freeze();
         crypto_provider.verify_with_label(
             self.payload.cipher_suite,
-            &self.payload.leaf_node.signature_key,
+            &self.payload.leaf_node.payload.signature_key,
             b"KeyPackageTBS",
             &raw,
             &self.signature,
@@ -196,14 +206,14 @@ impl KeyPackage {
         if self.payload.cipher_suite != ctx.cipher_suite {
             return Err(Error::CipherSuiteNotMatchGroupContext);
         }
-        if let LeafNodeSource::KeyPackage(_) = &self.payload.leaf_node.leaf_node_source {
+        if let LeafNodeSource::KeyPackage(_) = &self.payload.leaf_node.payload.leaf_node_source {
         } else {
             return Err(Error::KeyPackageContainsLeafNodeWithInvalidSource);
         }
         if self.verify_signature(crypto_provider).is_err() {
             return Err(Error::InvalidKeyPackageSignature);
         }
-        if self.payload.leaf_node.encryption_key == self.payload.init_key {
+        if self.payload.leaf_node.payload.encryption_key == self.payload.init_key {
             return Err(Error::KeyPackageEncryptionKeyAndInitKeyIdentical);
         }
         Ok(())
